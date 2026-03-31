@@ -1,0 +1,41 @@
+{
+	"name": "smartfin",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"dev:cf": "npm run build && wrangler dev .svelte-kit/cloudflare/_worker.js --local --port 5173",
+		"build": "vite build",
+		"preview": "wrangler dev .svelte-kit/cloudflare/_worker.js --port 4173",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"gen": "wrangler types",
+		"gen:ocr": "wrangler types --config workers/wrangler.ocr-consumer.jsonc",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate:local": "wrangler d1 migrations apply smartfin-db --local",
+		"db:migrate:remote": "wrangler d1 migrations apply smartfin-db --remote",
+		"db:seed:local": "wrangler d1 execute smartfin-db --local --file drizzle/seeds/local-customers.sql",
+		"deploy:ocr-consumer": "wrangler deploy --config workers/wrangler.ocr-consumer.jsonc"
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-cloudflare": "^7.2.6",
+		"@sveltejs/kit": "^2.50.2",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"autoprefixer": "^10.4.27",
+		"drizzle-kit": "^0.31.10",
+		"postcss": "^8.5.8",
+		"svelte": "^5.54.0",
+		"svelte-check": "^4.4.2",
+		"tailwindcss": "^3.4.19",
+		"typescript": "^5.9.3",
+		"vite": "^7.3.1",
+		"wrangler": "^4.63.0"
+	},
+	"dependencies": {
+		"better-auth": "^1.5.6",
+		"drizzle-orm": "^0.45.2",
+		"zod": "^4.3.6"
+	}
+}
