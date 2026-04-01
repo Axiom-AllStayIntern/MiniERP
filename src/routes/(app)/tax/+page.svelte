@@ -57,7 +57,7 @@
 			</select>
 		</label>
 		<div class="flex items-end">
-			<button class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white" type="submit">
+			<button class="rounded-lg bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white" type="submit">
 				Load Period
 			</button>
 		</div>
@@ -80,7 +80,7 @@
 			<p class="mt-2 text-xl font-semibold text-slate-900">
 				{(data.corporatePreview.effectiveRate * 100).toFixed(2)}%
 			</p>
-			<a class="mt-2 inline-block text-sm text-indigo-600 hover:text-indigo-500" href={`/tax/corporate?year=${data.year}`}>
+			<a class="mt-2 inline-block text-sm text-[var(--sf-green)] hover:text-[#2f5e2c]" href={`/tax/corporate?year=${data.year}`}>
 				Open Corporate Tax Detail
 			</a>
 		</article>
@@ -104,7 +104,7 @@
 						<td class="px-4 py-3">{money(data.gst.boxes[box.key])}</td>
 						<td class="px-4 py-3">
 							<a
-								class="text-indigo-600 hover:text-indigo-500"
+								class="text-[var(--sf-green)] hover:text-[#2f5e2c]"
 								href={`/tax/gst/${data.year}/${data.quarter}/box/${box.code}`}
 							>
 								View

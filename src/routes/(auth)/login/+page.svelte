@@ -16,7 +16,7 @@
 					type="text"
 					name="name"
 					required
-					class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-500 focus:ring-2"
+					class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-[var(--sf-green)] focus:ring-2"
 					placeholder="Aki"
 				/>
 			</label>
@@ -26,7 +26,7 @@
 					type="email"
 					name="email"
 					required
-					class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-500 focus:ring-2"
+					class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-[var(--sf-green)] focus:ring-2"
 					placeholder="name@company.com"
 				/>
 			</label>
@@ -34,7 +34,7 @@
 				Role
 				<select
 					name="role"
-					class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-indigo-500 focus:ring-2"
+					class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none ring-[var(--sf-green)] focus:ring-2"
 				>
 					<option value="owner">owner</option>
 					<option value="finance">finance</option>
@@ -44,7 +44,7 @@
 			</label>
 			<button
 				type="submit"
-				class="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+				class="w-full rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2f5e2c]"
 			>
 				Sign In
 			</button>

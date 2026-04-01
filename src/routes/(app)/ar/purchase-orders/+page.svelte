@@ -39,7 +39,7 @@
 		<input class="rounded border border-slate-300 px-3 py-2 text-sm" name="amount" type="number" step="0.01" placeholder="Amount" />
 		<input class="rounded border border-slate-300 px-3 py-2 text-sm" name="currency" value="SGD" />
 		<input class="rounded border border-slate-300 px-3 py-2 text-sm" name="date" type="date" />
-		<button class="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700 md:col-span-6" type="submit">
+		<button class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c] md:col-span-6" type="submit">
 			Add Purchase Order
 		</button>
 	</form>
@@ -72,7 +72,7 @@
 							<td class="px-4 py-3">{item.date ?? '--'}</td>
 							<td class="px-4 py-3">
 								<details>
-									<summary class="cursor-pointer text-indigo-600 hover:underline">Edit</summary>
+									<summary class="cursor-pointer text-[var(--sf-green)] hover:underline">Edit</summary>
 									<div class="mt-3 space-y-2 rounded border border-slate-200 bg-slate-50 p-3">
 										<form class="grid gap-2 md:grid-cols-2" method="POST" action="?/update">
 											<input type="hidden" name="purchaseOrderId" value={item.id} />
@@ -81,7 +81,7 @@
 											<input class="rounded border border-slate-300 px-2 py-1.5 text-xs" name="amount" type="number" step="0.01" value={item.amount ?? 0} />
 											<input class="rounded border border-slate-300 px-2 py-1.5 text-xs" name="currency" value={item.currency ?? 'SGD'} />
 											<input class="rounded border border-slate-300 px-2 py-1.5 text-xs md:col-span-2" name="date" type="date" value={item.date ?? ''} />
-											<button class="rounded bg-slate-900 px-2 py-1.5 text-xs text-white hover:bg-slate-700 md:col-span-2" type="submit">
+											<button class="rounded bg-[var(--sf-green)] px-2 py-1.5 text-xs text-white hover:bg-[#2f5e2c] md:col-span-2" type="submit">
 												Save Changes
 											</button>
 										</form>

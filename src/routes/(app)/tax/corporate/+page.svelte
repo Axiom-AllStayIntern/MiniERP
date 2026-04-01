@@ -23,7 +23,7 @@
 			/>
 		</label>
 		<div class="flex items-end">
-			<button class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white" type="submit">
+			<button class="rounded-lg bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white" type="submit">
 				Load Year
 			</button>
 		</div>
@@ -74,7 +74,7 @@
 			<li>Next 190,000 at {(data.corporate.bands.next190k * 100).toFixed(2)}%</li>
 			<li>Above 200,000 at {(data.corporate.bands.above200k * 100).toFixed(2)}%</li>
 		</ul>
-		<a class="mt-3 inline-block text-indigo-600 hover:text-indigo-500" href={`/tax?year=${data.year}&quarter=1`}>
+		<a class="mt-3 inline-block text-[var(--sf-green)] hover:text-[#2f5e2c]" href={`/tax?year=${data.year}&quarter=1`}>
 			Back to GST Summary
 		</a>
 	</section>

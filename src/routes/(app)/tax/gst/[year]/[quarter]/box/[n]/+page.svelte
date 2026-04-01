@@ -12,7 +12,7 @@
 	title={`GST Box ${data.box} Details`}
 	description={`Detailed data for ${data.year} Q${data.quarter}.`}
 >
-	<a class="inline-flex text-sm text-indigo-600 hover:text-indigo-500" href={`/tax?year=${data.year}&quarter=${data.quarter}`}>
+	<a class="inline-flex text-sm text-[var(--sf-green)] hover:text-[#2f5e2c]" href={`/tax?year=${data.year}&quarter=${data.quarter}`}>
 		Back to GST summary
 	</a>
 

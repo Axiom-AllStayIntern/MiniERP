@@ -56,7 +56,7 @@
 			<input type="checkbox" name="triggerOcr" value="true" checked />
 			Queue OCR after upload
 		</label>
-		<button class="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700 md:col-span-6" type="submit">
+		<button class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c] md:col-span-6" type="submit">
 			Upload Invoice File
 		</button>
 	</form>
@@ -93,7 +93,7 @@
 							<td class="px-4 py-3">{item.ocrConfidence ? `${(item.ocrConfidence * 100).toFixed(1)}%` : '--'}</td>
 							<td class="px-4 py-3">
 								<details>
-									<summary class="cursor-pointer text-indigo-600 hover:underline">Review / Actions</summary>
+									<summary class="cursor-pointer text-[var(--sf-green)] hover:underline">Review / Actions</summary>
 									<div class="mt-3 space-y-2 rounded border border-slate-200 bg-slate-50 p-3">
 										{#if item.rawParsed}
 											<pre class="max-h-52 overflow-auto rounded border border-slate-200 bg-white p-2 text-xs text-slate-600">{JSON.stringify(item.rawParsed, null, 2)}</pre>
@@ -114,14 +114,14 @@
 												<option value="confirmed">confirmed</option>
 												<option value="failed">failed</option>
 											</select>
-											<button class="rounded bg-slate-900 px-2 py-1.5 text-xs text-white hover:bg-slate-700 md:col-span-2" type="submit">
+											<button class="rounded bg-[var(--sf-green)] px-2 py-1.5 text-xs text-white hover:bg-[#2f5e2c] md:col-span-2" type="submit">
 												Confirm / Save
 											</button>
 										</form>
 										<div class="flex flex-wrap gap-2">
 											<form method="POST" action="?/retryQueue">
 												<input type="hidden" name="invoiceId" value={item.id} />
-												<button class="rounded border border-indigo-300 bg-indigo-50 px-2 py-1.5 text-xs text-indigo-700 hover:bg-indigo-100" type="submit">
+												<button class="rounded border border-indigo-300 bg-[var(--sf-green-soft)] px-2 py-1.5 text-xs text-[var(--sf-green)] hover:bg-indigo-100" type="submit">
 													Queue OCR
 												</button>
 											</form>

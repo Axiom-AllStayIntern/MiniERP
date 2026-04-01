@@ -15,7 +15,7 @@
 				<span class="text-slate-700">Customer</span>
 				<select
 					name="customerId"
-					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 					required
 				>
 					<option value="" disabled selected>Select a customer</option>
@@ -30,7 +30,7 @@
 				<input
 					name="name"
 					required
-					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 					placeholder="e.g. 2026 Q2 Sea Freight Project"
 				/>
 			</label>
@@ -39,7 +39,7 @@
 				<span class="text-slate-700">Status</span>
 				<select
 					name="status"
-					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 				>
 					<option value="active">active</option>
 					<option value="on_hold">on_hold</option>
@@ -52,7 +52,7 @@
 				<input
 					type="date"
 					name="startDate"
-					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 				/>
 			</label>
 
@@ -61,7 +61,7 @@
 				<input
 					type="date"
 					name="endDate"
-					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 				/>
 			</label>
 		</div>
@@ -71,13 +71,13 @@
 			<textarea
 				name="description"
 				rows="4"
-				class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+				class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 				placeholder="Add project background, goals, and notes."
 			></textarea>
 		</label>
 
 		<div class="flex gap-3">
-			<button class="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700" type="submit">
+			<button class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]" type="submit">
 				Create Project
 			</button>
 			<a class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/projects">

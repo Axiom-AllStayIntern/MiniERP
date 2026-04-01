@@ -61,7 +61,7 @@
 			<option value="void">void</option>
 		</select>
 		<input class="rounded border border-slate-300 px-3 py-2 text-sm md:col-span-2" name="currency" value="SGD" />
-		<button class="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700 md:col-span-5" type="submit">
+		<button class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c] md:col-span-5" type="submit">
 			Add Invoice
 		</button>
 	</form>
@@ -99,7 +99,7 @@
 							<td class="px-4 py-3">{item.status}</td>
 							<td class="px-4 py-3">
 								<details>
-									<summary class="cursor-pointer text-indigo-600 hover:underline">Edit</summary>
+									<summary class="cursor-pointer text-[var(--sf-green)] hover:underline">Edit</summary>
 									<div class="mt-3 space-y-2 rounded border border-slate-200 bg-slate-50 p-3">
 										<form class="grid gap-2 md:grid-cols-2" method="POST" action="?/update">
 											<input type="hidden" name="invoiceId" value={item.id} />
@@ -117,7 +117,7 @@
 												<option value="paid">paid</option>
 												<option value="void">void</option>
 											</select>
-											<button class="rounded bg-slate-900 px-2 py-1.5 text-xs text-white hover:bg-slate-700 md:col-span-2" type="submit">
+											<button class="rounded bg-[var(--sf-green)] px-2 py-1.5 text-xs text-white hover:bg-[#2f5e2c] md:col-span-2" type="submit">
 												Save Changes
 											</button>
 										</form>

@@ -12,7 +12,7 @@
 			<form class="flex flex-wrap gap-2" method="GET">
 				<select
 					name="status"
-					class="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+					class="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 					value={data.filters.status}
 				>
 					<option value="">All Statuses</option>
@@ -23,7 +23,7 @@
 
 				<select
 					name="customer_id"
-					class="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
+					class="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 					value={data.filters.customerId}
 				>
 					<option value="">All Customers</option>
@@ -42,7 +42,7 @@
 
 			<a
 				href="/projects/new"
-				class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700"
+				class="rounded-md bg-[var(--sf-green)] px-3 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]"
 			>
 				Create Project
 			</a>
@@ -77,7 +77,7 @@
 							<td class="px-4 py-3 text-slate-600">{project.startDate ?? '--'}</td>
 							<td class="px-4 py-3 text-slate-600">{project.updatedAt.slice(0, 10)}</td>
 							<td class="px-4 py-3">
-								<a class="text-indigo-600 hover:underline" href={`/projects/${project.id}`}>View Details</a>
+								<a class="text-[var(--sf-green)] hover:underline" href={`/projects/${project.id}`}>View Details</a>
 							</td>
 						</tr>
 					{/each}

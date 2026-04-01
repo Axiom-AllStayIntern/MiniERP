@@ -4,8 +4,48 @@
 
 :root {
 	color-scheme: light;
+	--sf-gold: #eabc3c;
+	--sf-green: #387234;
+	--sf-green-soft: #eef6ec;
+	--sf-gold-soft: #fdf7e2;
 }
 
 body {
-	@apply bg-slate-50 text-slate-900 antialiased;
+	@apply text-slate-900 antialiased;
+	background:
+		radial-gradient(circle at 10% 0%, rgba(234, 188, 60, 0.14) 0%, rgba(234, 188, 60, 0) 36%),
+		radial-gradient(circle at 90% 0%, rgba(56, 114, 52, 0.14) 0%, rgba(56, 114, 52, 0) 38%),
+		#f8fafc;
+}
+
+html {
+	/* Keep layout width stable whether page scrolls or not */
+	scrollbar-gutter: stable;
+	overflow-y: scroll;
+}
+
+@layer components {
+	.theme-shell {
+		@apply min-h-screen;
+		background: linear-gradient(180deg, rgba(255, 255, 255, 0.76) 0%, rgba(248, 250, 252, 0.92) 100%);
+	}
+
+	.theme-card {
+		@apply rounded-xl border bg-white shadow-sm;
+		border-color: rgba(56, 114, 52, 0.16);
+	}
+
+	.theme-accent {
+		color: var(--sf-green);
+	}
+
+	.theme-nav-active {
+		background-color: var(--sf-green);
+		color: #ffffff;
+	}
+
+	.theme-subnav-active {
+		background-color: var(--sf-gold);
+		color: #2f2512;
+	}
 }

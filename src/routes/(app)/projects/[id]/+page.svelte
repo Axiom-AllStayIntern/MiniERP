@@ -79,16 +79,16 @@
 	description={`Customer: ${data.customerName} | Status: ${data.project.status}`}
 >
 	<nav class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-		<a class="hover:text-indigo-600 hover:underline" href="/dashboard">Dashboard</a>
+		<a class="hover:text-[var(--sf-green)] hover:underline" href="/dashboard">Dashboard</a>
 		<span>/</span>
-		<a class="hover:text-indigo-600 hover:underline" href="/projects">Projects</a>
+		<a class="hover:text-[var(--sf-green)] hover:underline" href="/projects">Projects</a>
 		<span>/</span>
 		<span class="font-medium text-slate-800">{data.project.name}</span>
 	</nav>
 
 	<section class="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
 		<div>
-			<p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">Financial Overview</p>
+			<p class="text-xs font-semibold uppercase tracking-wide text-[var(--sf-green)]">Financial Overview</p>
 			<p class="mt-1 text-sm text-slate-500">
 				Click a metric card to open a detail window.
 			</p>
@@ -140,7 +140,7 @@
 
 	<section class="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
 		<div>
-			<p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">AR Document Submodules</p>
+			<p class="text-xs font-semibold uppercase tracking-wide text-[var(--sf-green)]">AR Document Submodules</p>
 			<p class="mt-1 text-sm text-slate-500">Operational document maintenance and data entry paths.</p>
 		</div>
 		<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -175,7 +175,7 @@
 					name="name"
 					required
 					value={data.project.name}
-					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 				/>
 			</label>
 
@@ -183,7 +183,7 @@
 				<span class="text-slate-700">Status</span>
 				<select
 					name="status"
-					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 					value={data.project.status}
 				>
 					<option value="active">active</option>
@@ -199,7 +199,7 @@
 					type="date"
 					name="startDate"
 					value={data.project.startDate ?? ''}
-					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 				/>
 			</label>
 
@@ -209,7 +209,7 @@
 					type="date"
 					name="endDate"
 					value={data.project.endDate ?? ''}
-					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 				/>
 			</label>
 		</div>
@@ -219,12 +219,12 @@
 			<textarea
 				name="description"
 				rows="4"
-				class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+				class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
 			>{data.project.description ?? ''}</textarea>
 		</label>
 
 		<div class="flex flex-wrap gap-3">
-			<button class="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700" type="submit">
+			<button class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]" type="submit">
 				Save Changes
 			</button>
 			<a class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/projects">
@@ -257,7 +257,7 @@
 	<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
 		<button
 			type="button"
-			class="absolute inset-0 bg-slate-900/40"
+			class="absolute inset-0 bg-[var(--sf-green)]/40"
 			aria-label="Close detail dialog"
 			onclick={closeDetail}
 		></button>

@@ -43,7 +43,7 @@
 			>
 				<h2 class="text-base font-semibold text-slate-900">{module.title}</h2>
 				<p class="mt-2 text-sm text-slate-600">{module.description}</p>
-				<p class="mt-4 text-sm font-medium text-indigo-600">Open module</p>
+				<p class="mt-4 text-sm font-medium text-[var(--sf-green)]">Open module</p>
 			</a>
 		{/each}
 	</section>

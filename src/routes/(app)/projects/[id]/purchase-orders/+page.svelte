@@ -9,18 +9,18 @@
 	description="This version supports manual PO entries for upcoming supplier invoice matching."
 >
 	<nav class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-		<a class="hover:text-indigo-600 hover:underline" href="/dashboard">Dashboard</a>
+		<a class="hover:text-[var(--sf-green)] hover:underline" href="/dashboard">Dashboard</a>
 		<span>/</span>
-		<a class="hover:text-indigo-600 hover:underline" href="/projects">Projects</a>
+		<a class="hover:text-[var(--sf-green)] hover:underline" href="/projects">Projects</a>
 		<span>/</span>
-		<a class="hover:text-indigo-600 hover:underline" href={`/projects/${data.project.id}`}>{data.project.name}</a>
+		<a class="hover:text-[var(--sf-green)] hover:underline" href={`/projects/${data.project.id}`}>{data.project.name}</a>
 		<span>/</span>
 		<span class="font-medium text-slate-800">Purchase Orders</span>
 	</nav>
 	<div class="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-2 text-xs">
 		<a class="rounded-md px-2 py-1 text-slate-600 hover:bg-slate-100" href={`/projects/${data.project.id}/contracts`}>Contracts</a>
 		<a class="rounded-md px-2 py-1 text-slate-600 hover:bg-slate-100" href={`/projects/${data.project.id}/quotations`}>Quotations</a>
-		<span class="rounded-md bg-indigo-600 px-2 py-1 font-medium text-white">Purchase Orders</span>
+		<span class="rounded-md bg-[var(--sf-green)] px-2 py-1 font-medium text-white">Purchase Orders</span>
 		<a class="rounded-md px-2 py-1 text-slate-600 hover:bg-slate-100" href={`/projects/${data.project.id}/expenses`}>Expenses</a>
 	</div>
 	{#if form?.message}
@@ -32,7 +32,7 @@
 		<input class="rounded border border-slate-300 px-3 py-2 text-sm" name="amount" type="number" step="0.01" placeholder="Amount" />
 		<input class="rounded border border-slate-300 px-3 py-2 text-sm" name="currency" value="SGD" />
 		<input class="rounded border border-slate-300 px-3 py-2 text-sm" name="date" type="date" />
-		<button class="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700 md:col-span-5" type="submit">Add Purchase Order</button>
+		<button class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c] md:col-span-5" type="submit">Add Purchase Order</button>
 	</form>
 
 	<div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -52,7 +52,7 @@
 							<td class="px-4 py-3">{item.date ?? '--'}</td>
 							<td class="px-4 py-3">
 								<details>
-									<summary class="cursor-pointer text-indigo-600 hover:underline">Edit</summary>
+									<summary class="cursor-pointer text-[var(--sf-green)] hover:underline">Edit</summary>
 									<div class="mt-3 space-y-2 rounded border border-slate-200 bg-slate-50 p-3">
 										<form class="grid gap-2 md:grid-cols-2" method="POST" action="?/update">
 											<input type="hidden" name="purchaseOrderId" value={item.id} />
@@ -61,7 +61,7 @@
 											<input class="rounded border border-slate-300 px-2 py-1.5 text-xs" name="amount" type="number" step="0.01" value={item.amount ?? 0} />
 											<input class="rounded border border-slate-300 px-2 py-1.5 text-xs" name="currency" value={item.currency ?? 'SGD'} />
 											<input class="rounded border border-slate-300 px-2 py-1.5 text-xs md:col-span-2" name="date" type="date" value={item.date ?? ''} />
-											<button class="rounded bg-slate-900 px-2 py-1.5 text-xs text-white hover:bg-slate-700 md:col-span-2" type="submit">Save Changes</button>
+											<button class="rounded bg-[var(--sf-green)] px-2 py-1.5 text-xs text-white hover:bg-[#2f5e2c] md:col-span-2" type="submit">Save Changes</button>
 										</form>
 										<form method="POST" action="?/delete">
 											<input type="hidden" name="purchaseOrderId" value={item.id} />

@@ -68,6 +68,7 @@
 				From
 				<input
 					type="date"
+					lang="en-GB"
 					name="from"
 					value={data.filters.from}
 					class="mt-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -77,12 +78,13 @@
 				To
 				<input
 					type="date"
+					lang="en-GB"
 					name="to"
 					value={data.filters.to}
 					class="mt-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
 				/>
 			</label>
-			<button class="rounded-md bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700" type="submit">
+			<button class="rounded-md bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c]" type="submit">
 				Apply
 			</button>
 			<a

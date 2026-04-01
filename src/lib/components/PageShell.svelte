@@ -15,8 +15,8 @@
 </script>
 
 <section class="space-y-6">
-	<header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-		<p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{eyebrow}</p>
+	<header class="rounded-2xl border bg-white p-6 shadow-sm" style="border-color: rgba(56, 114, 52, 0.2);">
+		<p class="text-xs font-semibold uppercase tracking-wide" style="color: #387234;">{eyebrow}</p>
 		<h1 class="mt-2 text-2xl font-semibold text-slate-900">{title}</h1>
 		<p class="mt-2 text-sm text-slate-600">{description}</p>
 		{#if actions}

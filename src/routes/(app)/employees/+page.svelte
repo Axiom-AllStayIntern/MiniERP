@@ -9,7 +9,7 @@
 	description="Manage employee profiles and track monthly fixed salary records."
 >
 	<div class="flex items-center justify-end">
-		<a class="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700" href="/employees/new">
+		<a class="rounded-md bg-[var(--sf-green)] px-3 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]" href="/employees/new">
 			Create Employee
 		</a>
 	</div>
@@ -40,7 +40,7 @@
 							</td>
 							<td class="px-4 py-3 text-slate-600">{employee.startDate ?? '--'}</td>
 							<td class="px-4 py-3">
-								<a class="text-indigo-600 hover:underline" href={`/employees/${employee.id}`}>View Details</a>
+								<a class="text-[var(--sf-green)] hover:underline" href={`/employees/${employee.id}`}>View Details</a>
 							</td>
 						</tr>
 					{/each}

@@ -21,12 +21,12 @@
 	let { children, data } = $props();
 </script>
 
-<div class="min-h-screen bg-slate-50">
-	<header class="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+<div class="theme-shell">
+	<header class="sticky top-0 z-20 border-b bg-white/90 backdrop-blur" style="border-color: rgba(56, 114, 52, 0.2);">
 		<div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
 			<div class="flex items-center gap-3">
-				<a class="text-lg font-semibold text-slate-900" href="/dashboard">SmartFin</a>
-				<span class="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+				<a class="text-lg font-semibold theme-accent" href="/dashboard">SmartFin</a>
+				<span class="rounded-full px-2 py-0.5 text-xs font-medium" style="background: #fdf7e2; color: #7a5a07;">
 					Project Shell v1
 				</span>
 			</div>
@@ -36,8 +36,8 @@
 						<a
 							class={`rounded-md px-3 py-1.5 text-sm transition ${
 								page.url.pathname.startsWith(item.prefix)
-									? 'bg-slate-900 text-white'
-									: 'text-slate-600 hover:bg-slate-100'
+									? 'theme-nav-active'
+									: 'text-slate-600 hover:bg-[rgba(56,114,52,0.10)]'
 							}`}
 							href={item.href}
 						>
@@ -48,7 +48,7 @@
 				{#if data.user}
 					<div class="flex items-center gap-2 text-xs text-slate-600">
 						<span class="rounded-full bg-slate-100 px-2 py-1 font-medium">{data.user.email}</span>
-						<span class="rounded-full bg-indigo-50 px-2 py-1 font-medium text-indigo-700">{data.user.role}</span>
+						<span class="rounded-full px-2 py-1 font-medium" style="background: #eef6ec; color: #387234;">{data.user.role}</span>
 					</div>
 					<form method="POST" action="/auth/logout">
 						<button class="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100" type="submit">
@@ -60,14 +60,14 @@
 		</div>
 	</header>
 	{#if page.url.pathname.startsWith('/ar')}
-		<div class="border-b border-slate-200 bg-white">
+		<div class="border-b bg-white" style="border-color: rgba(56, 114, 52, 0.15);">
 			<div class="mx-auto flex max-w-7xl flex-wrap gap-2 px-6 py-3">
 				{#each arItems as item}
 					<a
 						class={`rounded-md px-3 py-1.5 text-sm transition ${
 							page.url.pathname === item.href
-								? 'bg-indigo-600 text-white'
-								: 'text-slate-600 hover:bg-slate-100'
+								? 'theme-subnav-active'
+								: 'text-slate-600 hover:bg-[rgba(234,188,60,0.20)]'
 						}`}
 						href={item.href}
 					>
