@@ -6,8 +6,10 @@ export const load: PageServerLoad = async ({ url }) => {
 	const defaultFromDate = new Date(now);
 	defaultFromDate.setUTCMonth(defaultFromDate.getUTCMonth() - 3);
 	const defaultFrom = defaultFromDate.toISOString().slice(0, 10);
-	const from = url.searchParams.get('from') ?? defaultFrom;
-	const to = url.searchParams.get('to') ?? defaultTo;
+	const rawFrom = url.searchParams.get('from') ?? '';
+	const rawTo = url.searchParams.get('to') ?? '';
+	const from = rawFrom.trim() || defaultFrom;
+	const to = rawTo.trim() || defaultTo;
 
 	return {
 		filters: { status: projectStatus, from, to }

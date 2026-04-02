@@ -15,7 +15,8 @@
 		{ href: '/ar/quotations', label: 'Quotations' },
 		{ href: '/ar/purchase-orders', label: 'Purchase Orders' },
 		{ href: '/ar/customer-invoices', label: 'Customer Invoices' },
-		{ href: '/ar/supplier-invoices', label: 'Supplier Invoices' }
+		{ href: '/ar/supplier-invoices', label: 'Supplier Invoices' },
+		{ href: '/ar/document-upload', label: 'Document Upload' }
 	];
 
 	let { children, data } = $props();
