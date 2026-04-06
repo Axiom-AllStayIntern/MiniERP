@@ -3,6 +3,10 @@ import type { RequestHandler } from './$types';
 
 import { getDb, schema } from '$lib/server/db';
 import { fail, ok } from '$lib/server/http';
+import {
+	staffCostPayoutJoinConditions,
+	staffCostSumExpr
+} from '$lib/server/project-staff-cost';
 
 export const GET: RequestHandler = async ({ params, platform }) => {
 	if (!platform) {
@@ -28,9 +32,13 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 		.from(schema.invoicesIn)
 		.where(eq(schema.invoicesIn.projectId, params.id));
 	const [staff] = await db
-		.select({ total: sql<number>`coalesce(sum(${schema.projectCompensations.amount}), 0)` })
-		.from(schema.projectCompensations)
-		.where(eq(schema.projectCompensations.projectId, params.id));
+		.select({ total: staffCostSumExpr() })
+		.from(schema.payoutRecords)
+		.innerJoin(
+			schema.compensationComponents,
+			eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
+		)
+		.where(and(eq(schema.payoutRecords.projectId, params.id), staffCostPayoutJoinConditions()));
 	const [expense] = await db
 		.select({ total: sql<number>`coalesce(sum(${schema.expenses.amount}), 0)` })
 		.from(schema.expenses)

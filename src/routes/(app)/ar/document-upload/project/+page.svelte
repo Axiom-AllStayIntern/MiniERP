@@ -63,6 +63,8 @@
 	let invoiceInDueDate = $state('');
 	let otherTag = $state('');
 	let otherRef = $state('');
+	let saveStatus = $state<'idle' | 'saving' | 'done' | 'error'>('idle');
+	let saveMessage = $state('');
 
 	$effect(() => {
 		selectedDocType = data.filters.docType || 'contract';
@@ -666,12 +668,7 @@
 		}
 	}
 
-	function onPickFile(event: Event): void {
-		const input = event.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
-
-		// Reset document-level extraction context for each new file.
+	function resetExtractedFields(): void {
 		contractNo = '';
 		contractDate = '';
 		contractAmount = '';
@@ -715,6 +712,161 @@
 		llmFieldConfidence = {};
 		docTypeClassifyMessage = '';
 		docTypeClassifyConfidence = null;
+	}
+
+	function resetFileSelection(): void {
+		if (filePreviewUrl) {
+			URL.revokeObjectURL(filePreviewUrl);
+			filePreviewUrl = null;
+		}
+		selectedFile = null;
+		if (fileInputRef) fileInputRef.value = '';
+		fileMeta = null;
+	}
+
+	async function saveDocument(): Promise<void> {
+		if (!selectedFile || !data.selectedProject) {
+			saveMessage = 'Select a project and upload a file first.';
+			saveStatus = 'error';
+			return;
+		}
+
+		saveStatus = 'saving';
+		saveMessage = '';
+
+		try {
+			const entityId = crypto.randomUUID();
+			const presignRes = await fetch('/api/upload/presign', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					fileName: selectedFile.name,
+					contentType: selectedFile.type || 'application/octet-stream',
+					projectId: data.selectedProject.id,
+					entityType: selectedDocType,
+					entityId
+				})
+			});
+			const presignJson = (await presignRes.json()) as { ok?: boolean; error?: string; data?: { key: string; uploadUrl: string } };
+			if (!presignJson.ok || !presignJson.data?.key || !presignJson.data?.uploadUrl) {
+				throw new Error(presignJson.error || 'Could not start upload');
+			}
+			const { key, uploadUrl } = presignJson.data;
+
+			const putRes = await fetch(uploadUrl, {
+				method: 'PUT',
+				headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
+				body: selectedFile
+			});
+			if (!putRes.ok) {
+				throw new Error('Upload to storage failed');
+			}
+
+			const savePayload = {
+				key,
+				fileType: selectedFile.type || 'application/octet-stream',
+				projectId: data.selectedProject.id,
+				docType: selectedDocType,
+				docTitle,
+				docNotes,
+				fileName: selectedFile.name,
+				fileSize: selectedFile.size,
+				rawDetectedText,
+				contractNo,
+				contractDate,
+				contractAmount,
+				contractCurrency,
+				quotationRef,
+				quotationDate,
+				quotationChannel,
+				quotationAmount,
+				quotationCurrency,
+				poNumber,
+				poSupplier,
+				poDate,
+				poAmount,
+				poCurrency,
+				invoiceOutNo,
+				invoiceOutCustomer,
+				invoiceOutDate,
+				invoiceOutDueDate,
+				invoiceOutTotal,
+				invoiceOutCurrency,
+				invoiceOutGstAmount,
+				invoiceOutGstType,
+				invoiceInNo,
+				invoiceInSupplier,
+				invoiceInDate,
+				invoiceInPoNumber,
+				invoiceInAmount,
+				invoiceInCurrency,
+				invoiceInGstAmount,
+				invoiceInDueDate,
+				otherTag,
+				otherRef
+			};
+
+			let saveRes = await fetch('/api/ar/save-project-document', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(savePayload)
+			});
+			let saveJson = (await saveRes.json()) as {
+				ok?: boolean;
+				error?: string;
+				details?: unknown;
+			};
+
+			const duplicateInvoice =
+				saveRes.status === 409 &&
+				saveJson.details &&
+				typeof saveJson.details === 'object' &&
+				(saveJson.details as { code?: string }).code === 'DUPLICATE_INVOICE_NO';
+
+			if (!saveJson.ok && duplicateInvoice && selectedDocType === 'invoice_out') {
+				const inv = String((saveJson.details as { invoiceNo?: string }).invoiceNo ?? '');
+				const proceed = window.confirm(
+					`客户发票号码「${inv || '（当前填写）'}」在系统中已存在，可能是重复录入。\n\n` +
+						`点「确定」：使用系统自动生成的新发票号保存（文档识别出的原号码会写入明细字段）。\n` +
+						`点「取消」：不保存。`
+				);
+				if (!proceed) {
+					saveStatus = 'idle';
+					saveMessage = '已取消保存（发票号与其它记录重复）。';
+					return;
+				}
+				saveRes = await fetch('/api/ar/save-project-document', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ ...savePayload, invoiceOutReissueNumber: true })
+				});
+				saveJson = (await saveRes.json()) as { ok?: boolean; error?: string };
+			}
+
+			if (!saveJson.ok) {
+				throw new Error(saveJson.error || 'Save failed');
+			}
+
+			saveStatus = 'done';
+			saveMessage = 'Document saved.';
+			resetExtractedFields();
+			docTitle = '';
+			docNotes = '';
+			resetFileSelection();
+		} catch (e) {
+			saveStatus = 'error';
+			saveMessage = e instanceof Error ? e.message : 'Save failed';
+		}
+	}
+
+	function onPickFile(event: Event): void {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		resetExtractedFields();
+		saveMessage = '';
+		saveStatus = 'idle';
 
 		selectedFile = file;
 		if (filePreviewUrl) {
@@ -895,13 +1047,27 @@
 						{llmStatus === 'analyzing' ? 'AI Detecting...' : 'AI Autofill'}
 					</button>
 				</div>
-				<button
-					type="button"
-					class="rounded border border-[var(--sf-gold)] bg-white px-4 py-2 text-xs font-semibold text-[#b08a14] hover:bg-[var(--sf-gold-soft)]"
-					disabled={!data.selectedProject}
-				>
-					Save Document
-				</button>
+				<div class="flex flex-col items-end gap-1">
+					<button
+						type="button"
+						class="rounded border border-[var(--sf-gold)] bg-white px-4 py-2 text-xs font-semibold text-[#b08a14] hover:bg-[var(--sf-gold-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+						disabled={!data.selectedProject || !selectedFile || saveStatus === 'saving'}
+						onclick={() => void saveDocument()}
+					>
+						{saveStatus === 'saving' ? 'Saving…' : 'Save Document'}
+					</button>
+					{#if saveMessage}
+						<p
+							class="max-w-[220px] text-right text-[11px] {saveStatus === 'error'
+								? 'text-rose-600'
+								: saveStatus === 'done'
+									? 'text-emerald-700'
+									: 'text-slate-500'}"
+						>
+							{saveMessage}
+						</p>
+					{/if}
+				</div>
 			</div>
 
 			<div class="mt-3 grid gap-3 md:grid-cols-2">

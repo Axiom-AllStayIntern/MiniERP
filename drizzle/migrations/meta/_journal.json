@@ -29,6 +29,34 @@
       "when": 1774999000000,
       "tag": "0003_swift_contract_project_nullable",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1775002000000,
+      "tag": "0004_audit_logs_project_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1775005000000,
+      "tag": "0005_project_staff_payout_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1775008000000,
+      "tag": "0006_employee_company_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1775010000000,
+      "tag": "0007_compensation_component_origin",
+      "breakpoints": true
     }
   ]
 }

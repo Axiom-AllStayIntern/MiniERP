@@ -20,6 +20,9 @@
 	];
 
 	let { children, data } = $props();
+
+	/** 单项目页：主内容区与顶栏 max-w-7xl 的左缘对齐，向右占满视口（不在更宽的盒子里居中），避免侧栏左移 */
+	const wideProjectDetailMain = $derived(/^\/projects\/(?!new$)[^/]+/.test(page.url.pathname));
 </script>
 
 <div class="theme-shell">
@@ -78,7 +81,15 @@
 			</div>
 		</div>
 	{/if}
-	<main class="mx-auto w-full max-w-7xl px-6 py-6">
-		{@render children()}
+	<main class="w-full py-6">
+		{#if wideProjectDetailMain}
+			<div class="pr-6 pl-[calc((100vw-min(80rem,100vw))/2+1.5rem)]">
+				{@render children()}
+			</div>
+		{:else}
+			<div class="mx-auto w-full max-w-7xl px-6">
+				{@render children()}
+			</div>
+		{/if}
 	</main>
 </div>

@@ -1,7 +1,11 @@
 -- Reset non-OCR tables for repeatable local testing
 DELETE FROM audit_logs;
 DELETE FROM employee_salaries;
-DELETE FROM project_compensations;
+DELETE FROM payout_records;
+DELETE FROM compensation_components;
+DELETE FROM project_employees;
+DELETE FROM employee_project_allocations;
+DELETE FROM employee_compensation_components;
 DELETE FROM invoices_in;
 DELETE FROM invoices_out;
 DELETE FROM purchase_orders;
@@ -497,11 +501,21 @@ VALUES
 	);
 
 -- Employees and compensation
-INSERT INTO employees (id, name, type, status, start_date, end_date, contact, tax_id, metadata, created_at, updated_at, deleted_at)
+INSERT INTO employees (id, name, type, status, start_date, end_date, contact, tax_id, cpf_applicable, tax_resident_label, metadata, created_at, updated_at, deleted_at)
 VALUES
-	('emp-demo-001', 'Alice Tan', 'full_time', 'active', '2025-08-01', NULL, 'alice.tan@smartfin.local', 'S1234567A', '{"dept":"operations"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
-	('emp-demo-002', 'Rahim Iskandar', 'part_time', 'active', '2025-11-01', NULL, 'rahim@smartfin.local', 'S2345678B', '{"dept":"finance"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
-	('emp-demo-003', 'Wang Lei', 'freelancer', 'active', '2026-01-10', NULL, 'wang.lei@smartfin.local', 'F3344556C', '{"dept":"trade"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
+	('emp-demo-001', 'Alice Tan', 'full_time', 'active', '2025-08-01', NULL, 'alice.tan@smartfin.local', 'S1234567A', 1, 'Singapore citizen', '{"dept":"operations"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('emp-demo-002', 'Rahim Iskandar', 'part_time', 'active', '2025-11-01', NULL, 'rahim@smartfin.local', 'S2345678B', 1, 'Singapore PR', '{"dept":"finance"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('emp-demo-003', 'Wang Lei', 'freelancer', 'active', '2026-01-10', NULL, 'wang.lei@smartfin.local', 'F3344556C', 1, 'Non-resident', '{"dept":"trade"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
+
+INSERT INTO employee_compensation_components (id, employee_id, label, income_type, rule_type, value, floor, cap, frequency, taxable, effective_from, effective_to, created_at, updated_at, deleted_at)
+VALUES
+	('ecc-demo-001', 'emp-demo-001', '基本工资', 'salary', 'fixed', 5200, NULL, NULL, 'monthly', 1, '2026-01-01', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('ecc-demo-002', 'emp-demo-001', '交通津贴', 'allowance', 'fixed', 200, NULL, NULL, 'monthly', 1, '2026-01-01', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
+
+INSERT INTO employee_project_allocations (id, employee_id, project_id, weight_pct, allocation_mode, effective_from, effective_to, created_at, updated_at, deleted_at)
+VALUES
+	('epa-demo-001', 'emp-demo-001', 'proj-demo-001', 60, 'manual', '2026-01-01', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('epa-demo-002', 'emp-demo-001', 'proj-demo-002', 40, 'manual', '2026-01-01', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
 
 INSERT INTO employee_salaries (id, employee_id, month, salary, allowance, cpf_employee, cpf_employer, created_at, updated_at, deleted_at)
 VALUES
@@ -509,15 +523,35 @@ VALUES
 	('sal-demo-002', 'emp-demo-002', '2026-03', 3200, 180, 640, 544, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
 	('sal-demo-003', 'emp-demo-003', '2026-03', 4500, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
 
-INSERT INTO project_compensations (id, project_id, employee_id, amount, type, description, date, created_at, updated_at, deleted_at)
+INSERT INTO project_employees (id, project_id, employee_id, name, role, staff_type, date_in, date_out, cpf_applicable, created_at, updated_at, deleted_at)
 VALUES
-	('pc-demo-001', 'proj-demo-001', 'emp-demo-001', 2400, 'bonus', 'On-time customs clearance milestone', '2026-03-16', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
-	('pc-demo-002', 'proj-demo-001', 'emp-demo-003', 1900, 'freelance_fee', 'Trade document review support', '2026-03-20', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
-	('pc-demo-003', 'proj-demo-002', 'emp-demo-002', 850, 'bonus', 'Supplier reconciliation support', '2026-03-22', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
-	('pc-demo-004', 'proj-demo-005', 'emp-demo-001', 1200, 'bonus', 'Vietnam expansion milestone', '2025-08-29', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
-	('pc-demo-005', 'proj-demo-006', 'emp-demo-002', 760, 'bonus', 'Cold chain supplier onboarding', '2025-10-31', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
-	('pc-demo-006', 'proj-demo-007', 'emp-demo-003', 990, 'freelance_fee', 'Commodity risk advisory', '2025-12-23', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
-	('pc-demo-007', 'proj-demo-009', 'emp-demo-001', 1450, 'bonus', 'Re-export launch execution', '2026-04-30', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
+	('pe-proj-demo-001-emp-demo-001', 'proj-demo-001', 'emp-demo-001', 'Alice Tan', NULL, 'fulltime', '2025-08-01', NULL, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('pe-proj-demo-001-emp-demo-003', 'proj-demo-001', 'emp-demo-003', 'Wang Lei', NULL, 'freelancer', '2026-01-10', NULL, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('pe-proj-demo-002-emp-demo-002', 'proj-demo-002', 'emp-demo-002', 'Rahim Iskandar', NULL, 'parttime', '2025-11-01', NULL, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('pe-proj-demo-005-emp-demo-001', 'proj-demo-005', 'emp-demo-001', 'Alice Tan', NULL, 'fulltime', '2025-08-01', NULL, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('pe-proj-demo-006-emp-demo-002', 'proj-demo-006', 'emp-demo-002', 'Rahim Iskandar', NULL, 'parttime', '2025-11-01', NULL, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('pe-proj-demo-007-emp-demo-003', 'proj-demo-007', 'emp-demo-003', 'Wang Lei', NULL, 'freelancer', '2026-01-10', NULL, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('pe-proj-demo-009-emp-demo-001', 'proj-demo-009', 'emp-demo-001', 'Alice Tan', NULL, 'fulltime', '2025-08-01', NULL, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
+
+INSERT INTO compensation_components (id, project_employee_id, label, income_type, rule_type, value, floor, cap, frequency, taxable, effective_from, effective_to, created_at, updated_at, deleted_at)
+VALUES
+	('cc-demo-001', 'pe-proj-demo-001-emp-demo-001', 'bonus', 'bonus', 'manual', 2400, NULL, NULL, 'one_off', 1, '2026-03-16', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('cc-demo-002', 'pe-proj-demo-001-emp-demo-003', 'freelance_fee', 'allowance', 'manual', 1900, NULL, NULL, 'one_off', 1, '2026-03-20', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('cc-demo-003', 'pe-proj-demo-002-emp-demo-002', 'bonus', 'bonus', 'manual', 850, NULL, NULL, 'one_off', 1, '2026-03-22', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('cc-demo-004', 'pe-proj-demo-005-emp-demo-001', 'bonus', 'bonus', 'manual', 1200, NULL, NULL, 'one_off', 1, '2025-08-29', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('cc-demo-005', 'pe-proj-demo-006-emp-demo-002', 'bonus', 'bonus', 'manual', 760, NULL, NULL, 'one_off', 1, '2025-10-31', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('cc-demo-006', 'pe-proj-demo-007-emp-demo-003', 'freelance_fee', 'allowance', 'manual', 990, NULL, NULL, 'one_off', 1, '2025-12-23', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('cc-demo-007', 'pe-proj-demo-009-emp-demo-001', 'bonus', 'bonus', 'manual', 1450, NULL, NULL, 'one_off', 1, '2026-04-30', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
+
+INSERT INTO payout_records (id, component_id, project_id, period, base_value, computed_amount, cpf_employee, cpf_employer, taxable_amount, status, note, created_at, updated_at, deleted_at)
+VALUES
+	('pay-demo-001', 'cc-demo-001', 'proj-demo-001', '2026-03-16', 2400, 2400, 0, 0, 2400, 'confirmed', 'On-time customs clearance milestone', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('pay-demo-002', 'cc-demo-002', 'proj-demo-001', '2026-03-20', 1900, 1900, 0, 0, 1900, 'confirmed', 'Trade document review support', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('pay-demo-003', 'cc-demo-003', 'proj-demo-002', '2026-03-22', 850, 850, 0, 0, 850, 'confirmed', 'Supplier reconciliation support', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('pay-demo-004', 'cc-demo-004', 'proj-demo-005', '2025-08-29', 1200, 1200, 0, 0, 1200, 'confirmed', 'Vietnam expansion milestone', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('pay-demo-005', 'cc-demo-005', 'proj-demo-006', '2025-10-31', 760, 760, 0, 0, 760, 'confirmed', 'Cold chain supplier onboarding', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('pay-demo-006', 'cc-demo-006', 'proj-demo-007', '2025-12-23', 990, 990, 0, 0, 990, 'confirmed', 'Commodity risk advisory', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('pay-demo-007', 'cc-demo-007', 'proj-demo-009', '2026-04-30', 1450, 1450, 0, 0, 1450, 'confirmed', 'Re-export launch execution', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
 
 -- Expenses
 INSERT INTO expense_categories (id, name, is_system, parent_id, created_at, updated_at, deleted_at)
@@ -676,7 +710,7 @@ VALUES
 	);
 
 -- Audit log samples
-INSERT INTO audit_logs (id, actor_user_id, actor_email, action, entity_type, entity_id, metadata, created_at, updated_at, deleted_at)
+INSERT INTO audit_logs (id, actor_user_id, actor_email, action, entity_type, entity_id, project_id, metadata, created_at, updated_at, deleted_at)
 VALUES
 	(
 		'audit-demo-001',
@@ -685,6 +719,7 @@ VALUES
 		'login',
 		'auth',
 		'usr-owner-001',
+		NULL,
 		'{"source":"mock-seed"}',
 		CURRENT_TIMESTAMP,
 		CURRENT_TIMESTAMP,
@@ -694,10 +729,11 @@ VALUES
 		'audit-demo-002',
 		'usr-fin-001',
 		'finance@smartfin.local',
-		'update_project',
+		'project.update',
 		'project',
 		'proj-demo-001',
-		'{"source":"mock-seed"}',
+		'proj-demo-001',
+		'{"source":"mock-seed","name":"Demo Project Alpha"}',
 		CURRENT_TIMESTAMP,
 		CURRENT_TIMESTAMP,
 		NULL

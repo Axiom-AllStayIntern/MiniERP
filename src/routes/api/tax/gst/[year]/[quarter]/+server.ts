@@ -140,7 +140,7 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 			manualBoxes: ['box9', 'box10', 'box11', 'box12'],
 			notes: [
 				'Box 5 uses supplier invoices + expenses during the quarter.',
-				'Box 9-12 are sourced from company_settings manual values in this phase.',
+				'Box 9-12 follow IRAS definitions and are manually maintained in company_settings (default 0 unless applicable).',
 				'Box 13 uses total revenue from customer invoices during the quarter.'
 			]
 		}

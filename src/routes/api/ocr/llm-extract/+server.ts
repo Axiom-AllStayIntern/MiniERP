@@ -208,11 +208,24 @@ function heuristicExtract(docType: DocType, text: string): LlmExtractionResult {
 	return { confidence: 'low' };
 }
 
-function buildSystemPrompt(docType: DocType): string {
+function tenantNameHints(env: Env): string {
+	const raw = readEnv(env, 'OCR_TENANT_COMPANY_NAMES').trim();
+	if (raw) return raw;
+	return 'Axiom, Axiom Pte Ltd, Axiom Pte. Ltd.';
+}
+
+function buildSystemPrompt(docType: DocType, tenantNames: string): string {
+	const invoiceRole =
+		docType === 'invoice_in'
+			? `Role: SUPPLIER invoice (we are the buyer). supplierName = party who ISSUED the invoice (vendor we pay). customerName = our company (${tenantNames}) when shown as Bill-To / Invoice-To. GST is typically charged TO us on their supply.`
+			: docType === 'invoice_out'
+				? `Role: OUR sales invoice (we are the seller). customerName = external party billed (they pay us). supplierName should be null unless the document clearly labels another supplier; do not put the vendor as customerName. GST is typically output tax on our sale.`
+				: '';
+
 	return `You are a financial document extractor for ERP input.
 Return ONLY valid JSON.
 Document type: ${docType}
-
+${invoiceRole ? `\n${invoiceRole}\n` : ''}
 For contract return keys:
 contractNo, contractDate, contractAmount, contractCurrency, fieldConfidence, confidence (optional)
 
@@ -245,6 +258,7 @@ async function callExternalLlm(
 	if (provider !== 'external' || !apiUrl) return null;
 	const openAiModel = readEnv(env, 'OPENAI_MODEL') || 'gpt-4o-mini';
 	const isOpenAiChatEndpoint = /api\.openai\.com\/v1\/chat\/completions/i.test(apiUrl);
+	const tenantNames = tenantNameHints(env);
 	const response = await fetch(
 		apiUrl,
 		isOpenAiChatEndpoint
@@ -259,7 +273,10 @@ async function callExternalLlm(
 						temperature: 0,
 						response_format: { type: 'json_object' },
 						messages: [
-							{ role: 'system', content: `${buildSystemPrompt(docType)}\nPrompt version: ${promptVersion}` },
+							{
+								role: 'system',
+								content: `${buildSystemPrompt(docType, tenantNames)}\nPrompt version: ${promptVersion}`
+							},
 							{ role: 'user', content: text }
 						]
 					})
@@ -272,7 +289,7 @@ async function callExternalLlm(
 					},
 					body: JSON.stringify({
 						promptVersion,
-						system: buildSystemPrompt(docType),
+						system: buildSystemPrompt(docType, tenantNames),
 						input: text
 					})
 				}

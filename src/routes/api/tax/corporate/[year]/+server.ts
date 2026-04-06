@@ -1,8 +1,13 @@
-import { and, between, isNull, sql } from 'drizzle-orm';
+import { and, between, eq, isNull, sql } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
 import { getDb, schema } from '$lib/server/db';
 import { fail, ok } from '$lib/server/http';
+import {
+	staffCostPayoutJoinConditions,
+	staffCostPeriodBetween,
+	staffCostSumExpr
+} from '$lib/server/project-staff-cost';
 
 function calcCorporateTax(taxableIncome: number) {
 	const firstBand = Math.min(taxableIncome, 10000) * 0.0425;
@@ -30,9 +35,16 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 	const [purchase] = await db.select({ total: sql<number>`coalesce(sum(${schema.invoicesIn.amount}), 0)` }).from(
 		schema.invoicesIn
 	).where(and(between(schema.invoicesIn.invoiceDate, start, end), isNull(schema.invoicesIn.deletedAt)));
-	const [staff] = await db.select({ total: sql<number>`coalesce(sum(${schema.projectCompensations.amount}), 0)` }).from(
-		schema.projectCompensations
-	).where(and(between(schema.projectCompensations.date, start, end), isNull(schema.projectCompensations.deletedAt)));
+	const [staff] = await db
+		.select({ total: staffCostSumExpr() })
+		.from(schema.payoutRecords)
+		.innerJoin(
+			schema.compensationComponents,
+			eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
+		)
+		.where(
+			and(staffCostPeriodBetween(start, end), staffCostPayoutJoinConditions())
+		);
 	const [expense] = await db.select({ total: sql<number>`coalesce(sum(${schema.expenses.amount}), 0)` }).from(
 		schema.expenses
 	).where(and(between(schema.expenses.date, start, end), isNull(schema.expenses.deletedAt)));

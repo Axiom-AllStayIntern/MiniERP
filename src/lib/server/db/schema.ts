@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 const timeFields = {
 	createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -24,6 +24,8 @@ export const auditLogs = sqliteTable('audit_logs', {
 	action: text('action').notNull(),
 	entityType: text('entity_type').notNull(),
 	entityId: text('entity_id'),
+	/** When set, this row appears on the project detail activity feed. */
+	projectId: text('project_id'),
 	metadata: text('metadata'),
 	...timeFields
 });
@@ -142,6 +144,10 @@ export const employees = sqliteTable('employees', {
 	endDate: text('end_date'),
 	contact: text('contact'),
 	taxId: text('tax_id'),
+	/** Master switch; project_employee may still override per assignment. */
+	cpfApplicable: integer('cpf_applicable', { mode: 'boolean' }).notNull().default(true),
+	/** e.g. Singapore citizen, PR — used for payroll / IR8A context. */
+	taxResidentLabel: text('tax_resident_label'),
 	metadata: text('metadata'),
 	...timeFields
 });
@@ -159,7 +165,54 @@ export const employeeSalaries = sqliteTable('employee_salaries', {
 	...timeFields
 });
 
-export const projectCompensations = sqliteTable('project_compensations', {
+/** Company-level pay rules (Employee module); not tied to a single project. */
+export const employeeCompensationComponents = sqliteTable('employee_compensation_components', {
+	id: text('id').primaryKey(),
+	employeeId: text('employee_id')
+		.notNull()
+		.references(() => employees.id),
+	label: text('label').notNull(),
+	incomeType: text('income_type', {
+		enum: ['salary', 'bonus', 'allowance', 'dividend', 'reimbursement']
+	}).notNull(),
+	ruleType: text('rule_type', {
+		enum: ['fixed', 'profit_pct', 'revenue_pct', 'equity_share', 'hourly', 'manual']
+	}).notNull(),
+	value: real('value').notNull().default(0),
+	floor: real('floor'),
+	cap: real('cap'),
+	frequency: text('frequency', {
+		enum: ['monthly', 'quarterly', 'annual', 'one_off', 'on_project_close']
+	})
+		.notNull()
+		.default('monthly'),
+	taxable: integer('taxable', { mode: 'boolean' }).notNull().default(true),
+	effectiveFrom: text('effective_from').notNull(),
+	effectiveTo: text('effective_to'),
+	...timeFields
+});
+
+/** How much of company-level base cost is attributed to each project (manual or timesheet-derived). Weights should sum to 100 per active set. */
+export const employeeProjectAllocations = sqliteTable('employee_project_allocations', {
+	id: text('id').primaryKey(),
+	employeeId: text('employee_id')
+		.notNull()
+		.references(() => employees.id),
+	projectId: text('project_id')
+		.notNull()
+		.references(() => projects.id),
+	/** 0–100 */
+	weightPct: real('weight_pct').notNull(),
+	allocationMode: text('allocation_mode', { enum: ['manual', 'timesheet'] })
+		.notNull()
+		.default('manual'),
+	effectiveFrom: text('effective_from').notNull(),
+	effectiveTo: text('effective_to'),
+	...timeFields
+});
+
+/** Project-scoped assignment: who is on this project (decoupled from pay rules). */
+export const projectEmployees = sqliteTable('project_employees', {
 	id: text('id').primaryKey(),
 	projectId: text('project_id')
 		.notNull()
@@ -167,10 +220,76 @@ export const projectCompensations = sqliteTable('project_compensations', {
 	employeeId: text('employee_id')
 		.notNull()
 		.references(() => employees.id),
-	amount: real('amount').notNull().default(0),
-	type: text('type').notNull().default('bonus'),
-	description: text('description'),
-	date: text('date').notNull(),
+	name: text('name').notNull(),
+	role: text('role'),
+	staffType: text('staff_type', {
+		enum: ['fulltime', 'parttime', 'freelancer', 'director']
+	})
+		.notNull()
+		.default('fulltime'),
+	dateIn: text('date_in'),
+	dateOut: text('date_out'),
+	cpfApplicable: integer('cpf_applicable', { mode: 'boolean' }).notNull().default(true),
+	...timeFields
+});
+
+/** Pay rule line per project employee (versioned via effective_from / effective_to). */
+export const compensationComponents = sqliteTable('compensation_components', {
+	id: text('id').primaryKey(),
+	projectEmployeeId: text('project_employee_id')
+		.notNull()
+		.references(() => projectEmployees.id),
+	/** manual = user-defined project rules; company_allocated = shadow line for payouts tied to employee master components. */
+	origin: text('origin', { enum: ['manual', 'company_allocated'] })
+		.notNull()
+		.default('manual'),
+	employeeCompensationComponentId: text('employee_compensation_component_id').references(
+		() => employeeCompensationComponents.id
+	),
+	label: text('label').notNull(),
+	incomeType: text('income_type', {
+		enum: ['salary', 'bonus', 'allowance', 'dividend', 'reimbursement']
+	}).notNull(),
+	ruleType: text('rule_type', {
+		enum: ['fixed', 'profit_pct', 'revenue_pct', 'equity_share', 'hourly', 'manual']
+	}).notNull(),
+	value: real('value').notNull().default(0),
+	floor: real('floor'),
+	cap: real('cap'),
+	frequency: text('frequency', {
+		enum: ['monthly', 'quarterly', 'annual', 'one_off', 'on_project_close']
+	})
+		.notNull()
+		.default('monthly'),
+	taxable: integer('taxable', { mode: 'boolean' }).notNull().default(true),
+	effectiveFrom: text('effective_from').notNull(),
+	effectiveTo: text('effective_to'),
+	...timeFields
+});
+
+/** Settlement output; project Staff Cost sums confirmed/paid rows excluding dividend income_type. */
+export const payoutRecords = sqliteTable('payout_records', {
+	id: text('id').primaryKey(),
+	componentId: text('component_id')
+		.notNull()
+		.references(() => compensationComponents.id),
+	projectId: text('project_id')
+		.notNull()
+		.references(() => projects.id),
+	period: text('period').notNull(),
+	baseValue: real('base_value').notNull().default(0),
+	computedAmount: real('computed_amount').notNull().default(0),
+	cpfEmployee: real('cpf_employee').notNull().default(0),
+	cpfEmployer: real('cpf_employer').notNull().default(0),
+	taxableAmount: real('taxable_amount').notNull().default(0),
+	status: text('status', { enum: ['draft', 'confirmed', 'paid'] })
+		.notNull()
+		.default('draft'),
+	/** settlement = project rule run; allocated_from_company = base salary split from Employee module; adjustment = manual correction */
+	source: text('source', { enum: ['settlement', 'allocated_from_company', 'adjustment'] })
+		.notNull()
+		.default('settlement'),
+	note: text('note'),
 	...timeFields
 });
 

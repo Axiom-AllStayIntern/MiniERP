@@ -217,10 +217,10 @@
 									</button>
 									<a
 										class="rounded border border-[var(--sf-green)] bg-[var(--sf-green-soft)] px-2 py-1.5 text-xs text-[var(--sf-green)] hover:bg-[#dcefd8]"
-										href={item.projectId ? `/projects/${item.projectId}/contracts` : '/projects'}
+										href={item.projectId ? `/projects/${item.projectId}/contracts/${item.id}` : '/projects'}
 										data-sveltekit-noscroll
 									>
-										{item.projectId ? 'Go to Project Contracts' : 'Open Projects'}
+										{item.projectId ? 'Open in project' : 'Open Projects'}
 									</a>
 								</div>
 							</td>
@@ -291,8 +291,8 @@
 
 				<div class="mt-4 flex justify-end">
 					{#if selectedContract.projectId}
-						<a class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c]" href={`/projects/${selectedContract.projectId}/contracts`} data-sveltekit-noscroll>
-							Go to Project Contracts to Edit
+						<a class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c]" href={`/projects/${selectedContract.projectId}/contracts/${selectedContract.id}`} data-sveltekit-noscroll>
+							Open in project workspace
 						</a>
 					{:else}
 						<a class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c]" href="/projects" data-sveltekit-noscroll>

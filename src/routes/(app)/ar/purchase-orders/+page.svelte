@@ -183,8 +183,12 @@
 									<button type="button" class="rounded border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-100" onclick={() => openDetail(item)}>
 										View Detail
 									</button>
-									<a class="rounded border border-[var(--sf-green)] bg-[var(--sf-green-soft)] px-2 py-1.5 text-xs text-[var(--sf-green)] hover:bg-[#dcefd8]" href={`/projects/${item.projectId}/purchase-orders`} data-sveltekit-noscroll>
-										Go to Project Purchase Orders
+									<a
+										class="rounded border border-[var(--sf-green)] bg-[var(--sf-green-soft)] px-2 py-1.5 text-xs text-[var(--sf-green)] hover:bg-[#dcefd8]"
+										href={item.projectId ? `/projects/${item.projectId}/purchase-orders/${item.id}` : '/projects'}
+										data-sveltekit-noscroll
+									>
+										{item.projectId ? 'Open in project' : 'Open Projects'}
 									</a>
 								</div>
 							</td>
@@ -234,9 +238,15 @@
 				</div>
 
 				<div class="mt-4 flex justify-end">
-					<a class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c]" href={`/projects/${selectedPo.projectId}/purchase-orders`} data-sveltekit-noscroll>
-						Go to Project Purchase Orders to Edit
-					</a>
+					{#if selectedPo.projectId}
+						<a class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c]" href={`/projects/${selectedPo.projectId}/purchase-orders/${selectedPo.id}`} data-sveltekit-noscroll>
+							Open in project workspace
+						</a>
+					{:else}
+						<a class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c]" href="/projects" data-sveltekit-noscroll>
+							Open Projects
+						</a>
+					{/if}
 				</div>
 			</div>
 		</div>

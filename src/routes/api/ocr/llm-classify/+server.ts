@@ -66,30 +66,58 @@ function normalizeDocTypeFromModel(raw: unknown, fallback: DocType): DocType {
 	return aliases[v] ?? (DOC_TYPES.includes(v as DocType) ? (v as DocType) : fallback);
 }
 
-function buildClassifySystemPrompt(hint: DocType | undefined): string {
+/** Comma-separated legal/trading names; used in prompts + heuristics. */
+function tenantNameHints(env: Env): string {
+	const raw = readEnv(env, 'OCR_TENANT_COMPANY_NAMES').trim();
+	if (raw) return raw;
+	return 'Axiom, Axiom Pte Ltd, Axiom Pte. Ltd.';
+}
+
+function buildClassifySystemPrompt(hint: DocType | undefined, tenantNames: string): string {
 	const hintLine = hint && hint !== 'other' ? `Optional filename/UI hint (may be wrong): "${hint}". Prefer document body over hint when they conflict.` : 'No filename hint.';
-	return `You classify financial documents for an AR system.
+	return `You classify financial documents for an AR system used by our company (${tenantNames} — the "tenant" / ERP owner).
+
 Return ONLY valid JSON with keys: docType (string), confidence (integer 0-100), reason (short string, optional).
 
 docType must be exactly one of:
 - contract — service/goods agreement, master agreement, contract number
 - quotation — quote, proposal, RFQ, pricing offer
 - purchase_order — PO issued to a vendor to buy goods/services
-- invoice_out — sales invoice you issue to a customer (they owe you); bill-to / customer-facing
-- invoice_in — supplier/vendor invoice (you pay them); remit-to, vendor tax invoice
+- invoice_out — OUR sales invoice: WE (the tenant) are the seller/issuer; a CUSTOMER owes us money; output tax / we collect payment; "Bill To" is typically the external customer (not us).
+- invoice_in — SUPPLIER/vendor invoice: another party bills US (the tenant); WE are the buyer; input tax / GST charged TO us on their charges; we must PAY them; "Bill To" / "Invoice To" often lists ${tenantNames.split(',')[0]?.trim() ?? 'our company'}.
 - other — packing list, delivery note, unclear scan, non-financial
 
 ${hintLine}
 
-Rules:
-- Use headers, titles ("Tax Invoice", "Purchase Order"), and who is billed vs who bills.
+Critical rule for invoices (invoice_in vs invoice_out):
+- If the economic flow is "vendor charges the tenant" (tenant pays supplier, GST is the tenant's purchase / expense side) → invoice_in.
+- If the economic flow is "tenant charges a client" (tenant receives revenue, GST on sales) → invoice_out.
+- Do NOT use only the words "Tax Invoice"; decide from who issues the invoice vs who is the payer/receiver of the supply.
+- If the tenant appears as Bill-To / Customer of the issuing vendor, lean invoice_in. If the tenant appears as From / Issuer / Seller and someone else is billed, lean invoice_out.
+
+Other rules:
+- Use headers, titles ("Tax Invoice", "Purchase Order"), party blocks, GST registration labels, and remit-to vs bill-to.
 - If text is too short or ambiguous, use other with low confidence.
 - confidence = how sure you are of docType (not OCR quality).`;
 }
 
-function heuristicClassify(text: string, hint: DocType | undefined): ClassifyResult {
+function tenantRegex(env: Env): RegExp {
+	const custom = readEnv(env, 'OCR_TENANT_NAME_REGEX').trim();
+	if (custom) {
+		try {
+			return new RegExp(custom, 'i');
+		} catch {
+			// fall through
+		}
+	}
+	return /\baxiom(\s+pte\.?\s*ltd\.?)?\b/i;
+}
+
+function heuristicClassify(text: string, hint: DocType | undefined, env: Env): ClassifyResult {
 	const slice = text.slice(0, 12000);
 	const t = slice.toLowerCase();
+	const tenantRx = tenantRegex(env);
+	const mentionsTenant = tenantRx.test(slice);
 	const scores: Record<DocType, number> = {
 		contract: 0,
 		quotation: 0,
@@ -112,15 +140,36 @@ function heuristicClassify(text: string, hint: DocType | undefined): ClassifyRes
 	const customerCues =
 		/\b(bill\s+to|sold\s+to|customer|client|debit\s+note\s+to)\b/i.test(t) ||
 		/\b(amount\s+due|please\s+remit)\b/i.test(t);
+
+	const billToIdx = t.search(/\bbill\s+to\b|\binvoice\s+to\b|\bship\s+to\b/);
+	const billToWindow = billToIdx >= 0 ? slice.slice(billToIdx, billToIdx + 600) : '';
+	const tenantInBillTo = billToWindow.length > 0 && tenantRx.test(billToWindow);
+	const tenantNearIssuer =
+		/(?:^|\n)\s*(?:from|issuer|sold\s+by|supplier|vendor)\s*[:\s][^\n]{0,120}/i.exec(slice);
+	const tenantAsIssuer =
+		tenantNearIssuer !== null && tenantRx.test(tenantNearIssuer[0] ?? '');
+
 	if (hasInvoice) {
+		if (mentionsTenant) {
+			if (tenantInBillTo && !tenantAsIssuer) scores.invoice_in += 7;
+			if (tenantAsIssuer) scores.invoice_out += 7;
+		}
 		if (supplierCues && !customerCues) scores.invoice_in += 5;
 		else if (customerCues && !supplierCues) scores.invoice_out += 5;
 		else if (supplierCues && customerCues) {
-			scores.invoice_in += 2;
-			scores.invoice_out += 2;
+			if (tenantInBillTo && !tenantAsIssuer) scores.invoice_in += 4;
+			else if (tenantAsIssuer) scores.invoice_out += 4;
+			else {
+				scores.invoice_in += 2;
+				scores.invoice_out += 2;
+			}
 		} else {
-			scores.invoice_out += 2;
-			scores.invoice_in += 1;
+			if (tenantInBillTo && !tenantAsIssuer) scores.invoice_in += 3;
+			else if (tenantAsIssuer) scores.invoice_out += 3;
+			else {
+				scores.invoice_out += 2;
+				scores.invoice_in += 1;
+			}
 		}
 	}
 
@@ -168,7 +217,8 @@ async function callExternalClassify(
 
 	const openAiModel = readEnv(env, 'OPENAI_MODEL') || 'gpt-4o-mini';
 	const isOpenAiChatEndpoint = /api\.openai\.com\/v1\/chat\/completions/i.test(apiUrl);
-	const system = `${buildClassifySystemPrompt(hint)}\nPrompt version: ${promptVersion}`;
+	const tenantNames = tenantNameHints(env);
+	const system = `${buildClassifySystemPrompt(hint, tenantNames)}\nPrompt version: ${promptVersion}`;
 
 	const response = await fetch(
 		apiUrl,
@@ -248,6 +298,6 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		return ok({ provider: 'external_api', result: external });
 	}
 
-	const fallback = heuristicClassify(text, hint);
+	const fallback = heuristicClassify(text, hint, platform.env);
 	return ok({ provider: 'heuristic', result: fallback });
 };

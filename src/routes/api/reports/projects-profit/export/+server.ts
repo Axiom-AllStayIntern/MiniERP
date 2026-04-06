@@ -32,8 +32,8 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 	const dateInClause = hasRange
 		? sql` and ii.invoice_date between ${from} and ${to}`
 		: sql``;
-	const datePcClause = hasRange
-		? sql` and pc.date between ${from} and ${to}`
+	const datePrClause = hasRange
+		? sql` and pr.period between ${from} and ${to}`
 		: sql``;
 	const dateExClause = hasRange
 		? sql` and ex.date between ${from} and ${to}`
@@ -51,7 +51,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 			projectStatus: schema.projects.status,
 			revenue: sql<number>`coalesce((select sum(io.total) from invoices_out io where io.project_id = ${schema.projects.id} and io.deleted_at is null ${dateOutClause}), 0)`,
 			purchaseCost: sql<number>`coalesce((select sum(ii.amount) from invoices_in ii where ii.project_id = ${schema.projects.id} and ii.deleted_at is null ${dateInClause}), 0)`,
-			staffCost: sql<number>`coalesce((select sum(pc.amount) from project_compensations pc where pc.project_id = ${schema.projects.id} and pc.deleted_at is null ${datePcClause}), 0)`,
+			staffCost: sql<number>`coalesce((select sum(pr.computed_amount) from payout_records pr inner join compensation_components cc on cc.id = pr.component_id and cc.deleted_at is null where pr.project_id = ${schema.projects.id} and pr.deleted_at is null and pr.status in ('confirmed','paid') and cc.income_type != 'dividend' ${datePrClause}), 0)`,
 			expenseCost: sql<number>`coalesce((select sum(ex.amount) from expenses ex where ex.project_id = ${schema.projects.id} and ex.deleted_at is null ${dateExClause}), 0)`
 		})
 		.from(schema.projects)

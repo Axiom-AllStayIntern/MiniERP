@@ -23,8 +23,7 @@
 	"kv_namespaces": [
 		{
 			"binding": "KV",
-			"id": "0dceb2c3f48145fea746b64b9c227a6b",
-			"remote": true
+			"id": "0dceb2c3f48145fea746b64b9c227a6b"
 		}
 	],
 	"queues": {

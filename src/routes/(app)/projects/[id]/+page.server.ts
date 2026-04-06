@@ -4,28 +4,18 @@ import type { Actions, PageServerLoad } from './$types';
 
 import { writeAuditLog } from '$lib/server/audit';
 import { getDb, schema } from '$lib/server/db';
+import {
+	staffCostPayoutJoinConditions,
+	staffCostSumExpr
+} from '$lib/server/project-staff-cost';
 
-export const load: PageServerLoad = async ({ params, platform }) => {
+export const load: PageServerLoad = async ({ params, platform, parent }) => {
+	await parent();
 	if (!platform) {
 		throw error(500, 'Cloudflare platform bindings are required');
 	}
 
 	const db = getDb(platform.env);
-	const [project] = await db
-		.select()
-		.from(schema.projects)
-		.where(and(eq(schema.projects.id, params.id), isNull(schema.projects.deletedAt)))
-		.limit(1);
-
-	if (!project) {
-		throw error(404, 'Project not found');
-	}
-
-	const [customer] = await db
-		.select({ id: schema.customers.id, name: schema.customers.name })
-		.from(schema.customers)
-		.where(eq(schema.customers.id, project.customerId))
-		.limit(1);
 
 	const [revenue] = await db
 		.select({ total: sql<number>`coalesce(sum(${schema.invoicesOut.total}), 0)` })
@@ -35,16 +25,21 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		.select({ total: sql<number>`coalesce(sum(${schema.invoicesIn.amount}), 0)` })
 		.from(schema.invoicesIn)
 		.where(and(eq(schema.invoicesIn.projectId, params.id), isNull(schema.invoicesIn.deletedAt)));
+	const staffPayoutWhere = and(eq(schema.payoutRecords.projectId, params.id), staffCostPayoutJoinConditions());
 	const [staffCost] = await db
-		.select({ total: sql<number>`coalesce(sum(${schema.projectCompensations.amount}), 0)` })
-		.from(schema.projectCompensations)
-		.where(and(eq(schema.projectCompensations.projectId, params.id), isNull(schema.projectCompensations.deletedAt)));
+		.select({ total: staffCostSumExpr() })
+		.from(schema.payoutRecords)
+		.innerJoin(
+			schema.compensationComponents,
+			eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
+		)
+		.where(staffPayoutWhere);
 	const [expenseCost] = await db
 		.select({ total: sql<number>`coalesce(sum(${schema.expenses.amount}), 0)` })
 		.from(schema.expenses)
 		.where(and(eq(schema.expenses.projectId, params.id), isNull(schema.expenses.deletedAt)));
 
-	const [revenueItems, purchaseItems, staffItems, expenseItems] = await Promise.all([
+	const [revenueItems, purchaseItems, staffItems, expenseRows] = await Promise.all([
 		db
 			.select({
 				id: schema.invoicesOut.id,
@@ -69,27 +64,40 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 			.orderBy(sql`${schema.invoicesIn.invoiceDate} desc`, sql`${schema.invoicesIn.createdAt} desc`),
 		db
 			.select({
-				id: schema.projectCompensations.id,
-				label: schema.projectCompensations.type,
-				date: schema.projectCompensations.date,
-				status: schema.projectCompensations.description,
-				amount: schema.projectCompensations.amount
+				id: schema.payoutRecords.id,
+				label: schema.compensationComponents.label,
+				date: schema.payoutRecords.period,
+				status: schema.payoutRecords.status,
+				amount: schema.payoutRecords.computedAmount
 			})
-			.from(schema.projectCompensations)
-			.where(and(eq(schema.projectCompensations.projectId, params.id), isNull(schema.projectCompensations.deletedAt)))
-			.orderBy(sql`${schema.projectCompensations.date} desc`, sql`${schema.projectCompensations.createdAt} desc`),
+			.from(schema.payoutRecords)
+			.innerJoin(
+				schema.compensationComponents,
+				eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
+			)
+			.where(staffPayoutWhere)
+			.orderBy(sql`${schema.payoutRecords.period} desc`, sql`${schema.payoutRecords.createdAt} desc`),
 		db
 			.select({
 				id: schema.expenses.id,
-				label: schema.expenses.category,
+				category: schema.expenses.category,
+				subcategory: schema.expenses.subcategory,
 				date: schema.expenses.date,
-				status: schema.expenses.subcategory,
-				amount: schema.expenses.amount
+				amount: schema.expenses.amount,
+				currency: schema.expenses.currency
 			})
 			.from(schema.expenses)
 			.where(and(eq(schema.expenses.projectId, params.id), isNull(schema.expenses.deletedAt)))
 			.orderBy(sql`${schema.expenses.date} desc`, sql`${schema.expenses.createdAt} desc`)
 	]);
+
+	const expenseItems = expenseRows.map((row) => ({
+		id: row.id,
+		label: row.category,
+		date: row.date,
+		status: row.subcategory,
+		amount: row.amount
+	}));
 
 	const breakdown = {
 		revenue: revenue?.total ?? 0,
@@ -99,8 +107,6 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 	};
 
 	return {
-		project,
-		customerName: customer?.name ?? project.customerId,
 		breakdown,
 		details: {
 			revenueItems,
@@ -109,7 +115,13 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 			expenseItems
 		},
 		profit:
-			breakdown.revenue - breakdown.purchaseCost - breakdown.staffCost - breakdown.expenseCost
+			breakdown.revenue - breakdown.purchaseCost - breakdown.staffCost - breakdown.expenseCost,
+		metricDocCounts: {
+			revenue: revenueItems.length,
+			purchase: purchaseItems.length,
+			staff: staffItems.length,
+			expense: expenseItems.length
+		}
 	};
 };
 
@@ -147,6 +159,7 @@ export const actions: Actions = {
 			action: 'project.update',
 			entityType: 'project',
 			entityId: params.id,
+			projectId: params.id,
 			metadata: { status: status || 'active', name }
 		});
 
@@ -169,7 +182,8 @@ export const actions: Actions = {
 		await writeAuditLog(platform, locals.user, {
 			action: 'project.archive',
 			entityType: 'project',
-			entityId: params.id
+			entityId: params.id,
+			projectId: params.id
 		});
 
 		return { ok: true };
@@ -192,7 +206,8 @@ export const actions: Actions = {
 		await writeAuditLog(platform, locals.user, {
 			action: 'project.remove',
 			entityType: 'project',
-			entityId: params.id
+			entityId: params.id,
+			projectId: params.id
 		});
 
 		throw redirect(303, '/projects');

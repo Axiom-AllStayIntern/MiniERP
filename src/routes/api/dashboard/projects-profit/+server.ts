@@ -3,6 +3,11 @@ import type { RequestHandler } from './$types';
 
 import { getDb, schema } from '$lib/server/db';
 import { fail, ok } from '$lib/server/http';
+import {
+	staffCostPayoutJoinConditions,
+	staffCostPeriodBetween,
+	staffCostSumExpr
+} from '$lib/server/project-staff-cost';
 
 function isIsoDate(value: string) {
 	return /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -58,16 +63,20 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 		.where(and(...purchaseConditions))
 		.groupBy(schema.invoicesIn.projectId);
 
-	const staffConditions = [isNull(schema.projectCompensations.deletedAt)];
-	if (hasRange) staffConditions.push(sql`${schema.projectCompensations.date} between ${from} and ${to}`);
+	const staffConditions = [isNull(schema.payoutRecords.deletedAt), staffCostPayoutJoinConditions()];
+	if (hasRange) staffConditions.push(staffCostPeriodBetween(from, to));
 	const staffRows = await db
 		.select({
-			projectId: schema.projectCompensations.projectId,
-			total: sql<number>`coalesce(sum(${schema.projectCompensations.amount}), 0)`
+			projectId: schema.payoutRecords.projectId,
+			total: staffCostSumExpr()
 		})
-		.from(schema.projectCompensations)
+		.from(schema.payoutRecords)
+		.innerJoin(
+			schema.compensationComponents,
+			eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
+		)
 		.where(and(...staffConditions))
-		.groupBy(schema.projectCompensations.projectId);
+		.groupBy(schema.payoutRecords.projectId);
 
 	const expenseConditions = [isNull(schema.expenses.deletedAt)];
 	if (hasRange) expenseConditions.push(sql`${schema.expenses.date} between ${from} and ${to}`);

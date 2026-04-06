@@ -3,6 +3,11 @@ import type { RequestHandler } from './$types';
 
 import { getDb, schema } from '$lib/server/db';
 import { fail, ok } from '$lib/server/http';
+import {
+	staffCostPayoutJoinConditions,
+	staffCostPeriodBetween,
+	staffCostSumExpr
+} from '$lib/server/project-staff-cost';
 
 function isIsoDate(value: string) {
 	return /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -80,8 +85,9 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 	const baseRevenueRange = [isNull(schema.invoicesOut.deletedAt), inArray(schema.invoicesOut.projectId, projectIds)];
 	const baseSupplierRange = [isNull(schema.invoicesIn.deletedAt), inArray(schema.invoicesIn.projectId, projectIds)];
 	const baseStaffRange = [
-		isNull(schema.projectCompensations.deletedAt),
-		inArray(schema.projectCompensations.projectId, projectIds)
+		isNull(schema.payoutRecords.deletedAt),
+		inArray(schema.payoutRecords.projectId, projectIds),
+		staffCostPayoutJoinConditions()
 	];
 	const baseExpenseRange = [isNull(schema.expenses.deletedAt), inArray(schema.expenses.projectId, projectIds)];
 
@@ -91,10 +97,14 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 			.from(schema.invoicesIn)
 			.where(and(...baseSupplierRange, between(schema.invoicesIn.invoiceDate, current.start, current.end))),
 		db
-			.select({ total: sql<number>`coalesce(sum(${schema.projectCompensations.amount}), 0)` })
-			.from(schema.projectCompensations)
+			.select({ total: staffCostSumExpr() })
+			.from(schema.payoutRecords)
+			.innerJoin(
+				schema.compensationComponents,
+				eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
+			)
 			.where(
-				and(...baseStaffRange, between(schema.projectCompensations.date, current.start, current.end))
+				and(...baseStaffRange, staffCostPeriodBetween(current.start, current.end))
 			),
 		db
 			.select({ total: sql<number>`coalesce(sum(${schema.expenses.amount}), 0)` })
@@ -141,12 +151,16 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 			.where(and(...baseSupplierRange, between(schema.invoicesIn.invoiceDate, quarterStart, quarterEnd))),
 		db
 			.select({
-				date: schema.projectCompensations.date,
-				projectId: schema.projectCompensations.projectId,
-				amount: schema.projectCompensations.amount
+				date: schema.payoutRecords.period,
+				projectId: schema.payoutRecords.projectId,
+				amount: schema.payoutRecords.computedAmount
 			})
-			.from(schema.projectCompensations)
-			.where(and(...baseStaffRange, between(schema.projectCompensations.date, quarterStart, quarterEnd))),
+			.from(schema.payoutRecords)
+			.innerJoin(
+				schema.compensationComponents,
+				eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
+			)
+			.where(and(...baseStaffRange, staffCostPeriodBetween(quarterStart, quarterEnd))),
 		db
 			.select({
 				date: schema.expenses.date,
@@ -200,12 +214,16 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 			.groupBy(schema.invoicesIn.projectId),
 		db
 			.select({
-				projectId: schema.projectCompensations.projectId,
-				total: sql<number>`coalesce(sum(${schema.projectCompensations.amount}), 0)`
+				projectId: schema.payoutRecords.projectId,
+				total: staffCostSumExpr()
 			})
-			.from(schema.projectCompensations)
-			.where(and(...baseStaffRange, between(schema.projectCompensations.date, current.start, current.end)))
-			.groupBy(schema.projectCompensations.projectId),
+			.from(schema.payoutRecords)
+			.innerJoin(
+				schema.compensationComponents,
+				eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
+			)
+			.where(and(...baseStaffRange, staffCostPeriodBetween(current.start, current.end)))
+			.groupBy(schema.payoutRecords.projectId),
 		db
 			.select({
 				projectId: schema.expenses.projectId,

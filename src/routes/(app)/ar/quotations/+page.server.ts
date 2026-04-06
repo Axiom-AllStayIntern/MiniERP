@@ -193,7 +193,10 @@ export const load: PageServerLoad = async ({ platform, url }) => {
 		quotations: quotations.map((item) => ({
 			...item,
 			projectName: projectMap.get(item.projectId) ?? item.projectId,
-			fileViewUrl: item.fileUrl ? `/api/files?key=${encodeURIComponent(item.fileUrl)}` : null,
+			fileViewUrl:
+				item.fileUrl && !item.fileUrl.startsWith('manual://')
+					? `/api/files?key=${encodeURIComponent(item.fileUrl)}`
+					: null,
 			docMeta: parseDocumentMetadata(item.metadata)
 		})),
 		projects: projectsWithStats,

@@ -1,8 +1,13 @@
-import { and, between, desc, isNull, sql } from 'drizzle-orm';
+import { and, between, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
 import { getDb, schema } from '$lib/server/db';
 import { fail, ok } from '$lib/server/http';
+import {
+	staffCostPayoutJoinConditions,
+	staffCostPeriodBetween,
+	staffCostSumExpr
+} from '$lib/server/project-staff-cost';
 
 function isIsoDate(value: string) {
 	return /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -60,13 +65,14 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 			)
 		);
 	const [staffCost] = await db
-		.select({ total: sql<number>`coalesce(sum(${schema.projectCompensations.amount}), 0)` })
-		.from(schema.projectCompensations)
+		.select({ total: staffCostSumExpr() })
+		.from(schema.payoutRecords)
+		.innerJoin(
+			schema.compensationComponents,
+			eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
+		)
 		.where(
-			and(
-				between(schema.projectCompensations.date, current.start, current.end),
-				isNull(schema.projectCompensations.deletedAt)
-			)
+			and(staffCostPeriodBetween(current.start, current.end), staffCostPayoutJoinConditions())
 		);
 	const [expenseCost] = await db
 		.select({ total: sql<number>`coalesce(sum(${schema.expenses.amount}), 0)` })
@@ -92,13 +98,14 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 			)
 		);
 	const [prevStaffCost] = await db
-		.select({ total: sql<number>`coalesce(sum(${schema.projectCompensations.amount}), 0)` })
-		.from(schema.projectCompensations)
+		.select({ total: staffCostSumExpr() })
+		.from(schema.payoutRecords)
+		.innerJoin(
+			schema.compensationComponents,
+			eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
+		)
 		.where(
-			and(
-				between(schema.projectCompensations.date, previous.start, previous.end),
-				isNull(schema.projectCompensations.deletedAt)
-			)
+			and(staffCostPeriodBetween(previous.start, previous.end), staffCostPayoutJoinConditions())
 		);
 	const [prevExpenseCost] = await db
 		.select({ total: sql<number>`coalesce(sum(${schema.expenses.amount}), 0)` })
@@ -137,20 +144,21 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 			.orderBy(desc(schema.invoicesIn.invoiceDate), desc(schema.invoicesIn.createdAt)),
 		db
 			.select({
-				id: schema.projectCompensations.id,
-				date: schema.projectCompensations.date,
-				ref: schema.projectCompensations.type,
-				note: schema.projectCompensations.description,
-				amount: schema.projectCompensations.amount
+				id: schema.payoutRecords.id,
+				date: schema.payoutRecords.period,
+				ref: schema.compensationComponents.incomeType,
+				note: schema.payoutRecords.note,
+				amount: schema.payoutRecords.computedAmount
 			})
-			.from(schema.projectCompensations)
-			.where(
-				and(
-					between(schema.projectCompensations.date, current.start, current.end),
-					isNull(schema.projectCompensations.deletedAt)
-				)
+			.from(schema.payoutRecords)
+			.innerJoin(
+				schema.compensationComponents,
+				eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
 			)
-			.orderBy(desc(schema.projectCompensations.date), desc(schema.projectCompensations.createdAt)),
+			.where(
+				and(staffCostPeriodBetween(current.start, current.end), staffCostPayoutJoinConditions())
+			)
+			.orderBy(desc(schema.payoutRecords.period), desc(schema.payoutRecords.createdAt)),
 		db
 			.select({
 				id: schema.expenses.id,

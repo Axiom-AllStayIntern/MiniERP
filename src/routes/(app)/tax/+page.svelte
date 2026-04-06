@@ -14,10 +14,14 @@
 		{ code: 6, key: 'box6', label: 'Output tax due' },
 		{ code: 7, key: 'box7', label: 'Input tax and refunds' },
 		{ code: 8, key: 'box8', label: 'GST payable / claimable' },
-		{ code: 9, key: 'box9', label: 'Manual adjustment (import/suspension)' },
-		{ code: 10, key: 'box10', label: 'Manual declaration field #10' },
-		{ code: 11, key: 'box11', label: 'Manual declaration field #11' },
-		{ code: 12, key: 'box12', label: 'Manual declaration field #12' },
+		{
+			code: 9,
+			key: 'box9',
+			label: 'Total value of exempt imports under approved import schemes (e.g. MES / ISE)'
+		},
+		{ code: 10, key: 'box10', label: 'Output tax due under reverse charge' },
+		{ code: 11, key: 'box11', label: 'Value of taxable purchases under reverse charge' },
+		{ code: 12, key: 'box12', label: 'Value of imported services subject to reverse charge' },
 		{ code: 13, key: 'box13', label: 'Revenue for period' }
 	] as const;
 </script>

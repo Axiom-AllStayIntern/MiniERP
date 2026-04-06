@@ -218,10 +218,10 @@
 									</button>
 									<a
 										class="rounded border border-[var(--sf-green)] bg-[var(--sf-green-soft)] px-2 py-1.5 text-xs text-[var(--sf-green)] hover:bg-[#dcefd8]"
-										href={`/projects/${item.projectId}/quotations`}
+										href={item.projectId ? `/projects/${item.projectId}/quotations/${item.id}` : '/projects'}
 										data-sveltekit-noscroll
 									>
-										Go to Project Quotations
+										{item.projectId ? 'Open in project' : 'Open Projects'}
 									</a>
 								</div>
 							</td>
@@ -291,9 +291,15 @@
 				</div>
 
 				<div class="mt-4 flex justify-end">
-					<a class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c]" href={`/projects/${selectedQuotation.projectId}/quotations`} data-sveltekit-noscroll>
-						Go to Project Quotations to Edit
-					</a>
+					{#if selectedQuotation.projectId}
+						<a class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c]" href={`/projects/${selectedQuotation.projectId}/quotations/${selectedQuotation.id}`} data-sveltekit-noscroll>
+							Open in project workspace
+						</a>
+					{:else}
+						<a class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c]" href="/projects" data-sveltekit-noscroll>
+							Open Projects
+						</a>
+					{/if}
 				</div>
 			</div>
 		</div>

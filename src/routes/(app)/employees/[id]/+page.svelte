@@ -1,18 +1,28 @@
 <script lang="ts">
 	import PageShell from '$lib/components/PageShell.svelte';
+
 	let { data, form } = $props();
+
+	const today = new Date().toISOString().slice(0, 10);
 </script>
 
 <PageShell
-	eyebrow="Employee Detail"
+	eyebrow="Employee"
 	title={data.employee.name}
-	description={`Type: ${data.employee.type} | Status: ${data.employee.status}`}
+	description={`Type: ${data.employee.type} · Status: ${data.employee.status}`}
 >
 	{#if form?.message}
-		<p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{form.message}</p>
+		<p
+			class="rounded-md border px-3 py-2 text-sm {form.ok
+				? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+				: 'border-rose-200 bg-rose-50 text-rose-700'}"
+		>
+			{form.message}
+		</p>
 	{/if}
 
 	<form class="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm" method="POST" action="?/updateProfile">
+		<h2 class="text-lg font-semibold text-slate-900">Profile</h2>
 		<div class="grid gap-4 md:grid-cols-2">
 			<label class="space-y-1 text-sm">
 				<span class="text-slate-700">Name</span>
@@ -35,68 +45,132 @@
 					<option value="inactive">inactive</option>
 				</select>
 			</label>
+			<label class="flex items-center gap-2 text-sm pt-6">
+				<input type="checkbox" name="cpfApplicable" checked={data.employee.cpfApplicable ?? true} class="rounded border-slate-300" />
+				<span class="text-slate-700">CPF applicable (company default)</span>
+			</label>
 			<label class="space-y-1 text-sm">
-				<span class="text-slate-700">Start Date</span>
+				<span class="text-slate-700">Start date</span>
 				<input type="date" name="startDate" value={data.employee.startDate ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
 			</label>
 			<label class="space-y-1 text-sm">
-				<span class="text-slate-700">End Date</span>
+				<span class="text-slate-700">End date</span>
 				<input type="date" name="endDate" value={data.employee.endDate ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
 			</label>
 			<label class="space-y-1 text-sm">
 				<span class="text-slate-700">Contact</span>
 				<input name="contact" value={data.employee.contact ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
 			</label>
-			<label class="space-y-1 text-sm md:col-span-2">
+			<label class="space-y-1 text-sm">
 				<span class="text-slate-700">Tax ID</span>
 				<input name="taxId" value={data.employee.taxId ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
 			</label>
+			<label class="space-y-1 text-sm md:col-span-2">
+				<span class="text-slate-700">Tax resident label</span>
+				<input
+					name="taxResidentLabel"
+					value={data.employee.taxResidentLabel ?? ''}
+					placeholder="e.g. Singapore citizen, PR, non-resident"
+					class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"
+				/>
+			</label>
 		</div>
 
-		<div class="flex gap-3">
-			<button class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]" type="submit">Save Profile</button>
-			<a class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/employees">Back to List</a>
+		<div class="flex flex-wrap gap-3">
+			<button class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]" type="submit">Save profile</button>
+			<a class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/employees">Back to list</a>
 		</div>
 	</form>
 
-	<section class="space-y-3 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-		<h2 class="text-lg font-semibold text-slate-900">Monthly Salary Records</h2>
-		<form class="grid gap-3 md:grid-cols-5" method="POST" action="?/addSalary">
-			<input name="month" type="month" class="rounded border border-slate-300 px-3 py-2 text-sm" required />
-			<input name="salary" type="number" step="0.01" placeholder="Salary" class="rounded border border-slate-300 px-3 py-2 text-sm" />
-			<input name="allowance" type="number" step="0.01" placeholder="Allowance" class="rounded border border-slate-300 px-3 py-2 text-sm" />
-			<input name="cpfEmployee" type="number" step="0.01" placeholder="CPF Employee" class="rounded border border-slate-300 px-3 py-2 text-sm" />
-			<input name="cpfEmployer" type="number" step="0.01" placeholder="CPF Employer" class="rounded border border-slate-300 px-3 py-2 text-sm" />
-			<button class="rounded bg-[var(--sf-green)] px-3 py-2 text-sm text-white hover:bg-[#2f5e2c] md:col-span-5" type="submit">Add Salary Record</button>
+	<section class="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+		<div>
+			<h2 class="text-lg font-semibold text-slate-900">Company compensation components</h2>
+			<p class="mt-1 text-xs text-slate-500">
+				Rules applied at employee level; project assignment pages show an allocated slice using weights you set for projects this person is on (see
+				<span class="font-medium text-slate-600">Base cost allocation</span>).
+			</p>
+		</div>
+
+		<form class="grid gap-3 rounded-lg border border-slate-100 bg-slate-50/80 p-4 md:grid-cols-2 lg:grid-cols-3" method="POST" action="?/addCompanyComponent">
+			<label class="space-y-1 text-sm md:col-span-2">
+				<span class="text-slate-700">Label</span>
+				<input name="label" required class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+			</label>
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Income type</span>
+				<select name="incomeType" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+					<option value="salary">salary</option>
+					<option value="bonus">bonus</option>
+					<option value="allowance">allowance</option>
+					<option value="dividend">dividend</option>
+					<option value="reimbursement">reimbursement</option>
+				</select>
+			</label>
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Rule type</span>
+				<select name="ruleType" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+					<option value="fixed">fixed</option>
+					<option value="hourly">hourly</option>
+					<option value="manual">manual</option>
+					<option value="profit_pct">profit_pct</option>
+					<option value="revenue_pct">revenue_pct</option>
+					<option value="equity_share">equity_share</option>
+				</select>
+			</label>
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Value</span>
+				<input name="value" type="number" step="0.01" value="0" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+			</label>
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Frequency</span>
+				<select name="frequency" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+					<option value="monthly">monthly</option>
+					<option value="quarterly">quarterly</option>
+					<option value="annual">annual</option>
+					<option value="one_off">one_off</option>
+					<option value="on_project_close">on_project_close</option>
+				</select>
+			</label>
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Effective from</span>
+				<input name="effectiveFrom" type="date" value={today} class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+			</label>
+			<label class="flex items-center gap-2 text-sm md:col-span-2">
+				<input type="checkbox" name="taxable" checked class="rounded border-slate-300" />
+				<span class="text-slate-700">Taxable</span>
+			</label>
+			<button class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c] md:col-span-3" type="submit">Add component</button>
 		</form>
 
 		<div class="overflow-hidden rounded border border-slate-200">
 			<table class="min-w-full divide-y divide-slate-200 text-sm">
 				<thead class="bg-slate-50 text-left text-slate-600">
 					<tr>
-						<th class="px-4 py-3">Month</th>
-						<th class="px-4 py-3">Salary</th>
-						<th class="px-4 py-3">Allowance</th>
-						<th class="px-4 py-3">CPF Employee</th>
-						<th class="px-4 py-3">CPF Employer</th>
-						<th class="px-4 py-3">Action</th>
+						<th class="px-4 py-3">Label</th>
+						<th class="px-4 py-3">Type</th>
+						<th class="px-4 py-3">Rule</th>
+						<th class="px-4 py-3">Value</th>
+						<th class="px-4 py-3">Freq</th>
+						<th class="px-4 py-3">From</th>
+						<th class="px-4 py-3"></th>
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-slate-100">
-					{#if data.salaries.length === 0}
-						<tr><td class="px-4 py-6 text-slate-500" colspan="6">No salary records yet.</td></tr>
+					{#if data.companyComponents.length === 0}
+						<tr><td class="px-4 py-6 text-slate-500" colspan="7">No company-level components yet.</td></tr>
 					{:else}
-						{#each data.salaries as item}
+						{#each data.companyComponents as c}
 							<tr>
-								<td class="px-4 py-3">{item.month}</td>
-								<td class="px-4 py-3">{item.salary}</td>
-								<td class="px-4 py-3">{item.allowance}</td>
-								<td class="px-4 py-3">{item.cpfEmployee}</td>
-								<td class="px-4 py-3">{item.cpfEmployer}</td>
+								<td class="px-4 py-3 font-medium text-slate-800">{c.label}</td>
+								<td class="px-4 py-3 text-slate-600">{c.incomeType}</td>
+								<td class="px-4 py-3 text-slate-600">{c.ruleType}</td>
+								<td class="px-4 py-3 text-slate-600">{c.value}</td>
+								<td class="px-4 py-3 text-slate-600">{c.frequency}</td>
+								<td class="px-4 py-3 text-slate-600">{c.effectiveFrom}</td>
 								<td class="px-4 py-3">
-									<form method="POST" action="?/deleteSalary">
-										<input type="hidden" name="salaryId" value={item.id} />
-										<button class="rounded border border-rose-300 bg-rose-50 px-2 py-1 text-xs text-rose-700 hover:bg-rose-100" type="submit">Delete</button>
+									<form method="POST" action="?/removeCompanyComponent">
+										<input type="hidden" name="componentId" value={c.id} />
+										<button class="rounded border border-rose-300 bg-rose-50 px-2 py-1 text-xs text-rose-700 hover:bg-rose-100" type="submit">Remove</button>
 									</form>
 								</td>
 							</tr>
@@ -107,9 +181,82 @@
 		</div>
 	</section>
 
+	<section class="space-y-3 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+		<h2 class="text-lg font-semibold text-slate-900">Project participation</h2>
+		<p class="text-xs text-slate-500">
+			Only these projects appear in base-cost allocation below. Add or remove people from each project’s roster.
+		</p>
+		{#if data.participation.length === 0}
+			<p class="text-sm text-slate-500">Not assigned to any project yet.</p>
+		{:else}
+			<div class="flex flex-wrap gap-2">
+				{#each data.participation as p}
+					<a
+						href="/projects/{p.projectId}/employees/{p.peId}"
+						class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-800 hover:border-[var(--sf-green)] hover:bg-[var(--sf-green-soft)]"
+					>
+						{p.projectName}
+						<span class="text-slate-500">{p.staffType}{p.role ? ` · ${p.role}` : ''}</span>
+					</a>
+				{/each}
+			</div>
+		{/if}
+	</section>
+
+	<section class="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+		<div>
+			<h2 class="text-lg font-semibold text-slate-900">Base cost allocation (participating projects only)</h2>
+			<p class="mt-1 text-xs text-slate-500">
+				Split company-level base cost across projects this employee is on. Positive weights must total 100%. Leave blank or 0 where this person’s
+				base cost should not hit that project.
+			</p>
+		</div>
+		{#if data.participation.length === 0}
+			<p class="rounded-lg border border-amber-100 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
+				Add this person to at least one project (project roster) before setting allocation weights.
+			</p>
+		{:else}
+			<form method="POST" action="?/saveAllocations" class="space-y-4">
+				<label class="flex flex-wrap items-center gap-2 text-sm">
+					<span class="text-slate-700">Effective from</span>
+					<input type="date" name="effectiveFrom" value={data.allocations[0]?.effectiveFrom ?? today} class="rounded-md border border-slate-300 px-3 py-2" />
+				</label>
+				<div class="max-h-[320px] space-y-2 overflow-y-auto rounded-lg border border-slate-100 p-3">
+					{#each data.participation as p}
+						<div class="flex flex-wrap items-center gap-3 text-sm">
+							<span class="min-w-[12rem] font-medium text-slate-800">{p.projectName}</span>
+							<label class="flex items-center gap-2">
+								<span class="text-slate-500">Weight %</span>
+								<input
+									type="number"
+									name={`w_${p.projectId}`}
+									step="0.01"
+									min="0"
+									max="100"
+									value={data.allocationByProjectId[p.projectId] ?? ''}
+									class="w-24 rounded-md border border-slate-300 px-2 py-1"
+								/>
+							</label>
+						</div>
+					{/each}
+				</div>
+				<p class="text-xs text-slate-500">Saving replaces all allocation rows for this employee and keeps only the projects listed above.</p>
+				<button class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]" type="submit">Save allocation</button>
+			</form>
+		{/if}
+	</section>
+
+	<section class="space-y-2 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+		<h2 class="text-lg font-semibold text-slate-900">IR8A / annual tax (placeholder)</h2>
+		<p class="text-sm text-slate-600">
+			Annual figures should roll up from <strong>company compensation components</strong>, confirmed payouts, and CPF flags on the master record. Dedicated IR8A
+			worksheets and filing export are not implemented in this build.
+		</p>
+	</section>
+
 	<form method="POST" action="?/deleteEmployee">
 		<button type="submit" class="rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-100">
-			Archive and Remove Employee
+			Archive employee
 		</button>
 	</form>
 </PageShell>

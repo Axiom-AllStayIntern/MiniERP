@@ -4,6 +4,8 @@ type AuditInput = {
 	action: string;
 	entityType: string;
 	entityId?: string | null;
+	/** Scope to a project for the detail-page activity timeline (optional). */
+	projectId?: string | null;
 	metadata?: Record<string, unknown>;
 };
 
@@ -22,6 +24,7 @@ export async function writeAuditLog(
 		action: input.action,
 		entityType: input.entityType,
 		entityId: input.entityId ?? null,
+		projectId: input.projectId ?? null,
 		metadata: input.metadata ? JSON.stringify(input.metadata) : null,
 		createdAt: now,
 		updatedAt: now

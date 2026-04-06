@@ -4,17 +4,29 @@
 	let { data, form } = $props();
 
 	const fieldRows = [
-		{ key: 'gst_box9_manual', label: 'Box 9', description: 'Manual adjustment (import/suspension)' },
-		{ key: 'gst_box10_manual', label: 'Box 10', description: 'Manual declaration field #10' },
-		{ key: 'gst_box11_manual', label: 'Box 11', description: 'Manual declaration field #11' },
-		{ key: 'gst_box12_manual', label: 'Box 12', description: 'Manual declaration field #12' }
+		{
+			key: 'gst_box9_manual',
+			label: 'Box 9',
+			description: 'Total value of exempt imports under approved import schemes (e.g. MES / ISE).'
+		},
+		{ key: 'gst_box10_manual', label: 'Box 10', description: 'Output tax due under reverse charge.' },
+		{
+			key: 'gst_box11_manual',
+			label: 'Box 11',
+			description: 'Value of taxable purchases under reverse charge.'
+		},
+		{
+			key: 'gst_box12_manual',
+			label: 'Box 12',
+			description: 'Value of imported services subject to reverse charge.'
+		}
 	] as const;
 </script>
 
 <PageShell
 	eyebrow="Tax / Settings"
 	title="GST Manual Box Settings"
-	description="Configure manual values used for GST Box 9-12."
+	description="Configure Box 9-12 values using their IRAS definitions. Default should be 0 unless applicable."
 >
 	{#if form?.message}
 		<p class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{form.message}</p>
