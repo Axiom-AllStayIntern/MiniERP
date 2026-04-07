@@ -65,6 +65,19 @@
 	let otherRef = $state('');
 	let saveStatus = $state<'idle' | 'saving' | 'done' | 'error'>('idle');
 	let saveMessage = $state('');
+	let emlSummary = $state('');
+	let emlAttachments = $state<
+		Array<{
+			filename: string;
+			mimeType: string;
+			sizeLabel: string;
+			score: number;
+			keywords: string[];
+			isLikelyTarget: boolean;
+			llmConfidence?: number;
+			llmReason?: string;
+		}>
+	>([]);
 
 	$effect(() => {
 		selectedDocType = data.filters.docType || 'contract';
@@ -99,6 +112,330 @@
 
 	function docTypeLabel(key: string): string {
 		return DOC_TYPE_LABELS[key] ?? key;
+	}
+
+	function decodeMimeWord(input: string): string {
+		return input.replace(/=\?([^?]+)\?([BQbq])\?([^?]+)\?=/g, (_full, charsetRaw, encodingRaw, bodyRaw) => {
+			const charset = String(charsetRaw || '').toLowerCase();
+			const encoding = String(encodingRaw || '').toUpperCase();
+			const body = String(bodyRaw || '');
+			if (charset && charset !== 'utf-8' && charset !== 'us-ascii') return body;
+			if (encoding === 'B') {
+				try {
+					return atob(body);
+				} catch {
+					return body;
+				}
+			}
+			const qp = body.replace(/_/g, ' ').replace(/=([0-9A-F]{2})/gi, (_m, hex) => {
+				const n = Number.parseInt(hex, 16);
+				return Number.isFinite(n) ? String.fromCharCode(n) : '';
+			});
+			return qp;
+		});
+	}
+
+	function parseEmlHeaders(raw: string): Record<string, string> {
+		const lines = raw.replace(/\r\n/g, '\n').split('\n');
+		const headers: Record<string, string> = {};
+		let activeKey = '';
+		for (const line of lines) {
+			if (!line.trim()) break;
+			if ((line.startsWith(' ') || line.startsWith('\t')) && activeKey) {
+				headers[activeKey] = `${headers[activeKey]} ${line.trim()}`.trim();
+				continue;
+			}
+			const idx = line.indexOf(':');
+			if (idx <= 0) continue;
+			activeKey = line.slice(0, idx).trim().toLowerCase();
+			headers[activeKey] = line.slice(idx + 1).trim();
+		}
+		return headers;
+	}
+
+	function parseBoundary(contentType: string): string | null {
+		const boundaryMatch = contentType.match(/boundary="?([^";]+)"?/i);
+		return boundaryMatch?.[1] ?? null;
+	}
+
+	function extractMultipartParts(raw: string, boundary: string): string[] {
+		const normalized = raw.replace(/\r\n/g, '\n');
+		const marker = `--${boundary}`;
+		const chunks = normalized.split(marker);
+		const out: string[] = [];
+		for (const chunk of chunks) {
+			const trimmed = chunk.trim();
+			if (!trimmed || trimmed === '--') continue;
+			const endMarkerIdx = trimmed.indexOf('\n--');
+			out.push(endMarkerIdx >= 0 ? trimmed.slice(0, endMarkerIdx).trim() : trimmed);
+		}
+		return out;
+	}
+
+	function decodeBodyContent(body: string, transferEncoding: string): string {
+		const normalizedEncoding = transferEncoding.toLowerCase();
+		if (normalizedEncoding.includes('base64')) {
+			try {
+				return atob(body.replace(/\s+/g, ''));
+			} catch {
+				return '';
+			}
+		}
+		if (normalizedEncoding.includes('quoted-printable')) {
+			return body
+				.replace(/=\n/g, '')
+				.replace(/=([0-9A-F]{2})/gi, (_m, hex) => {
+					const n = Number.parseInt(hex, 16);
+					return Number.isFinite(n) ? String.fromCharCode(n) : '';
+				});
+		}
+		return body;
+	}
+
+	function stringToLatin1Bytes(s: string): Uint8Array {
+		const out = new Uint8Array(s.length);
+		for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 0xff;
+		return out;
+	}
+
+	/** Decode a MIME part body to raw bytes (for PDF attachments). */
+	function decodeMimePartToBytes(body: string, transferEncoding: string): Uint8Array | null {
+		const enc = transferEncoding.toLowerCase();
+		const trimmed = body.replace(/\r\n/g, '\n').trim();
+		if (!trimmed) return null;
+		if (enc.includes('base64')) {
+			try {
+				const bin = atob(trimmed.replace(/\s+/g, ''));
+				const out = new Uint8Array(bin.length);
+				for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) & 0xff;
+				return out;
+			} catch {
+				return null;
+			}
+		}
+		if (enc.includes('quoted-printable')) {
+			return stringToLatin1Bytes(decodeBodyContent(body, 'quoted-printable'));
+		}
+		return stringToLatin1Bytes(trimmed);
+	}
+
+	function isPdfMimeOrFilename(filename: string, mimeBase: string): boolean {
+		return mimeBase.toLowerCase().includes('pdf') || /\.pdf$/i.test(filename);
+	}
+
+	function isLikelyPdfBytes(bytes: Uint8Array): boolean {
+		if (bytes.length < 5) return false;
+		const max = Math.min(bytes.length - 5, 2048);
+		for (let i = 0; i <= max; i++) {
+			if (
+				bytes[i] === 0x25 &&
+				bytes[i + 1] === 0x50 &&
+				bytes[i + 2] === 0x44 &&
+				bytes[i + 3] === 0x46 &&
+				bytes[i + 4] === 0x2d
+			) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	type EmlParsedAttachment = {
+		filename: string;
+		mimeType: string;
+		size: number;
+		score: number;
+		keywords: string[];
+		/** Populated for PDF parts when decoding succeeds */
+		decodedBytes?: Uint8Array | null;
+	};
+
+	function collectFromMimePart(
+		partHeaderRaw: string,
+		partBodyRaw: string,
+		fallbackTransferEncoding: string,
+		depth: number
+	): { attachments: EmlParsedAttachment[]; textParts: string[] } {
+		if (depth > 10) return { attachments: [], textParts: [] };
+
+		const h = parseEmlHeaders(partHeaderRaw);
+		const contentType = h['content-type'] ?? 'text/plain';
+		const transferEncoding = (h['content-transfer-encoding'] ?? fallbackTransferEncoding ?? '').trim();
+		const mimeBase = contentType.split(';')[0].trim();
+		const ctLower = contentType.toLowerCase();
+		const boundary = parseBoundary(contentType);
+
+		if (boundary && ctLower.includes('multipart/')) {
+			const decoded = decodeBodyContent(partBodyRaw, transferEncoding);
+			const innerParts = extractMultipartParts(decoded, boundary);
+			const attachments: EmlParsedAttachment[] = [];
+			const textParts: string[] = [];
+			for (const chunk of innerParts) {
+				const { headerRaw: ih, bodyRaw: ib } = splitHeaderBody(chunk);
+				const sub = collectFromMimePart(ih, ib, '', depth + 1);
+				attachments.push(...sub.attachments);
+				textParts.push(...sub.textParts);
+			}
+			return { attachments, textParts };
+		}
+
+		const disposition = h['content-disposition'] ?? '';
+		const filename = pickFileName(disposition, contentType);
+		const dispLower = disposition.toLowerCase();
+		const isAttachment =
+			dispLower.includes('attachment') ||
+			Boolean(filename) ||
+			mimeBase.toLowerCase() === 'application/pdf';
+
+		if (isAttachment) {
+			const { score, keywords } = scoreAttachment(filename || 'unnamed', mimeBase);
+			const wantPdfBytes = isPdfMimeOrFilename(filename || '', mimeBase);
+			const decodedBytes = wantPdfBytes ? decodeMimePartToBytes(partBodyRaw, transferEncoding) : null;
+			let size = partBodyRaw.length;
+			if (decodedBytes) size = decodedBytes.length;
+			else if (transferEncoding.toLowerCase().includes('base64')) {
+				try {
+					size = atob(partBodyRaw.replace(/\s+/g, '')).length;
+				} catch {
+					/* keep */
+				}
+			}
+			return {
+				attachments: [
+					{
+						filename: filename || 'unnamed',
+						mimeType: mimeBase,
+						size,
+						score,
+						keywords,
+						decodedBytes: wantPdfBytes ? decodedBytes : undefined
+					}
+				],
+				textParts: []
+			};
+		}
+
+		if (ctLower.includes('text/plain') || ctLower.includes('text/html')) {
+			const decoded = decodeBodyContent(partBodyRaw, transferEncoding);
+			const plain = decoded
+				.replace(/<style[\s\S]*?<\/style>/gi, ' ')
+				.replace(/<script[\s\S]*?<\/script>/gi, ' ')
+				.replace(/<[^>]+>/g, ' ')
+				.replace(/\s+/g, ' ')
+				.trim();
+			return { attachments: [], textParts: plain ? [plain] : [] };
+		}
+
+		return { attachments: [], textParts: [] };
+	}
+
+	function orderEmlAttachmentsByRank(
+		attachments: EmlParsedAttachment[],
+		ranked: Array<{ filename: string; confidence?: number; reason?: string }>
+	): EmlParsedAttachment[] {
+		const byName = new Map(attachments.map((a) => [a.filename, a]));
+		const seen = new Set<string>();
+		const ordered: EmlParsedAttachment[] = [];
+		for (const r of ranked) {
+			const a = byName.get(r.filename);
+			if (!a || seen.has(a.filename)) continue;
+			seen.add(a.filename);
+			ordered.push(a);
+		}
+		for (const a of attachments) {
+			if (!seen.has(a.filename)) ordered.push(a);
+		}
+		return ordered;
+	}
+
+	function splitHeaderBody(rawPart: string): { headerRaw: string; bodyRaw: string } {
+		const normalized = rawPart.replace(/\r\n/g, '\n');
+		const idx = normalized.indexOf('\n\n');
+		if (idx < 0) return { headerRaw: normalized, bodyRaw: '' };
+		return { headerRaw: normalized.slice(0, idx), bodyRaw: normalized.slice(idx + 2) };
+	}
+
+	function pickFileName(disposition: string, contentType: string): string {
+		const fromDisposition = disposition.match(/filename\*?="?([^";]+)"?/i)?.[1];
+		const fromType = contentType.match(/name\*?="?([^";]+)"?/i)?.[1];
+		const raw = fromDisposition || fromType || '';
+		return decodeMimeWord(raw).trim();
+	}
+
+	function scoreAttachment(filename: string, mimeType: string): { score: number; keywords: string[] } {
+		const normalized = `${filename} ${mimeType}`.toLowerCase();
+		const keywords = ['invoice', '发票', 'bill', 'tax', 'gst', 'po', 'purchase', 'contract', 'quotation', 'quote'];
+		const matched = keywords.filter((k) => normalized.includes(k));
+		let score = 0;
+		if (/\.(pdf|xlsx|xls|csv|docx?)$/i.test(filename)) score += 15;
+		if (mimeType.includes('pdf')) score += 20;
+		score += matched.length * 18;
+		return { score: Math.min(100, score), keywords: matched };
+	}
+
+	function parseEmlContent(rawEml: string): {
+		subject: string;
+		sender: string;
+		bodyText: string;
+		attachments: EmlParsedAttachment[];
+	} {
+		const { headerRaw, bodyRaw } = splitHeaderBody(rawEml);
+		const rootHeaders = parseEmlHeaders(headerRaw);
+		const subject = decodeMimeWord(rootHeaders.subject ?? '');
+		const sender = decodeMimeWord(rootHeaders.from ?? '');
+		const rootTe = rootHeaders['content-transfer-encoding'] ?? '';
+		const { attachments, textParts } = collectFromMimePart(headerRaw, bodyRaw, rootTe, 0);
+		attachments.sort((a, b) => b.score - a.score);
+		return { subject, sender, bodyText: textParts.join('\n'), attachments };
+	}
+
+	function mapEmailIntentToClassifyHint(intent: { email_type?: string } | null): string | undefined {
+		if (!intent?.email_type) return undefined;
+		const t = intent.email_type.toLowerCase();
+		if (t === 'contract') return 'contract';
+		if (t === 'quotation') return 'quotation';
+		if (t === 'purchase_order') return 'purchase_order';
+		if (t === 'invoice') return undefined;
+		if (t === 'other') return 'other';
+		return undefined;
+	}
+
+	function mergeEmlAttachmentsForUi(
+		attachments: EmlParsedAttachment[],
+		ranked: Array<{ filename: string; confidence?: number; reason?: string }>
+	): Array<{
+		filename: string;
+		mimeType: string;
+		sizeLabel: string;
+		score: number;
+		keywords: string[];
+		isLikelyTarget: boolean;
+		llmConfidence?: number;
+		llmReason?: string;
+	}> {
+		const meta = new Map<string, { confidence?: number; reason?: string }>();
+		const byName = new Map(attachments.map((a) => [a.filename, a]));
+		for (const r of ranked) {
+			if (!r.filename?.trim() || !byName.has(r.filename)) continue;
+			meta.set(r.filename, { confidence: r.confidence, reason: r.reason });
+		}
+		const ordered = orderEmlAttachmentsByRank(attachments, ranked);
+		return ordered.slice(0, 5).map((item, index) => {
+			const m = meta.get(item.filename);
+			const llmConf = m?.confidence;
+			const topLlm = index === 0 && llmConf !== undefined && llmConf >= 0.45;
+			const topRule = index === 0 && item.score >= 35 && llmConf === undefined;
+			return {
+				filename: item.filename,
+				mimeType: item.mimeType,
+				sizeLabel: formatFileSize(item.size),
+				score: item.score,
+				keywords: item.keywords,
+				isLikelyTarget: topLlm || topRule,
+				llmConfidence: m?.confidence,
+				llmReason: m?.reason
+			};
+		});
 	}
 
 	function parseAmount(text: string): string {
@@ -469,7 +806,7 @@
 		return { lib, elapsedMs };
 	}
 
-	async function extractPdfText(file: File): Promise<{
+	async function extractPdfTextFromUint8Array(data: Uint8Array): Promise<{
 		text: string;
 		pageCount: number;
 		parsedPages: number;
@@ -477,10 +814,7 @@
 		pdfParseMs: number;
 	}> {
 		const { lib: pdfjs, elapsedMs: pdfLoadMs } = await loadPdfJs();
-		const fileBuffer = await file.arrayBuffer();
-		const loadingTask = pdfjs.getDocument({
-			data: new Uint8Array(fileBuffer)
-		});
+		const loadingTask = pdfjs.getDocument({ data });
 		console.time('pdf-parse');
 		const parseStart = performance.now();
 		const pdf = await Promise.race([
@@ -514,6 +848,17 @@
 		};
 	}
 
+	async function extractPdfText(file: File): Promise<{
+		text: string;
+		pageCount: number;
+		parsedPages: number;
+		pdfLoadMs: number;
+		pdfParseMs: number;
+	}> {
+		const fileBuffer = await file.arrayBuffer();
+		return extractPdfTextFromUint8Array(new Uint8Array(fileBuffer));
+	}
+
 	async function runQuickTextDetection(file: File): Promise<void> {
 		const totalStart = performance.now();
 		detectStatus = 'analyzing';
@@ -521,6 +866,8 @@
 		detectedTextPreview = '';
 		rawDetectedText = '';
 		detectTiming = null;
+		emlSummary = '';
+		emlAttachments = [];
 		try {
 			const name = file.name.toLowerCase();
 			const type = (file.type || '').toLowerCase();
@@ -537,6 +884,7 @@
 			let pdfLoadMs = 0;
 			let pdfParseMs = 0;
 			let baseDetectMsg = '';
+			let emlClassifyHint: string | undefined = undefined;
 			if (isPdf) {
 				const result = await extractPdfText(file);
 				raw = result.text;
@@ -544,8 +892,136 @@
 				pdfParseMs = result.pdfParseMs;
 				baseDetectMsg = `PDF text extraction complete (${result.parsedPages}/${result.pageCount} pages scanned).`;
 			} else if (isTextLike) {
-				raw = await file.text();
-				baseDetectMsg = 'Text file loaded.';
+				if (name.endsWith('.eml')) {
+					const emlRaw = await file.text();
+					const parsed = parseEmlContent(emlRaw);
+					const bodyPreview = parsed.bodyText.replace(/\s+/g, ' ').slice(0, 500);
+					const attachmentNames = parsed.attachments.map((a) => a.filename);
+
+					const intentPromise = fetch('/api/ocr/llm-email-intent', {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify({
+							subject: parsed.subject,
+							sender: parsed.sender,
+							bodyPreview,
+							attachmentNames
+						})
+					});
+
+					const rankPromise =
+						parsed.attachments.length > 0
+							? fetch('/api/ocr/llm-attachment-rank', {
+									method: 'POST',
+									headers: { 'content-type': 'application/json' },
+									body: JSON.stringify({
+										emailType: 'business',
+										attachments: parsed.attachments.map((a) => ({
+											filename: a.filename,
+											mimeType: a.mimeType,
+											sizeBytes: a.size
+										}))
+									})
+								})
+							: Promise.resolve(null as Response | null);
+
+					const [intentRes, rankRes] = await Promise.all([intentPromise, rankPromise]);
+
+					type IntentApi = {
+						ok: boolean;
+						data?: {
+							provider: string;
+							result: {
+								email_type: string;
+								target_attachment_keywords: string[];
+								priority_attachment: string | null;
+								confidence: number;
+							};
+						};
+						error?: string;
+					};
+					const intentJson = (await intentRes.json()) as IntentApi;
+
+					let ranked: Array<{ filename: string; confidence?: number; reason?: string }> = [];
+					let rankProvider = '';
+					if (rankRes) {
+						const rankJson = (await rankRes.json()) as {
+							ok: boolean;
+							data?: {
+								provider: string;
+								result: { ranked: Array<{ filename: string; confidence?: number; reason?: string }> };
+							};
+						};
+						if (rankJson.ok && rankJson.data?.result?.ranked?.length) {
+							ranked = rankJson.data.result.ranked;
+							rankProvider = rankJson.data.provider ?? '';
+						}
+					}
+
+					emlAttachments = mergeEmlAttachmentsForUi(parsed.attachments, ranked);
+
+					const orderedForPdf = orderEmlAttachmentsByRank(parsed.attachments, ranked);
+					const maxEmlPdfs = 3;
+					const emlPdfSnippets: string[] = [];
+					for (const att of orderedForPdf) {
+						if (!att.decodedBytes || !isLikelyPdfBytes(att.decodedBytes)) continue;
+						if (emlPdfSnippets.length >= maxEmlPdfs) break;
+						try {
+							const pr = await extractPdfTextFromUint8Array(att.decodedBytes);
+							pdfLoadMs += pr.pdfLoadMs;
+							pdfParseMs += pr.pdfParseMs;
+							if (pr.text.trim()) {
+								emlPdfSnippets.push(
+									`--- PDF attachment: ${att.filename} (${pr.parsedPages}/${pr.pageCount} pages) ---\n${pr.text.trim()}`
+								);
+							}
+						} catch {
+							/* invalid or encrypted PDF */
+						}
+					}
+					const emlPdfBlock = emlPdfSnippets.length ? emlPdfSnippets.join('\n\n') : '';
+
+					let intentProvider = '';
+					let intentLine = '';
+					if (intentJson.ok && intentJson.data?.result) {
+						const ir = intentJson.data.result;
+						intentProvider = intentJson.data.provider ?? '';
+						const kw =
+							Array.isArray(ir.target_attachment_keywords) && ir.target_attachment_keywords.length
+								? ir.target_attachment_keywords.slice(0, 6).join(', ')
+								: '-';
+						intentLine = ` | #1 ${intentProvider}: ${ir.email_type} (${(ir.confidence * 100).toFixed(0)}%), priority: ${ir.priority_attachment ?? '-'}, keywords: ${kw}`;
+						emlClassifyHint = mapEmailIntentToClassifyHint(ir);
+					} else {
+						intentLine = intentJson.error ? ` | #1 failed: ${intentJson.error}` : '';
+						emlClassifyHint = undefined;
+					}
+
+					const rankLine = rankProvider
+						? ` | #2 ${rankProvider}: attachment rank (${ranked.length} items)`
+						: '';
+
+					emlSummary = `Subject: ${parsed.subject || '-'} | From: ${parsed.sender || '-'} | Attachments: ${parsed.attachments.length}${intentLine}${rankLine}`;
+
+					const attachmentNamesStr = parsed.attachments.map((a) => a.filename).join(', ');
+					raw = [
+						parsed.subject ? `Subject: ${parsed.subject}` : '',
+						parsed.sender ? `From: ${parsed.sender}` : '',
+						attachmentNamesStr ? `Attachment list: ${attachmentNamesStr}` : '',
+						parsed.bodyText,
+						emlPdfBlock
+					]
+						.filter(Boolean)
+						.join('\n')
+						.trim();
+					baseDetectMsg = `EML parsed, found ${parsed.attachments.length} attachment(s).`;
+					if (emlPdfSnippets.length > 0) {
+						baseDetectMsg += ` Extracted text from ${emlPdfSnippets.length} PDF attachment(s) (pdf.js, up to ${maxEmlPdfs} files, 8 pages each max).`;
+					}
+				} else {
+					raw = await file.text();
+					baseDetectMsg = 'Text file loaded.';
+				}
 			} else {
 				detectStatus = 'unsupported';
 				detectMessage =
@@ -575,7 +1051,8 @@
 						headers: { 'content-type': 'application/json' },
 						body: JSON.stringify({
 							text: raw.slice(0, 12000),
-							hintDocType: filenameHint !== 'other' ? filenameHint : undefined
+							hintDocType:
+								emlClassifyHint ?? (filenameHint !== 'other' ? filenameHint : undefined)
 						})
 					});
 					const payload = (await cr.json()) as {
@@ -654,6 +1131,8 @@
 			detectMessage = error instanceof Error ? error.message : 'Quick detection failed.';
 			const totalMs = performance.now() - totalStart;
 			detectTiming = { totalMs };
+			emlSummary = '';
+			emlAttachments = [];
 			llmStatus = 'idle';
 			llmMessage = '';
 			llmDetectedLines = [];
@@ -712,6 +1191,8 @@
 		llmFieldConfidence = {};
 		docTypeClassifyMessage = '';
 		docTypeClassifyConfidence = null;
+		emlSummary = '';
+		emlAttachments = [];
 	}
 
 	function resetFileSelection(): void {
@@ -1028,6 +1509,27 @@
 								{#if detectTiming.regexExtractMs !== undefined} regex={detectTiming.regexExtractMs.toFixed(1)}ms {/if}
 								total={detectTiming.totalMs?.toFixed(1)}ms
 							</p>
+						{/if}
+						{#if emlSummary}
+							<p class="mt-1"><span class="font-medium">EML:</span> {emlSummary}</p>
+						{/if}
+						{#if emlAttachments.length > 0}
+							<div class="mt-2 rounded border border-slate-200 bg-white p-2">
+								<p class="font-medium text-slate-700">Detected Attachments (Top Candidates)</p>
+								<div class="mt-1 space-y-1">
+									{#each emlAttachments as item}
+										<p class={item.isLikelyTarget ? 'text-emerald-700' : 'text-slate-700'}>
+											{item.isLikelyTarget ? '★ ' : ''}{item.filename}
+											({item.mimeType}, {item.sizeLabel}, rule {item.score})
+											{item.keywords.length ? ` | keywords: ${item.keywords.join(', ')}` : ''}
+											{#if item.llmConfidence !== undefined}
+												{' '}| LLM rank {item.llmConfidence.toFixed(2)}
+												{item.llmReason ? ` (${item.llmReason})` : ''}
+											{/if}
+										</p>
+									{/each}
+								</div>
+							</div>
 						{/if}
 					</div>
 				{/if}
