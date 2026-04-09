@@ -21,6 +21,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Cloudflare worker types
+        run: npm run gen
+
       - name: CI checks (type + static analysis)
         run: npm run check
 
