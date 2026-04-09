@@ -2,13 +2,13 @@
 	import { page } from '$app/state';
 
 	const navItems = [
-		{ href: '/dashboard', label: 'Dashboard', prefix: '/dashboard' },
-		{ href: '/ar', label: 'AR', prefix: '/ar' },
-		{ href: '/projects', label: 'Projects', prefix: '/projects' },
-		{ href: '/employees', label: 'Employees', prefix: '/employees' },
-		{ href: '/tax', label: 'Tax', prefix: '/tax' },
-		{ href: '/reports', label: 'Reports', prefix: '/reports' },
-		{ href: '/settings', label: 'Settings', prefix: '/settings' }
+		{ href: '/dashboard', label: 'Dashboard', prefix: '/dashboard', moduleId: null },
+		{ href: '/ar', label: 'AR', prefix: '/ar', moduleId: 'ar' },
+		{ href: '/projects', label: 'Projects', prefix: '/projects', moduleId: 'project' },
+		{ href: '/employees', label: 'Employees', prefix: '/employees', moduleId: 'employee' },
+		{ href: '/tax', label: 'Tax', prefix: '/tax', moduleId: 'tax' },
+		{ href: '/reports', label: 'Reports', prefix: '/reports', moduleId: 'reporting' },
+		{ href: '/settings', label: 'Settings', prefix: '/settings', moduleId: 'core' }
 	];
 	const arItems = [
 		{ href: '/ar/contracts', label: 'Contracts' },
@@ -20,6 +20,10 @@
 	];
 
 	let { children, data } = $props();
+	const enabledModules = $derived(new Set((data.enabledModules as string[] | undefined) ?? []));
+	const visibleNavItems = $derived(
+		navItems.filter((item) => item.moduleId === null || item.moduleId === 'core' || enabledModules.has(item.moduleId))
+	);
 
 	/** 单项目页：主内容区与顶栏 max-w-7xl 的左缘对齐，向右占满视口（不在更宽的盒子里居中），避免侧栏左移 */
 	const wideProjectDetailMain = $derived(/^\/projects\/(?!new$)[^/]+/.test(page.url.pathname));
@@ -36,7 +40,7 @@
 			</div>
 			<div class="flex flex-wrap items-center gap-3">
 				<nav class="flex flex-wrap items-center gap-2">
-					{#each navItems as item}
+					{#each visibleNavItems as item}
 						<a
 							class={`rounded-md px-3 py-1.5 text-sm transition ${
 								page.url.pathname.startsWith(item.prefix)
@@ -63,7 +67,7 @@
 			</div>
 		</div>
 	</header>
-	{#if page.url.pathname.startsWith('/ar')}
+	{#if page.url.pathname.startsWith('/ar') && enabledModules.has('ar')}
 		<div class="border-b bg-white" style="border-color: rgba(56, 114, 52, 0.15);">
 			<div class="mx-auto flex max-w-7xl flex-wrap gap-2 px-6 py-3">
 				{#each arItems as item}

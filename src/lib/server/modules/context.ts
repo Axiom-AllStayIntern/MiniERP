@@ -3,6 +3,7 @@ import { getDb } from '../db';
 import type { ModuleContext } from './types';
 import { createEventBus, resetCorrelationId } from './event-bus';
 import { registry } from './registry';
+import { CompanySettingsRepository } from './core/repository';
 
 /**
  * Create a ModuleContext from a SvelteKit RequestEvent.
@@ -16,7 +17,35 @@ import { registry } from './registry';
  * Also creates a fresh EventBus and registers handlers from all
  * enabled modules.
  */
-export function createModuleContext(event: RequestEvent): ModuleContext {
+async function resolveEnabledModuleIds(db: ModuleContext['db']): Promise<string[]> {
+	const allModules = registry.getAll();
+	const fallback = allModules.map((m) => m.manifest.id);
+	try {
+		const configRepo = new CompanySettingsRepository(db);
+		const raw = await configRepo.get<unknown>('modules.enabled');
+		if (!Array.isArray(raw)) return fallback;
+
+		const configured = raw.filter((id): id is string => typeof id === 'string').map((id) => id.trim());
+		const existing = new Set(allModules.map((m) => m.manifest.id));
+		const filtered = configured.filter((id) => existing.has(id));
+		const validation = registry.validateDependencies(filtered);
+
+		if (!validation.valid) {
+			console.error('[Modules] Invalid modules.enabled dependency graph, falling back to full set.', {
+				configured: filtered,
+				missing: validation.missing
+			});
+			return fallback;
+		}
+
+		return filtered;
+	} catch (err) {
+		console.error('[Modules] Failed to resolve modules.enabled, falling back to full set.', err);
+		return fallback;
+	}
+}
+
+export async function createModuleContext(event: RequestEvent): Promise<ModuleContext> {
 	const platform = event.platform;
 	if (!platform) {
 		throw new Error('Cloudflare platform bindings are required');
@@ -32,9 +61,8 @@ export function createModuleContext(event: RequestEvent): ModuleContext {
 
 	const ctx: ModuleContext = { env, db, user, eventBus };
 
-	// Register event handlers from all modules.
-	// In Phase 9 this will be filtered by enabled modules via KV lookup.
-	const modules = registry.getAll();
+	const enabledIds = await resolveEnabledModuleIds(db);
+	const modules = registry.getEnabled(enabledIds);
 	for (const mod of modules) {
 		mod.registerHandlers?.(eventBus, ctx);
 	}
@@ -46,10 +74,10 @@ export function createModuleContext(event: RequestEvent): ModuleContext {
  * Create a ModuleContext from raw Env + user (for non-SvelteKit contexts
  * like Queue consumers or scheduled workers).
  */
-export function createWorkerContext(
+export async function createWorkerContext(
 	env: Env,
 	user?: App.Locals['user']
-): ModuleContext {
+): Promise<ModuleContext> {
 	resetCorrelationId();
 
 	const db = getDb(env);
@@ -57,7 +85,8 @@ export function createWorkerContext(
 
 	const ctx: ModuleContext = { env, db, user: user ?? null, eventBus };
 
-	const modules = registry.getAll();
+	const enabledIds = await resolveEnabledModuleIds(db);
+	const modules = registry.getEnabled(enabledIds);
 	for (const mod of modules) {
 		mod.registerHandlers?.(eventBus, ctx);
 	}

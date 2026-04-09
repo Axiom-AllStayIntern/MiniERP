@@ -1,5 +1,6 @@
 import { and, eq, isNull, or } from 'drizzle-orm';
 import type { ModuleContext } from '../types';
+import { createEvent } from '../event-bus';
 import {
 	CompensationComponentRepository,
 	PayoutRepository,
@@ -12,6 +13,7 @@ import {
 	employeeProjectAllocations,
 	payoutRecords
 } from './schema';
+import { projectEmployees } from '../project/schema';
 
 // ---------------------------------------------------------------------------
 // Helpers (absorbed from company-allocation-settle.ts)
@@ -111,6 +113,12 @@ export class SettlementService {
 		const period = monthStart(monthYm);
 		const now = new Date().toISOString();
 		let lines = 0;
+		const [member] = await db
+			.select({ personId: projectEmployees.personId, employeeId: projectEmployees.employeeId })
+			.from(projectEmployees)
+			.where(eq(projectEmployees.id, peId))
+			.limit(1);
+		const personId = member?.personId ?? member?.employeeId ?? peId;
 
 		for (const c of components) {
 			if (c.frequency !== 'monthly' && c.frequency !== 'one_off') continue;
@@ -138,6 +146,7 @@ export class SettlementService {
 				)
 				.limit(1);
 
+			let payoutId: string;
 			if (existing) {
 				await db
 					.update(payoutRecords)
@@ -150,9 +159,11 @@ export class SettlementService {
 						updatedAt: now
 					})
 					.where(eq(payoutRecords.id, existing.id));
+				payoutId = existing.id;
 			} else {
+				const createdId = crypto.randomUUID();
 				await db.insert(payoutRecords).values({
-					id: crypto.randomUUID(),
+					id: createdId,
 					componentId: c.id,
 					projectId,
 					period,
@@ -167,7 +178,18 @@ export class SettlementService {
 					createdAt: now,
 					updatedAt: now
 				});
+				payoutId = createdId;
 			}
+
+			await this.ctx.eventBus.emit(
+				createEvent('payout.settled', 'employee', {
+					payoutId,
+					projectId,
+					personId,
+					amount,
+					period
+				})
+			);
 			lines += 1;
 		}
 
@@ -294,6 +316,7 @@ export class SettlementService {
 
 			const note = `${ecc.label} × ${weightPct}% (company → project)`;
 
+			let payoutId: string;
 			if (existingPayout) {
 				await db
 					.update(payoutRecords)
@@ -306,9 +329,11 @@ export class SettlementService {
 						updatedAt: now
 					})
 					.where(eq(payoutRecords.id, existingPayout.id));
+				payoutId = existingPayout.id;
 			} else {
+				const createdId = crypto.randomUUID();
 				await db.insert(payoutRecords).values({
-					id: crypto.randomUUID(),
+					id: createdId,
 					componentId: shadowId,
 					projectId,
 					period,
@@ -323,7 +348,18 @@ export class SettlementService {
 					createdAt: now,
 					updatedAt: now
 				});
+				payoutId = createdId;
 			}
+
+			await this.ctx.eventBus.emit(
+				createEvent('payout.settled', 'employee', {
+					payoutId,
+					projectId,
+					personId: employeeId,
+					amount,
+					period
+				})
+			);
 			lines += 1;
 		}
 
@@ -345,7 +381,7 @@ export class SettlementService {
 export class AllocationService {
 	private repo: AllocationRepository;
 
-	constructor(ctx: ModuleContext) {
+	constructor(private ctx: ModuleContext) {
 		this.repo = new AllocationRepository(ctx.db);
 	}
 
@@ -372,6 +408,13 @@ export class AllocationService {
 				allocationMode: 'manual',
 				effectiveFrom: alloc.effectiveFrom
 			});
+			await this.ctx.eventBus.emit(
+				createEvent('allocation.updated', 'employee', {
+					personId: employeeId,
+					projectId: alloc.projectId,
+					weightPct: alloc.weightPct
+				})
+			);
 		}
 	}
 }

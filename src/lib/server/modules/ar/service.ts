@@ -53,17 +53,40 @@ export class InvoiceService {
 		const gstType = data.gstType ?? 'standard';
 		const { gstAmount, total } = InvoiceService.calculateGst(data.subtotal, gstType);
 
-		return this.customerInvoiceRepo.create({
+		const created = await this.customerInvoiceRepo.create({
 			...data,
 			gstType,
 			gstAmount,
 			total,
 			status: data.status ?? 'draft'
 		});
+		await this.ctx.eventBus.emit(
+			createEvent('invoice.created', 'ar', {
+				invoiceId: created.id,
+				projectId: data.projectId,
+				type: 'customer',
+				amount: total
+			})
+		);
+		return created;
 	}
 
 	async updateCustomerInvoice(id: string, data: Record<string, unknown>) {
-		return this.customerInvoiceRepo.update(id, data);
+		const updated = await this.customerInvoiceRepo.update(id, data);
+		const status = typeof data.status === 'string' ? data.status : null;
+		if (status === 'voided' || status === 'cancelled') {
+			const invoice = await this.customerInvoiceRepo.findById(id);
+			if (invoice) {
+				await this.ctx.eventBus.emit(
+					createEvent('invoice.voided', 'ar', {
+						invoiceId: id,
+						projectId: invoice.projectId,
+						type: 'customer'
+					})
+				);
+			}
+		}
+		return updated;
 	}
 
 	async confirmInvoice(id: string) {

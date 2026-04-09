@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 
 export const actions: Actions = {
 	default: async ({ request, platform }) => {

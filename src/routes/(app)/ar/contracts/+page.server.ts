@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, isNull, like, or, sql } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { parseDocumentMetadata } from '$lib/server/document-metadata';
 
 export const load: PageServerLoad = async ({ platform, url }) => {

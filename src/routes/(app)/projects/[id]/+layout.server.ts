@@ -7,7 +7,7 @@ import {
 	parseAuditMetadata,
 	summarizeAuditForProject
 } from '$lib/server/audit-display';
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 
 function fileLabelFromUrl(fileUrl: string | null, fallbackDate: string | null): string {
 	if (!fileUrl || fileUrl.startsWith('manual://')) {

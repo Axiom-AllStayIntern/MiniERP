@@ -1,6 +1,7 @@
 import type { ModuleContext } from '../types';
 import { ProjectRepository, ProjectMemberRepository } from './repository';
 import { NotFoundError } from '../errors';
+import { createEvent } from '../event-bus';
 
 // ---------------------------------------------------------------------------
 // ProjectService
@@ -47,7 +48,13 @@ export class ProjectService {
 	}
 
 	async archive(id: string) {
-		return this.repo.update(id, { status: 'archived' });
+		const updated = await this.repo.update(id, { status: 'archived' });
+		await this.ctx.eventBus.emit(
+			createEvent('project.archived', 'project', {
+				projectId: id
+			})
+		);
+		return updated;
 	}
 
 	async softDelete(id: string) {

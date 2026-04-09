@@ -2,7 +2,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 
 import { parseStoredInvoiceLineItems } from '$lib/invoice-line-items';
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 
 export const load: PageServerLoad = async ({ platform, url }) => {
 	const preselectProjectId = url.searchParams.get('projectId')?.trim() ?? '';

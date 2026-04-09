@@ -6,7 +6,7 @@ import { fail, ok } from '$lib/server/http';
 
 export const GET: RequestHandler = async (event) => {
 	try {
-		const ctx = createModuleContext(event);
+		const ctx = await createModuleContext(event);
 		const bp = createBusinessPartnerApi(ctx);
 		const customers = await bp.listCustomers();
 		return ok(customers);
@@ -17,7 +17,7 @@ export const GET: RequestHandler = async (event) => {
 
 export const POST: RequestHandler = async (event) => {
 	try {
-		const ctx = createModuleContext(event);
+		const ctx = await createModuleContext(event);
 		const bp = createBusinessPartnerApi(ctx);
 
 		const body = (await event.request.json()) as {

@@ -2,7 +2,7 @@ import { desc, isNull } from 'drizzle-orm';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 
 export const load: PageServerLoad = async ({ platform }) => {
 	if (!platform) {

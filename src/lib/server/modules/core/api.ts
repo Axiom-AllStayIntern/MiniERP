@@ -11,6 +11,8 @@ export function createCoreApi(ctx: ModuleContext) {
 		writeAuditLog: audit.writeLog.bind(audit),
 		getProjectActivity: audit.getProjectActivity.bind(audit),
 		getSetting: config.get.bind(config),
-		setSetting: config.set.bind(config)
+		setSetting: config.set.bind(config),
+		getEnabledModules: config.getEnabledModules.bind(config),
+		setEnabledModules: config.setEnabledModules.bind(config)
 	};
 }

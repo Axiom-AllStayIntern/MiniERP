@@ -7,7 +7,7 @@ import { fail, ok } from '$lib/server/http';
 
 export const POST: RequestHandler = async (event) => {
 	try {
-		const ctx = createModuleContext(event);
+		const ctx = await createModuleContext(event);
 		const ar = createArApi(ctx);
 
 		const body = (await event.request.json()) as {

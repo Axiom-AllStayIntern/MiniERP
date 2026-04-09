@@ -3,7 +3,7 @@ import { error, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
 import { periodCalendarMonth, settleCompanyAllocationMonth } from '$lib/server/company-allocation-settle';
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { runSettleManualProjectComponentsForMonth } from '$lib/server/settle-project-components';
 
 export const load: PageServerLoad = async ({ params, platform, parent, url }) => {

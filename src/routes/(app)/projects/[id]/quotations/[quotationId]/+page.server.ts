@@ -4,7 +4,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 import { writeAuditLog } from '$lib/server/audit';
 import { buildDocumentMetadata, parseDocumentMetadata } from '$lib/server/document-metadata';
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { r2FileUrls } from '$lib/server/r2-file-urls';
 
 export const load: PageServerLoad = async ({ params, platform, parent }) => {

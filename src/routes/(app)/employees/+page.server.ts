@@ -1,7 +1,7 @@
 import { desc, isNull } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 
 export const load: PageServerLoad = async ({ platform }) => {
 	if (!platform) {

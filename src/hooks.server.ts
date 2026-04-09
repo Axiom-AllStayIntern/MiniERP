@@ -3,6 +3,8 @@ import { redirect } from '@sveltejs/kit';
 
 import { isRouteAllowed } from '$lib/server/auth/permissions';
 import { readSessionCookie } from '$lib/server/auth/session';
+import { getDb } from '$lib/server/db';
+import { getEnabledModuleIds, isPathEnabled } from '$lib/server/modules/enabled';
 
 // Register all modules at app startup (side-effect import)
 import '$lib/server/modules/register-all';
@@ -49,6 +51,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 				return new Response(JSON.stringify({ ok: false, error: 'Forbidden' }), { status: 403 });
 			}
 			throw redirect(303, '/dashboard');
+		}
+
+		if (event.platform) {
+			const db = getDb(event.platform.env);
+			const enabledIds = await getEnabledModuleIds(db);
+			if (!isPathEnabled(event.url.pathname, enabledIds)) {
+				return new Response('Not Found', { status: 404 });
+			}
 		}
 	}
 

@@ -5,16 +5,25 @@ import type { EventBus, ModuleContext } from '../types';
  */
 export function registerTaxHandlers(bus: EventBus, _ctx: ModuleContext) {
 	// Listen to invoice.confirmed for GST working data
-	bus.on('invoice.confirmed', async (_event) => {
-		// Future: refresh GST working data for the relevant quarter
-		// const p = event.payload as InvoiceConfirmedPayload;
-		// await gstService.refreshQuarterData(p);
+	bus.on('invoice.confirmed', async (event) => {
+		const p = event.payload as { invoiceId: string; projectId: string; amount: number };
+		console.info('[Tax] invoice.confirmed received', p);
 	});
 
 	// Listen to payout.settled for PersonIncome records
-	bus.on('payout.settled', async (_event) => {
-		// Future: create/update PersonIncome records
-		// const p = event.payload as PayoutSettledPayload;
-		// await incomeTaxService.recordPayoutIncome(p);
+	bus.on('payout.settled', async (event) => {
+		const p = event.payload as {
+			payoutId: string;
+			projectId: string;
+			personId: string;
+			amount: number;
+			period: string;
+		};
+		console.info('[Tax] payout.settled received', p);
+	});
+
+	bus.on('invoice.voided', async (event) => {
+		const p = event.payload as { invoiceId: string; projectId: string; type: string };
+		console.info('[Tax] invoice.voided received', p);
 	});
 }

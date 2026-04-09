@@ -7,6 +7,10 @@ export {
 	periodCalendarMonth,
 	shadowCompensationComponentId
 } from '$lib/server/modules/employee/service';
+import {
+	allocationPeriodDay,
+	shadowCompensationComponentId
+} from '$lib/server/modules/employee/service';
 
 // Legacy function wrapper — existing routes call this with {db, projectId, peId, employeeId, monthYm}
 // but the new SettlementService needs a ModuleContext. We keep this for routes not yet refactored.

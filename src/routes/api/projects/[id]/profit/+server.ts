@@ -10,7 +10,7 @@ import { fail, ok } from '$lib/server/http';
 
 export const GET: RequestHandler = async (event) => {
 	try {
-		const ctx = createModuleContext(event);
+		const ctx = await createModuleContext(event);
 		const project = createProjectApi(ctx);
 		const ar = createArApi(ctx);
 		const employee = createEmployeeApi(ctx);

@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { fail, ok } from '$lib/server/http';
 import { parseStoredInvoiceLineItems } from '$lib/invoice-line-items';
 import { objectExists } from '$lib/server/r2';

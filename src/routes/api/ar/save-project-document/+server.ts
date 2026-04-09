@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 
 import { writeAuditLog } from '$lib/server/audit';
 import { buildDocumentMetadata } from '$lib/server/document-metadata';
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { fail, ok } from '$lib/server/http';
 import { objectExists } from '$lib/server/r2';
 

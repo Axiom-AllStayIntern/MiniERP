@@ -4,7 +4,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 import type { DocumentMetadata } from '$lib/server/document-metadata';
 import { writeAuditLog } from '$lib/server/audit';
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { r2FileUrls } from '$lib/server/r2-file-urls';
 
 function prettyRawOcr(raw: string | null) {

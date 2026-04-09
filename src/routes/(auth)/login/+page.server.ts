@@ -5,7 +5,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { writeAuditLog } from '$lib/server/audit';
 import type { AuthRole } from '$lib/server/auth/config';
 import { createSessionCookie } from '$lib/server/auth/session';
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 
 const allowedRoles: AuthRole[] = ['owner', 'finance', 'project_manager', 'employee'];
 

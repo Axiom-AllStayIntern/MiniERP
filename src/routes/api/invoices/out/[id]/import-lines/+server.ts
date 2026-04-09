@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { fail, ok } from '$lib/server/http';
 
 export const POST: RequestHandler = async ({ params, platform }) => {

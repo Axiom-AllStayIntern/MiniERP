@@ -6,7 +6,7 @@ import { fail, ok } from '$lib/server/http';
 
 export const GET: RequestHandler = async (event) => {
 	try {
-		const ctx = createModuleContext(event);
+		const ctx = await createModuleContext(event);
 		const project = createProjectApi(ctx);
 
 		const q = event.url.searchParams.get('q') ?? undefined;
@@ -21,7 +21,7 @@ export const GET: RequestHandler = async (event) => {
 
 export const POST: RequestHandler = async (event) => {
 	try {
-		const ctx = createModuleContext(event);
+		const ctx = await createModuleContext(event);
 		const project = createProjectApi(ctx);
 
 		const body = (await event.request.json()) as {

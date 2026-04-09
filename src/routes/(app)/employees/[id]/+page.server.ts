@@ -2,7 +2,7 @@ import { and, asc, between, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { estimateSingaporeResidentTax } from '$lib/server/singapore-resident-tax-estimate';
 
 export const load: PageServerLoad = async ({ params, platform, url }) => {
