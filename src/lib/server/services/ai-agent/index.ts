@@ -1,4 +1,5 @@
 type JsonLike = Record<string, unknown> | unknown[];
+export type AiProviderUsed = 'workers_ai' | 'external_api' | 'none';
 
 type AiJsonCallInput = {
 	system: string;
@@ -24,18 +25,68 @@ function tryParseJson(raw: string): unknown | null {
 	}
 }
 
+/** Best-effort: pull first `{...}` balancing strings (weak models often wrap JSON in prose or fences). */
+function extractBalancedJsonObject(s: string): string | null {
+	const start = s.indexOf('{');
+	if (start < 0) return null;
+	let depth = 0;
+	let inString = false;
+	let escape = false;
+	for (let i = start; i < s.length; i++) {
+		const c = s[i];
+		if (escape) {
+			escape = false;
+			continue;
+		}
+		if (c === '\\' && inString) {
+			escape = true;
+			continue;
+		}
+		if (c === '"') {
+			inString = !inString;
+			continue;
+		}
+		if (inString) continue;
+		if (c === '{') depth++;
+		else if (c === '}') {
+			depth--;
+			if (depth === 0) return s.slice(start, i + 1);
+		}
+	}
+	return null;
+}
+
+/** Parse JSON from model output: strict, then ```json``` fence, then first balanced object. */
+function parseLooseModelJson(text: string): unknown | null {
+	const direct = tryParseJson(text);
+	if (direct !== null) return direct;
+	const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+	if (fenced?.[1]) {
+		const inner = tryParseJson(fenced[1].trim());
+		if (inner !== null) return inner;
+		const balanced = extractBalancedJsonObject(fenced[1]);
+		if (balanced) return tryParseJson(balanced);
+	}
+	const balanced = extractBalancedJsonObject(text);
+	return balanced ? tryParseJson(balanced) : null;
+}
+
 function pickJsonFromUnknown(input: unknown): unknown | null {
 	if (input === null || input === undefined) return null;
-	if (typeof input === 'string') return tryParseJson(input);
+	if (typeof input === 'string') return parseLooseModelJson(input);
 	if (Array.isArray(input)) return input;
 	if (typeof input === 'object') {
 		const obj = input as Record<string, unknown>;
 		if (typeof obj.response === 'string') {
-			const parsed = tryParseJson(obj.response);
+			const parsed = parseLooseModelJson(obj.response);
 			if (parsed !== null) return parsed;
 		}
 		if (typeof obj.output_text === 'string') {
-			const parsed = tryParseJson(obj.output_text);
+			const parsed = parseLooseModelJson(obj.output_text);
+			if (parsed !== null) return parsed;
+		}
+		if (typeof obj.text === 'string') {
+			const parsed = parseLooseModelJson(obj.text);
 			if (parsed !== null) return parsed;
 		}
 		if (Array.isArray(obj.result)) return obj.result;
@@ -52,17 +103,51 @@ async function callWorkersAiJson(env: Env, input: AiJsonCallInput): Promise<unkn
 		? `${input.system}\nPrompt version: ${input.promptVersion}`
 		: input.system;
 
-	try {
-		const raw = await env.AI.run(modelKey, {
+	const maxTokensRaw = readEnv(env, 'WORKERS_AI_MAX_TOKENS');
+	const maxTokens = Math.min(8192, Math.max(256, Number.parseInt(maxTokensRaw, 10) || 2048));
+	const jsonModePreferred = readEnv(env, 'WORKERS_AI_JSON_MODE').toLowerCase() !== 'false';
+
+	const run = async (userContent: string, useJsonMode: boolean): Promise<unknown> => {
+		const opts: Record<string, unknown> = {
 			messages: [
 				{ role: 'system', content: systemFull },
-				{ role: 'user', content: input.user }
-			]
-		});
-		return pickJsonFromUnknown(raw);
+				{ role: 'user', content: userContent }
+			],
+			temperature: 0,
+			max_tokens: maxTokens
+		};
+		if (useJsonMode) opts.response_format = { type: 'json_object' };
+		return env.AI!.run(modelKey, opts as Parameters<NonNullable<Env['AI']>['run']>[1]);
+	};
+
+	let raw: unknown;
+	try {
+		raw = await run(input.user, jsonModePreferred);
 	} catch {
-		return null;
+		if (!jsonModePreferred) return null;
+		try {
+			raw = await run(input.user, false);
+		} catch {
+			return null;
+		}
 	}
+
+	let parsed = pickJsonFromUnknown(raw);
+	if (parsed !== null) return parsed;
+
+	const retryHint =
+		'\n\nYou must reply with one JSON object only. No markdown code fences, no explanation text before or after.';
+	try {
+		raw = await run(input.user + retryHint, jsonModePreferred);
+	} catch {
+		try {
+			raw = await run(input.user + retryHint, false);
+		} catch {
+			return null;
+		}
+	}
+	parsed = pickJsonFromUnknown(raw);
+	return parsed;
 }
 
 async function callExternalApiJson(env: Env, input: AiJsonCallInput): Promise<unknown> {
@@ -116,7 +201,7 @@ async function callExternalApiJson(env: Env, input: AiJsonCallInput): Promise<un
 		if (isOpenAiChatEndpoint) {
 			const choices = json.choices as Array<{ message?: { content?: string } }> | undefined;
 			const content = choices?.[0]?.message?.content;
-			return typeof content === 'string' ? tryParseJson(content) : null;
+			return typeof content === 'string' ? parseLooseModelJson(content) : null;
 		}
 		return json;
 	} catch {
@@ -125,9 +210,21 @@ async function callExternalApiJson(env: Env, input: AiJsonCallInput): Promise<un
 }
 
 export async function callAiJson(env: Env, input: AiJsonCallInput): Promise<unknown> {
+	const result = await callAiJsonWithSource(env, input);
+	return result.json;
+}
+
+export async function callAiJsonWithSource(
+	env: Env,
+	input: AiJsonCallInput
+): Promise<{ json: unknown; provider: AiProviderUsed }> {
 	const fromWorkersAi = await callWorkersAiJson(env, input);
-	if (fromWorkersAi !== null) return fromWorkersAi;
-	return callExternalApiJson(env, input);
+	if (fromWorkersAi !== null) return { json: fromWorkersAi, provider: 'workers_ai' };
+
+	const fromExternalApi = await callExternalApiJson(env, input);
+	if (fromExternalApi !== null) return { json: fromExternalApi, provider: 'external_api' };
+
+	return { json: null, provider: 'none' };
 }
 
 export function isJsonLike(value: unknown): value is JsonLike {

@@ -1,7 +1,8 @@
 import type { RequestHandler } from './$types';
 
 import { fail, ok } from '$lib/server/http';
-import { callAiJson } from '$lib/server/services/ai-agent';
+import { callAiJsonWithSource, type AiProviderUsed } from '$lib/server/services/ai-agent';
+import { applyExtractAliases, llmExtractionHasUsableSignal } from '$lib/server/ocr/llm-json-normalize';
 
 type DocType =
 	| 'contract'
@@ -290,21 +291,7 @@ Rules:
 - unknown values must be null`;
 }
 
-async function callExternalLlm(
-	docType: DocType,
-	text: string,
-	env: Env
-): Promise<LlmExtractionResult | null> {
-	const promptVersion = readEnv(env, 'OCR_PROMPT_VERSION') || 'v1';
-	const tenantNames = tenantNameHints(env);
-	const parsedUnknown = await callAiJson(env, {
-		system: buildSystemPrompt(docType, tenantNames),
-		user: text,
-		promptVersion
-	});
-	if (!parsedUnknown || typeof parsedUnknown !== 'object' || Array.isArray(parsedUnknown)) return null;
-	const parsed = parsedUnknown as Record<string, unknown>;
-
+function mapParsedToExtractionResult(parsed: Record<string, unknown>): LlmExtractionResult {
 	const fieldConfidence = parseFieldConfidence(parsed.fieldConfidence);
 
 	const expenseLayerRaw = typeof parsed.expenseCostLayer === 'string' ? parsed.expenseCostLayer.toLowerCase() : '';
@@ -346,6 +333,31 @@ async function callExternalLlm(
 	};
 }
 
+async function runLlmExtract(
+	docType: DocType,
+	text: string,
+	env: Env
+): Promise<{ result: LlmExtractionResult | null; provider: AiProviderUsed }> {
+	const promptVersion = readEnv(env, 'OCR_PROMPT_VERSION') || 'v1';
+	const tenantNames = tenantNameHints(env);
+	const { json: parsedUnknown, provider } = await callAiJsonWithSource(env, {
+		system: buildSystemPrompt(docType, tenantNames),
+		user: text,
+		promptVersion
+	});
+	if (!parsedUnknown || typeof parsedUnknown !== 'object' || Array.isArray(parsedUnknown)) {
+		return { result: null, provider: 'none' };
+	}
+	const parsed = applyExtractAliases(parsedUnknown as Record<string, unknown>, docType);
+	const mapped = mapParsedToExtractionResult(parsed);
+
+	const signal = llmExtractionHasUsableSignal(docType, mapped as unknown as Record<string, unknown>);
+	if (!signal) {
+		return { result: null, provider };
+	}
+	return { result: mapped, provider };
+}
+
 export const POST: RequestHandler = async ({ request, platform }) => {
 	if (!platform) return fail('Cloudflare platform bindings are required', 500);
 
@@ -354,9 +366,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const text = payload.text?.trim() ?? '';
 	if (!text) return fail('Text is required', 400);
 
-	const external = await callExternalLlm(docType, text, platform.env);
-	if (external) {
-		return ok({ provider: 'external_api', result: external });
+	const llm = await runLlmExtract(docType, text, platform.env);
+	if (llm.result) {
+		const apiProvider = llm.provider === 'workers_ai' ? 'workers_ai' : 'external_api';
+		return ok({ provider: apiProvider, result: llm.result });
 	}
 
 	const fallback = heuristicExtract(docType, text);

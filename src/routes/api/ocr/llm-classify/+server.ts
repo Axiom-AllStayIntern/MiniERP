@@ -1,7 +1,8 @@
 import type { RequestHandler } from './$types';
 
+import { applyClassifyAliases } from '$lib/server/ocr/llm-json-normalize';
 import { fail, ok } from '$lib/server/http';
-import { callAiJson } from '$lib/server/services/ai-agent';
+import { callAiJsonWithSource, type AiProviderUsed } from '$lib/server/services/ai-agent';
 
 type DocType =
 	| 'contract'
@@ -229,17 +230,19 @@ async function callExternalClassify(
 	text: string,
 	hint: DocType | undefined,
 	env: Env
-): Promise<ClassifyResult | null> {
+): Promise<{ result: ClassifyResult | null; provider: AiProviderUsed }> {
 	const promptVersion = readEnv(env, 'OCR_PROMPT_VERSION') || 'v1';
 	const tenantNames = tenantNameHints(env);
 	const system = `${buildClassifySystemPrompt(hint, tenantNames)}\nPrompt version: ${promptVersion}`;
-	const parsedUnknown = await callAiJson(env, {
+	const { json: parsedUnknown, provider } = await callAiJsonWithSource(env, {
 		system,
 		user: text.slice(0, 12000),
 		promptVersion
 	});
-	if (!parsedUnknown || typeof parsedUnknown !== 'object' || Array.isArray(parsedUnknown)) return null;
-	const parsed = parsedUnknown as Record<string, unknown>;
+	if (!parsedUnknown || typeof parsedUnknown !== 'object' || Array.isArray(parsedUnknown)) {
+		return { result: null, provider };
+	}
+	const parsed = applyClassifyAliases(parsedUnknown as Record<string, unknown>);
 
 	const docType = normalizeDocTypeFromModel(parsed.docType, 'other');
 	let confidence = 55;
@@ -251,7 +254,7 @@ async function callExternalClassify(
 	}
 
 	const reason = typeof parsed.reason === 'string' ? parsed.reason.slice(0, 200) : undefined;
-	return { docType, confidence, reason };
+	return { result: { docType, confidence, reason }, provider };
 }
 
 export const POST: RequestHandler = async ({ request, platform }) => {
@@ -263,9 +266,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 	const hint = normalizeHint(payload.hintDocType);
 
-	const external = await callExternalClassify(text, hint, platform.env);
-	if (external) {
-		return ok({ provider: 'external_api', result: external });
+	const llm = await callExternalClassify(text, hint, platform.env);
+	if (llm.result) {
+		const apiProvider = llm.provider === 'workers_ai' ? 'workers_ai' : 'external_api';
+		return ok({ provider: apiProvider, result: llm.result });
 	}
 
 	const fallback = heuristicClassify(text, hint, platform.env);

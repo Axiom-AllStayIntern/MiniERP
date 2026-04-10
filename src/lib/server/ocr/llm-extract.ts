@@ -1,4 +1,4 @@
-import { callAiJson } from '$lib/server/services/ai-agent';
+import { callAiJsonWithSource, type AiProviderUsed } from '$lib/server/services/ai-agent';
 
 type StructuredInvoiceCore = {
 	invoiceDate: string | null;
@@ -11,7 +11,7 @@ type StructuredInvoiceCore = {
 };
 
 type LlmStructuredResult = StructuredInvoiceCore & {
-	llmProvider: 'heuristic' | 'external_api';
+	llmProvider: 'heuristic' | 'external_api' | 'workers_ai';
 	modelResponseRaw?: string;
 };
 
@@ -73,13 +73,15 @@ async function externalExtract(rawText: string, options: LlmExtractOptions): Pro
 	const systemPrompt = `You are an invoice data extractor. Return ONLY JSON object with keys:
 invoiceDate, totalAmount, currency, supplierName, gstAmount, poNumber, dueDate.
 Use null for unknown fields.`;
-	const parsedUnknown = await callAiJson(envForCall, {
+	const { json: parsedUnknown, provider } = await callAiJsonWithSource(envForCall, {
 		system: systemPrompt,
 		user: rawText,
 		promptVersion: options.promptVersion
 	});
 	if (!parsedUnknown || typeof parsedUnknown !== 'object' || Array.isArray(parsedUnknown)) return null;
 	const parsed = parsedUnknown as Record<string, unknown>;
+	const llmProvider: Extract<LlmStructuredResult['llmProvider'], AiProviderUsed> =
+		provider === 'workers_ai' ? 'workers_ai' : 'external_api';
 
 	return {
 		invoiceDate: typeof parsed.invoiceDate === 'string' ? parsed.invoiceDate : null,
@@ -89,7 +91,7 @@ Use null for unknown fields.`;
 		gstAmount: typeof parsed.gstAmount === 'number' ? parsed.gstAmount : null,
 		poNumber: typeof parsed.poNumber === 'string' ? parsed.poNumber : null,
 		dueDate: typeof parsed.dueDate === 'string' ? parsed.dueDate : null,
-		llmProvider: 'external_api',
+		llmProvider,
 		modelResponseRaw: JSON.stringify(parsed)
 	};
 }

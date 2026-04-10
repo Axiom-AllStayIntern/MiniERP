@@ -28,7 +28,7 @@ export type ExtractedInvoiceFields = {
 	sourceSnippets: SourceSnippetMap;
 	extractionMethod: 'pdf_text' | 'external_ocr';
 	ocrProvider: 'builtin_pdf' | 'external_api' | 'external_api_mock';
-	llmProvider: 'heuristic' | 'external_api';
+	llmProvider: 'heuristic' | 'external_api' | 'workers_ai';
 	promptVersion: string;
 	rawText: string;
 };
