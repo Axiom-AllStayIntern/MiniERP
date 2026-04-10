@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
+	import AgentChat from '$lib/components/AgentChat.svelte';
 
 	const navItems = [
 		{ href: '/dashboard', label: 'Dashboard', prefix: '/dashboard', moduleId: null },
@@ -106,4 +107,5 @@
 			</div>
 		{/if}
 	</main>
+	<AgentChat />
 </div>

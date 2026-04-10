@@ -2,8 +2,19 @@
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
+	import { setAgentPageContext } from '$lib/agent/context';
 
 	let { data } = $props();
+	$effect(() => {
+		setAgentPageContext({
+			project_id: data.project.id,
+			project_name: data.project.name
+		});
+
+		return () => {
+			setAgentPageContext({});
+		};
+	});
 
 	const DOC_KINDS = ['contracts', 'quotations', 'purchaseOrders', 'expenses'] as const;
 
