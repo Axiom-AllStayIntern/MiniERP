@@ -35,6 +35,28 @@ async function resolveProjectId(
 	return null;
 }
 
+/**
+ * Public function to resolve project_name to project_id.
+ * Used by executor when entry contains [id] placeholder but only project_name is available.
+ */
+export async function resolveProjectIdByName(
+	ctx: QueryContext,
+	projectName: string
+): Promise<string | null> {
+	try {
+		const moduleCtx = await createWorkerContext(ctx.env, {
+			id: ctx.userId,
+			email: '',
+			role: ctx.userRole as 'owner' | 'finance' | 'project_manager' | 'employee'
+		});
+		const project = createProjectApi(moduleCtx);
+		const resolved = await resolveProjectId(project, { project_name: projectName });
+		return resolved?.id ?? null;
+	} catch {
+		return null;
+	}
+}
+
 async function handleProjectProfitQuery(
 	ctx: QueryContext,
 	params: Record<string, unknown>
