@@ -43,8 +43,8 @@ export function getAuth(env: Env): ReturnType<typeof betterAuth> {
 		}),
 		emailAndPassword: {
 			enabled: true,
-			requireEmailVerification: true,
-			autoSignIn: false,
+			requireEmailVerification: false,
+			autoSignIn: true,
 			sendResetPassword: async ({ user, url }) => {
 				await sendTransactionalEmail(env, {
 					to: user.email,
@@ -63,7 +63,7 @@ export function getAuth(env: Env): ReturnType<typeof betterAuth> {
 			},
 			customSyntheticUser: ({ coreFields, id }) => ({
 				...coreFields,
-				role: 'employee',
+				role: 'owner',
 				id
 			})
 		},
@@ -82,7 +82,7 @@ export function getAuth(env: Env): ReturnType<typeof betterAuth> {
 				role: {
 					type: 'string',
 					required: false,
-					defaultValue: 'employee',
+					defaultValue: 'owner',
 					input: false
 				}
 			}

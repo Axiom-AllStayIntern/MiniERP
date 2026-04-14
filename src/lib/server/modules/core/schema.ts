@@ -15,7 +15,7 @@ export const users = sqliteTable('users', {
 	image: text('image'),
 	role: text('role', { enum: ['owner', 'finance', 'project_manager', 'employee'] })
 		.notNull()
-		.default('employee'),
+		.default('owner'),
 	createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 	updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 	deletedAt: text('deleted_at')

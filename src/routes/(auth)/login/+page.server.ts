@@ -1,4 +1,8 @@
+import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-/** Session and redirects are handled in hooks.server.ts (better-auth). */
-export const load: PageServerLoad = async () => ({});
+/** Login UI is unified on `/` (welcome page with embedded sign-in form). */
+export const load: PageServerLoad = async ({ url }) => {
+	const qs = url.searchParams.toString();
+	throw redirect(307, qs ? `/?${qs}` : '/');
+};
