@@ -1,6 +1,6 @@
 <script lang="ts">
 	import PageShell from '$lib/components/PageShell.svelte';
-	import { consumePrefill } from '$lib/agent/prefill';
+	import { agentPrefill, consumePrefill, parseDateToPrefill } from '$lib/agent/prefill';
 
 	let { form } = $props();
 
@@ -12,7 +12,13 @@
 	let contact = $state('');
 	let taxId = $state('');
 
+	let lastPrefillVersion = $state(-1);
+
 	$effect(() => {
+		const state = $agentPrefill;
+		if (state.version === lastPrefillVersion) return;
+		lastPrefillVersion = state.version;
+
 		const prefill = consumePrefill();
 		if (Object.keys(prefill).length === 0) return;
 
@@ -20,7 +26,14 @@
 		if (typeof prefill.employee_name === 'string') name = prefill.employee_name;
 		if (typeof prefill.type === 'string') type = prefill.type;
 		if (typeof prefill.status === 'string') status = prefill.status;
-		if (typeof prefill.start_date === 'string') startDate = prefill.start_date;
+		if (prefill.start_date !== undefined) {
+			const parsed = parseDateToPrefill(prefill.start_date);
+			if (parsed) startDate = parsed;
+		}
+		if (prefill.end_date !== undefined) {
+			const parsed = parseDateToPrefill(prefill.end_date);
+			if (parsed) endDate = parsed;
+		}
 		if (typeof prefill.contact === 'string') contact = prefill.contact;
 		if (typeof prefill.email === 'string') contact = prefill.email;
 		if (typeof prefill.tax_id === 'string') taxId = prefill.tax_id;

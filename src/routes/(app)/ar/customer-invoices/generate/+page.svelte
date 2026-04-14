@@ -3,7 +3,7 @@
 	import { tick } from 'svelte';
 	import PageShell from '$lib/components/PageShell.svelte';
 	import companyLogo from '$lib/assets/favicon.png';
-	import { consumePrefill } from '$lib/agent/prefill';
+	import { agentPrefill, consumePrefill } from '$lib/agent/prefill';
 
 	type ProjectRow = {
 		id: string;
@@ -144,8 +144,13 @@
 	let selectedCustomerId = $state(editing?.customerId ?? '');
 	let lastBillToProjectId = $state('');
 	let editingInvoiceId = $state(editing?.id ?? '');
+	let lastPrefillVersion = $state(-1);
 
 	$effect(() => {
+		const state = $agentPrefill;
+		if (state.version === lastPrefillVersion) return;
+		lastPrefillVersion = state.version;
+
 		const prefill = consumePrefill();
 		if (Object.keys(prefill).length === 0) return;
 

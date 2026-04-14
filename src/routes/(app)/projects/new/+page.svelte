@@ -1,6 +1,6 @@
 <script lang="ts">
 	import PageShell from '$lib/components/PageShell.svelte';
-	import { consumePrefill } from '$lib/agent/prefill';
+	import { agentPrefill, consumePrefill, parseDateToPrefill } from '$lib/agent/prefill';
 
 	let { data, form } = $props();
 
@@ -11,15 +11,26 @@
 	let description = $state('');
 	let status = $state('active');
 
+	let lastPrefillVersion = $state(-1);
+
 	$effect(() => {
+		const state = $agentPrefill;
+		if (state.version === lastPrefillVersion) return;
+		lastPrefillVersion = state.version;
+
 		const prefill = consumePrefill();
 		if (Object.keys(prefill).length === 0) return;
 
 		if (typeof prefill.project_name === 'string') {
 			projectName = prefill.project_name;
 		}
-		if (typeof prefill.start_date === 'string') {
-			startDate = prefill.start_date;
+		if (prefill.start_date !== undefined) {
+			const parsed = parseDateToPrefill(prefill.start_date);
+			if (parsed) startDate = parsed;
+		}
+		if (prefill.end_date !== undefined) {
+			const parsed = parseDateToPrefill(prefill.end_date);
+			if (parsed) endDate = parsed;
 		}
 		if (typeof prefill.description === 'string') {
 			description = prefill.description;
