@@ -35,3 +35,42 @@ export interface AgentIntentResult {
 	prefill: Record<string, unknown>;
 	missing_context: string[];
 }
+
+// ============ Multi-Agent 新增类型 ============
+
+/** Router Agent 的输出 */
+export interface RouterResult {
+	intent_type: 'action' | 'query' | 'chat';
+	domain: string | null;
+	confidence: number;
+	raw_message: string;
+	context: AgentContext;
+}
+
+/** Domain Agent 的输出 */
+export interface DomainResult {
+	reply: string;
+	action: {
+		id: string;
+		entry: string;
+		layer: AgentLayer;
+	} | null;
+	prefill: Record<string, unknown>;
+	data?: unknown;
+	missing_context: string[];
+}
+
+/** 模块描述，供 Router Agent 分类用 */
+export interface DomainDescriptor {
+	id: string;
+	name: string;
+	description: string;
+	keywords: string[];
+}
+
+/** Domain Agent 定义 */
+export interface DomainAgentDef {
+	descriptor: DomainDescriptor;
+	actions: AgentAction[];
+	buildSystemPrompt: () => string;
+}

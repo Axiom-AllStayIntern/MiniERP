@@ -8,15 +8,21 @@
 		role: 'user' | 'assistant';
 		text: string;
 		action?: {
+			id: string;
 			entry: string;
 			layer: number;
 		} | null;
 		prefill?: Record<string, unknown>;
+		data?: unknown;
+		missing_context?: string[];
 	};
+
 	type AgentIntentResponse = {
-		reply?: string;
-		action?: { entry: string; layer: number } | null;
-		prefill?: Record<string, unknown>;
+		reply: string;
+		action: { id: string; entry: string; layer: number } | null;
+		prefill: Record<string, unknown>;
+		data?: unknown;
+		missing_context: string[];
 	};
 
 	let open = $state(false);
@@ -52,7 +58,9 @@
 					role: 'assistant',
 					text: data.reply ?? '我没有理解你的意思，能换个方式说吗？',
 					action: data.action ?? null,
-					prefill: data.prefill ?? {}
+					prefill: data.prefill ?? {},
+					data: data.data,
+					missing_context: data.missing_context ?? []
 				}
 			];
 		} catch {
@@ -72,6 +80,12 @@
 		const url = params.size > 0 ? `${entry}?${params.toString()}` : entry;
 		goto(url);
 		open = false;
+	}
+
+	function formatData(data: unknown): string {
+		if (data === null || data === undefined) return '';
+		if (typeof data === 'string') return data;
+		return JSON.stringify(data, null, 2);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -113,6 +127,18 @@
 					>
 						{msg.text}
 					</span>
+
+					{#if msg.role === 'assistant' && msg.data}
+						<div class="mt-1 max-w-[90%] rounded-lg bg-gray-50 p-2 text-left">
+							<pre class="overflow-x-auto text-xs text-gray-600">{formatData(msg.data)}</pre>
+						</div>
+					{/if}
+
+					{#if msg.role === 'assistant' && msg.missing_context && msg.missing_context.length > 0}
+						<div class="mt-1 text-left text-xs text-amber-600">
+							需要补充：{msg.missing_context.join('、')}
+						</div>
+					{/if}
 
 					{#if msg.role === 'assistant' && msg.action}
 						<div class="mt-1">
