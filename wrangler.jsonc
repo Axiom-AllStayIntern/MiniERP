@@ -49,13 +49,15 @@
 		"EMAIL_FROM": "SmartFin <onboarding@resend.dev>",
 		"LLM_PROVIDER": "heuristic",
 		"WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct",
+		"WORKERS_AI_VISION_MODEL": "@cf/meta/llama-3.2-11b-vision-instruct",
 		"OCR_PROMPT_VERSION": "v1"
 	},
 	"assets": {
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
 	},
-	"ai": { "binding": "AI" },
+	// Workers AI 无本地模拟；`wrangler dev --local` 时必须显式 remote，否则会报 “Binding AI needs to be run remotely”
+	"ai": { "binding": "AI", "remote": true },
 	"workers_dev": true,
 	"preview_urls": true
 }

@@ -1082,6 +1082,55 @@
 		return extractPdfTextFromUint8Array(new Uint8Array(fileBuffer));
 	}
 
+	/** Below this length, treat PDF as likely scanned and try Workers AI vision on page 1. */
+	const MIN_PDF_TEXT_CHARS = 48;
+
+	async function postWorkersVisionOcr(blob: Blob, fileName: string): Promise<{ text: string; error?: string }> {
+		const fd = new FormData();
+		fd.append('file', blob, fileName);
+		const res = await fetch('/api/ocr/workers-vision', { method: 'POST', body: fd });
+		const payload = (await res.json()) as {
+			ok?: boolean;
+			data?: { text?: string; model?: string };
+			error?: string;
+		};
+		if (!res.ok || !payload.ok || typeof payload.data?.text !== 'string') {
+			return { text: '', error: payload.error ?? `Workers vision OCR failed (${res.status})` };
+		}
+		return { text: payload.data.text };
+	}
+
+	async function renderPdfFirstPageToJpegBlob(file: File): Promise<Blob | null> {
+		try {
+			const { lib: pdfjs } = await loadPdfJs();
+			const loadingTask = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
+			const pdf = await Promise.race([
+				loadingTask.promise,
+				new Promise<never>((_, reject) =>
+					setTimeout(() => reject(new Error('PDF open timeout')), 15000)
+				)
+			]);
+			if (pdf.numPages < 1) return null;
+			const page = await pdf.getPage(1);
+			const baseVp = page.getViewport({ scale: 1 });
+			const maxW = 1600;
+			const scale = Math.min(2.5, maxW / Math.max(baseVp.width, 1));
+			const viewport = page.getViewport({ scale });
+			const canvas = document.createElement('canvas');
+			canvas.width = Math.ceil(viewport.width);
+			canvas.height = Math.ceil(viewport.height);
+			const ctx = canvas.getContext('2d');
+			if (!ctx) return null;
+			const renderTask = page.render({ canvasContext: ctx, viewport, canvas });
+			await renderTask.promise;
+			return await new Promise((resolve) => {
+				canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.88);
+			});
+		} catch {
+			return null;
+		}
+	}
+
 	async function runQuickTextDetection(file: File): Promise<void> {
 		const totalStart = performance.now();
 		detectStatus = 'analyzing';
@@ -1095,6 +1144,8 @@
 			const name = file.name.toLowerCase();
 			const type = (file.type || '').toLowerCase();
 			const isPdf = type.includes('pdf') || name.endsWith('.pdf');
+			const isImage =
+				type.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(name);
 			const isTextLike =
 				type.startsWith('text/') ||
 				type.includes('json') ||
@@ -1114,6 +1165,36 @@
 				pdfLoadMs = result.pdfLoadMs;
 				pdfParseMs = result.pdfParseMs;
 				baseDetectMsg = `PDF text extraction complete (${result.parsedPages}/${result.pageCount} pages scanned).`;
+
+				const pdfTextLen = raw.replace(/\s+/g, ' ').trim().length;
+				if (pdfTextLen < MIN_PDF_TEXT_CHARS) {
+					detectMessage = 'Little or no selectable text — running Workers AI OCR on first page…';
+					const jpegBlob = await renderPdfFirstPageToJpegBlob(file);
+					if (jpegBlob) {
+						const baseName = name.replace(/\.pdf$/i, '') || 'document';
+						const ocr = await postWorkersVisionOcr(jpegBlob, `${baseName}-p1.jpg`);
+						if (ocr.text.trim()) {
+							raw = ocr.text;
+							baseDetectMsg = `PDF had no usable text layer (${result.parsedPages}/${result.pageCount} pages checked). Workers AI OCR on page 1.`;
+						} else if (ocr.error) {
+							baseDetectMsg = `${baseDetectMsg} Workers AI OCR: ${ocr.error}`;
+						}
+					} else {
+						baseDetectMsg = `${baseDetectMsg} Could not rasterize first page for OCR.`;
+					}
+				}
+			} else if (isImage) {
+				detectMessage = 'Running Workers AI vision OCR…';
+				const ocr = await postWorkersVisionOcr(file, file.name);
+				if (!ocr.text.trim()) {
+					detectStatus = 'error';
+					detectMessage = ocr.error ?? 'Workers AI OCR returned no text.';
+					return;
+				}
+				raw = ocr.text;
+				pdfLoadMs = 0;
+				pdfParseMs = 0;
+				baseDetectMsg = 'Image processed with Workers AI vision OCR.';
 			} else if (isTextLike) {
 				if (name.endsWith('.eml')) {
 					const emlRaw = await file.text();
@@ -1248,7 +1329,7 @@
 			} else {
 				detectStatus = 'unsupported';
 				detectMessage =
-					'Quick text detection currently supports PDF text layer, text, csv, and eml. Image OCR is planned in next phase.';
+					'Quick detection supports PDF (text layer + scanned page 1 via Workers AI), images (JPEG/PNG/WebP/GIF via Workers AI), text/csv, and eml.';
 				return;
 			}
 
@@ -1343,7 +1424,7 @@
 			} else {
 				detectStatus = 'unsupported';
 				detectMessage = isPdf
-					? 'No readable text layer found in this PDF. This likely needs OCR in next phase.'
+					? 'No readable text from this PDF and Workers AI OCR did not return usable text (check AI binding / model).'
 					: 'No readable text found from this file.';
 				llmStatus = 'idle';
 				llmMessage = '';

@@ -24,3 +24,8 @@ BETTER_AUTH_SECRET=
 # OPENAI_MODEL=gpt-4o-mini
 # LLM_USE_EXTERNAL=false   # opt-out of HTTP LLM even if LLM_API_URL is set
 # LLM_SKIP_WORKERS=true     # skip Workers AI; use external only (when URL + key set)
+
+# --- Local image OCR (Paddle) — bypasses Workers AI vision when `wrangler dev --local` cannot use `env.AI` ---
+# Run: python scripts/paddle_ocr_dev_server.py   (see script header for pip install)
+# PADDLE_OCR_URL=http://127.0.0.1:8765
+# OCR_PADDLE_ONLY=true   # do not fall back to Workers AI after Paddle fails

@@ -7,6 +7,12 @@ declare global {
 		KV: KVNamespace;
 		OCR_QUEUE: Queue;
 		AI?: Ai;
+		/** Workers AI vision model for document image OCR (default @cf/meta/llama-3.2-11b-vision-instruct). */
+		WORKERS_AI_VISION_MODEL?: string;
+		/** Local PaddleOCR HTTP service base or full `/ocr` URL (e.g. http://127.0.0.1:8765). When set, tried before Workers AI. */
+		PADDLE_OCR_URL?: string;
+		/** If `true`, only use Paddle (`PADDLE_OCR_URL`); no Workers AI fallback. */
+		OCR_PADDLE_ONLY?: string;
 		OCR_PROVIDER?: 'mock' | 'external';
 		OCR_API_URL?: string;
 		OCR_API_KEY?: string;
