@@ -69,6 +69,18 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 
 	if (docType === 'contract') {
 		const contractId = crypto.randomUUID();
+		const contractMetadata = {
+			...extracted,
+			sourceType: 'upload' as const,
+			parseStatus: 'not_parsed' as const,
+			upload: {
+				key,
+				fileName,
+				contentType: fileType,
+				size: 0,
+				uploadedAt: now
+			}
+		};
 		await db.insert(schema.contracts).values({
 			id: contractId,
 			projectId,
@@ -83,7 +95,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			type: (str(extracted.type) as 'customer_contract' | 'supplier_contract' | '') || 'customer_contract',
 			status: (status as 'draft' | 'active' | 'completed' | 'terminated' | '') || 'active',
 			fileUrl: key,
-			metadata: JSON.stringify(extracted),
+			metadata: JSON.stringify(contractMetadata),
 			notes,
 			createdAt: now,
 			updatedAt: now
@@ -150,7 +162,16 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 			currency,
 			fileUrl: key,
 			metadata: JSON.stringify({
-				line_items: extracted.line_items ?? null
+				line_items: extracted.line_items ?? null,
+				sourceType: 'upload',
+				parseStatus: 'not_parsed',
+				upload: {
+					key,
+					fileName,
+					contentType: fileType,
+					size: 0,
+					uploadedAt: now
+				}
 			}),
 			status: (status as 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | '') || 'draft',
 			notes,
@@ -219,7 +240,16 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		description: str(extracted.description) || null,
 		fileUrl: key,
 		metadata: JSON.stringify({
-			line_items: extracted.line_items ?? null
+			line_items: extracted.line_items ?? null,
+			sourceType: 'upload',
+			parseStatus: 'not_parsed',
+			upload: {
+				key,
+				fileName,
+				contentType: fileType,
+				size: 0,
+				uploadedAt: now
+			}
 		}),
 		status: (status as 'draft' | 'sent' | 'confirmed' | 'fulfilled' | '') || 'draft',
 		notes,

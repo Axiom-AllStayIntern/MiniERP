@@ -201,7 +201,7 @@
 		extracted?: Record<string, unknown> | null;
 	};
 
-	// --- Client-side PDF text extraction ---
+	// --- Client-side PDF / image extraction (pdfjs-dist + Workers AI vision) ---
 	let _pdfJsCache: (typeof import('pdfjs-dist')) | null = null;
 
 	async function loadPdfJs() {
@@ -228,6 +228,36 @@
 			if (line) chunks.push(line);
 		}
 		return chunks.join('\n').trim();
+	}
+
+	async function renderPdfFirstPageToJpeg(file: File): Promise<Blob | null> {
+		try {
+			const pdfjs = await loadPdfJs();
+			const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+			if (pdf.numPages < 1) return null;
+			const page = await pdf.getPage(1);
+			const viewport = page.getViewport({ scale: Math.min(2.5, 1600 / Math.max(page.getViewport({ scale: 1 }).width, 1)) });
+			const canvas = document.createElement('canvas');
+			canvas.width = Math.ceil(viewport.width);
+			canvas.height = Math.ceil(viewport.height);
+			const ctx = canvas.getContext('2d');
+			if (!ctx) return null;
+			await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+			return await new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.88));
+		} catch {
+			return null;
+		}
+	}
+
+	async function runWorkersVisionOcr(blob: Blob, fileName: string): Promise<string> {
+		const fd = new FormData();
+		fd.append('file', blob, fileName);
+		const res = await fetch('/api/ocr/workers-vision', { method: 'POST', body: fd });
+		const payload = (await res.json()) as { ok?: boolean; data?: { text?: string }; error?: string };
+		if (!res.ok || !payload.ok || typeof payload.data?.text !== 'string') {
+			throw new Error(payload.error ?? `Workers AI vision OCR failed (${res.status})`);
+		}
+		return payload.data.text;
 	}
 
 	function applyExtracted(data: DetectData) {
@@ -270,12 +300,29 @@
 			fd.set('file', selectedFile);
 			fd.set('docType', docType);
 
-			// Extract PDF text client-side for better accuracy
-			const isPdf = selectedFile.type === 'application/pdf' || selectedFile.name.toLowerCase().endsWith('.pdf');
-			if (isPdf) {
+			// Client-side text extraction before sending to server
+			const mime = selectedFile.type.toLowerCase();
+			const fname = selectedFile.name.toLowerCase();
+			const isPdf = mime === 'application/pdf' || fname.endsWith('.pdf');
+			const isImage = mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(fname);
+
+			if (isImage) {
+				const ocrText = await runWorkersVisionOcr(selectedFile, selectedFile.name);
+				if (ocrText.trim()) fd.set('rawText', ocrText);
+			} else if (isPdf) {
 				try {
 					const text = await extractPdfTextClient(selectedFile);
-					if (text.trim()) fd.set('rawText', text);
+					if (text.trim().length >= 48) {
+						fd.set('rawText', text);
+					} else {
+						// Scanned PDF: render first page → Workers AI vision
+						const jpeg = await renderPdfFirstPageToJpeg(selectedFile);
+						if (jpeg) {
+							const baseName = fname.replace(/\.pdf$/i, '') || 'document';
+							const ocrText = await runWorkersVisionOcr(jpeg, `${baseName}-p1.jpg`);
+							if (ocrText.trim()) fd.set('rawText', ocrText);
+						}
+					}
 				} catch { /* fall back to server-side extraction */ }
 			}
 

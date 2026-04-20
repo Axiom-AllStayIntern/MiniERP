@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { documentPreviewMode } from '$lib/document-preview-mode';
 
 	let { data, form } = $props();
 
@@ -10,14 +11,13 @@
 			value ?? 0
 		);
 
-	const previewMode = $derived.by((): 'pdf' | 'image' | 'none' | 'other' => {
-		if (!data.fileViewUrl) return 'none';
-		const fn = data.docMeta.upload?.fileName?.toLowerCase() ?? '';
-		const ct = (data.docMeta.upload?.contentType ?? '').toLowerCase();
-		if (ct.includes('pdf') || fn.endsWith('.pdf')) return 'pdf';
-		if (ct.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp)$/i.test(fn)) return 'image';
-		return 'other';
-	});
+	const previewMode = $derived(
+		documentPreviewMode({
+			fileViewUrl: data.fileViewUrl,
+			fileUrl: data.quotation.fileUrl,
+			upload: data.docMeta.upload
+		})
+	);
 
 	const fmtBytes = (n: number | undefined) => {
 		if (n == null || !Number.isFinite(n)) return '—';

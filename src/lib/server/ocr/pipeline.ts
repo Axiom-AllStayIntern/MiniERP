@@ -1,5 +1,6 @@
 import { strFromU8, unzipSync } from 'fflate';
 import { extractStructuredDocumentFields } from './llm-extract';
+import { runImageDocumentOcr } from './image-document-ocr';
 import type { OcrPipelineExtract } from './types';
 
 const IMAGE_MIME = /^image\//i;
@@ -112,24 +113,47 @@ export async function runOcrPipeline(
 	const promptVersion = readEnvString(env, 'OCR_PROMPT_VERSION') || 'v1';
 
 	if (isImage) {
+		const ocrResult = await runImageDocumentOcr(env, {
+			imageBytes: new Uint8Array(bytes),
+			mimeType: mime || 'image/jpeg',
+			fileName: opts?.fileName ?? ''
+		});
+		if (!ocrResult.ok) {
+			return {
+				documentDate: null, totalAmount: null, currency: null, supplierName: null,
+				gstAmount: null, poNumber: null, dueDate: null,
+				confidence: 0, confidenceBand: 'low', needsReview: true,
+				validationWarnings: [`Image OCR failed: ${ocrResult.error}`],
+				sourceSnippets: {}, extractionMethod: 'external_ocr', ocrProvider: 'workers_ai',
+				llmProvider: 'heuristic', promptVersion, rawText: ''
+			};
+		}
+		const imageText = ocrResult.text.trim();
+		if (imageText.length < 50) {
+			return {
+				documentDate: null, totalAmount: null, currency: null, supplierName: null,
+				gstAmount: null, poNumber: null, dueDate: null,
+				confidence: 0.1, confidenceBand: 'low', needsReview: true,
+				validationWarnings: ['Image OCR returned very little text.'],
+				sourceSnippets: {}, extractionMethod: 'external_ocr', ocrProvider: 'workers_ai',
+				llmProvider: 'heuristic', promptVersion, rawText: imageText
+			};
+		}
+		const imageExtracted = await extractStructuredDocumentFields(imageText, {
+			llmProvider: 'external', promptVersion, env
+		});
+		const imgConfidence = imageExtracted.llmProvider !== 'heuristic' ? 0.75 : 0.45;
 		return {
-			documentDate: null,
-			totalAmount: null,
-			currency: null,
-			supplierName: null,
-			gstAmount: null,
-			poNumber: null,
-			dueDate: null,
-			confidence: 0,
-			confidenceBand: 'low',
-			needsReview: true,
-			validationWarnings: ['Image file: OCR for images is not available yet.'],
-			sourceSnippets: {},
-			extractionMethod: 'external_ocr',
-			ocrProvider: 'workers_ai',
-			llmProvider: 'heuristic',
-			promptVersion,
-			rawText: ''
+			documentDate: imageExtracted.documentDate, totalAmount: imageExtracted.totalAmount,
+			currency: imageExtracted.currency, supplierName: imageExtracted.supplierName,
+			gstAmount: imageExtracted.gstAmount, poNumber: imageExtracted.poNumber,
+			dueDate: imageExtracted.dueDate,
+			confidence: imgConfidence,
+			confidenceBand: imgConfidence >= 0.75 ? 'high' : 'medium',
+			needsReview: imgConfidence < 0.75,
+			validationWarnings: [],
+			sourceSnippets: {}, extractionMethod: 'external_ocr', ocrProvider: 'workers_ai',
+			llmProvider: imageExtracted.llmProvider, promptVersion, rawText: imageText
 		};
 	}
 
