@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 
 import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { fail, ok } from '$lib/server/http';
+import { projectExpenseTotalSumExpr, projectRevenueTotalSumExpr } from '$lib/server/modules/expense/repository';
 import {
 	staffCostPayoutJoinConditions,
 	staffCostPeriodBetween,
@@ -41,16 +42,16 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 		return ok([]);
 	}
 
-	const revenueConditions = [isNull(schema.invoicesOut.deletedAt)];
-	if (hasRange) revenueConditions.push(sql`${schema.invoicesOut.date} between ${from} and ${to}`);
+	const revenueConditions = [isNull(schema.revenue.deletedAt)];
+	if (hasRange) revenueConditions.push(sql`${schema.revenue.date} between ${from} and ${to}`);
 	const revenueRows = await db
 		.select({
-			projectId: schema.invoicesOut.projectId,
-			total: sql<number>`coalesce(sum(${schema.invoicesOut.total}), 0)`
+			projectId: schema.revenue.projectId,
+			total: projectRevenueTotalSumExpr()
 		})
-		.from(schema.invoicesOut)
+		.from(schema.revenue)
 		.where(and(...revenueConditions))
-		.groupBy(schema.invoicesOut.projectId);
+		.groupBy(schema.revenue.projectId);
 
 	const purchaseConditions = [isNull(schema.invoicesIn.deletedAt)];
 	if (hasRange) purchaseConditions.push(sql`${schema.invoicesIn.invoiceDate} between ${from} and ${to}`);
@@ -83,7 +84,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 	const expenseRows = await db
 		.select({
 			projectId: schema.expenses.projectId,
-			total: sql<number>`coalesce(sum(${schema.expenses.amount}), 0)`
+			total: projectExpenseTotalSumExpr()
 		})
 		.from(schema.expenses)
 		.where(and(...expenseConditions))

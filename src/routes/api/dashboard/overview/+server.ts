@@ -4,6 +4,12 @@ import type { RequestHandler } from './$types';
 import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { fail, ok } from '$lib/server/http';
 import {
+	expenseSgdAmountExpr,
+	projectExpenseTotalSumExpr,
+	projectRevenueTotalSumExpr,
+	revenueSgdAmountExpr
+} from '$lib/server/modules/expense/repository';
+import {
 	staffCostPayoutJoinConditions,
 	staffCostPeriodBetween,
 	staffCostSumExpr
@@ -50,11 +56,9 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 	};
 
 	const [income] = await db
-		.select({ total: sql<number>`coalesce(sum(${schema.invoicesOut.total}), 0)` })
-		.from(schema.invoicesOut)
-		.where(
-			and(between(schema.invoicesOut.date, current.start, current.end), isNull(schema.invoicesOut.deletedAt))
-		);
+		.select({ total: projectRevenueTotalSumExpr() })
+		.from(schema.revenue)
+		.where(and(between(schema.revenue.date, current.start, current.end), isNull(schema.revenue.deletedAt)));
 	const [supplierCost] = await db
 		.select({ total: sql<number>`coalesce(sum(${schema.invoicesIn.amount}), 0)` })
 		.from(schema.invoicesIn)
@@ -75,18 +79,15 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 			and(staffCostPeriodBetween(current.start, current.end), staffCostPayoutJoinConditions())
 		);
 	const [expenseCost] = await db
-		.select({ total: sql<number>`coalesce(sum(${schema.expenses.amount}), 0)` })
+		.select({ total: projectExpenseTotalSumExpr() })
 		.from(schema.expenses)
 		.where(and(between(schema.expenses.date, current.start, current.end), isNull(schema.expenses.deletedAt)));
 
 	const [prevIncome] = await db
-		.select({ total: sql<number>`coalesce(sum(${schema.invoicesOut.total}), 0)` })
-		.from(schema.invoicesOut)
+		.select({ total: projectRevenueTotalSumExpr() })
+		.from(schema.revenue)
 		.where(
-			and(
-				between(schema.invoicesOut.date, previous.start, previous.end),
-				isNull(schema.invoicesOut.deletedAt)
-			)
+			and(between(schema.revenue.date, previous.start, previous.end), isNull(schema.revenue.deletedAt))
 		);
 	const [prevSupplierCost] = await db
 		.select({ total: sql<number>`coalesce(sum(${schema.invoicesIn.amount}), 0)` })
@@ -108,24 +109,24 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 			and(staffCostPeriodBetween(previous.start, previous.end), staffCostPayoutJoinConditions())
 		);
 	const [prevExpenseCost] = await db
-		.select({ total: sql<number>`coalesce(sum(${schema.expenses.amount}), 0)` })
+		.select({ total: projectExpenseTotalSumExpr() })
 		.from(schema.expenses)
 		.where(and(between(schema.expenses.date, previous.start, previous.end), isNull(schema.expenses.deletedAt)));
 
 	const [revenueItems, supplierItems, staffItems, expenseItems] = await Promise.all([
 		db
 			.select({
-				id: schema.invoicesOut.id,
-				date: schema.invoicesOut.date,
-				ref: schema.invoicesOut.invoiceNo,
-				note: schema.invoicesOut.status,
-				amount: schema.invoicesOut.total
+				id: schema.revenue.id,
+				date: schema.revenue.date,
+				ref: sql<string>`coalesce(${schema.revenue.invoiceNumber}, ${schema.revenue.id})`,
+				note: sql<string>`'completed'`,
+				amount: revenueSgdAmountExpr()
 			})
-			.from(schema.invoicesOut)
+			.from(schema.revenue)
 			.where(
-				and(between(schema.invoicesOut.date, current.start, current.end), isNull(schema.invoicesOut.deletedAt))
+				and(between(schema.revenue.date, current.start, current.end), isNull(schema.revenue.deletedAt))
 			)
-			.orderBy(desc(schema.invoicesOut.date), desc(schema.invoicesOut.createdAt)),
+			.orderBy(desc(schema.revenue.date), desc(schema.revenue.createdAt)),
 		db
 			.select({
 				id: schema.invoicesIn.id,
@@ -165,7 +166,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 				date: schema.expenses.date,
 				ref: schema.expenses.category,
 				note: schema.expenses.notes,
-				amount: schema.expenses.amount
+				amount: expenseSgdAmountExpr()
 			})
 			.from(schema.expenses)
 			.where(and(between(schema.expenses.date, current.start, current.end), isNull(schema.expenses.deletedAt)))

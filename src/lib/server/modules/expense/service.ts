@@ -2,6 +2,7 @@ import type { ModuleContext } from '../types';
 import { ExpenseRepository, RevenueRepository, ExpenseCategoryRepository } from './repository';
 import { createEvent } from '../event-bus';
 import type { ExpenseType } from '$lib/constants/expense-upload';
+import { resolveSgdEquivalentForWrite } from '$lib/server/fx/resolve-sgd-equivalent';
 
 // ---------------------------------------------------------------------------
 // ExpenseService
@@ -42,10 +43,16 @@ export class ExpenseService {
 		metadata?: string | null;
 		documentRef?: string | null;
 	}) {
+		const currency = (data.currency ?? 'SGD').trim().toUpperCase();
+		const sgdEquivalent = await resolveSgdEquivalentForWrite({
+			amount: data.amount,
+			currency,
+			dateYmd: data.date
+		});
 		const result = await this.repo.create({
 			...data,
-			currency: data.currency ?? 'SGD',
-			sgdEquivalent: (data.currency ?? 'SGD') === 'SGD' ? data.amount : 0,
+			currency,
+			sgdEquivalent,
 			reimbursement: data.reimbursement ?? false,
 			businessTrip: data.businessTrip ?? false
 		});
@@ -100,10 +107,16 @@ export class ExpenseService {
 		gstAmount?: number;
 		notes?: string | null;
 	}) {
+		const currency = (data.currency ?? 'SGD').trim().toUpperCase();
+		const sgdEquivalent = await resolveSgdEquivalentForWrite({
+			amount: data.amount,
+			currency,
+			dateYmd: data.date
+		});
 		return this.revenueRepo.create({
 			...data,
-			currency: data.currency ?? 'SGD',
-			sgdEquivalent: (data.currency ?? 'SGD') === 'SGD' ? data.amount : 0,
+			currency,
+			sgdEquivalent,
 			gstAmount: data.gstAmount ?? 0
 		});
 	}

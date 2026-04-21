@@ -10,7 +10,13 @@
  */
 
 // Core module
-export { users, auditLogs, companySettings } from '../modules/core/schema';
+export {
+	users,
+	auditLogs,
+	companySettings,
+	uploadIdempotency,
+	uploadFileDedup
+} from '../modules/core/schema';
 
 // better-auth tables (sessions, accounts, verifications)
 export { sessions, accounts, verifications } from '../auth/auth-tables';

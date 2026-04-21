@@ -3,6 +3,8 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 
 import { getDb, schema } from '$lib/server/modules/legacy-db';
+import { resolveSgdEquivalentForWrite } from '$lib/server/fx/resolve-sgd-equivalent';
+import { projectRevenueTotalSumExpr } from '$lib/server/modules/expense/repository';
 
 export const load: PageServerLoad = async ({ params, platform, parent }) => {
 	const { project } = await parent();
@@ -72,19 +74,20 @@ export const load: PageServerLoad = async ({ params, platform, parent }) => {
 		invoices = [];
 	}
 
-	const revenueTotal = revenueRecords.reduce(
-		(sum, r) => sum + (r.sgdEquivalent || r.amount || 0),
-		0
-	);
-	const invoicedTotal = invoices.reduce((sum, i) => sum + (i.total || 0), 0);
+	const [sumRow] = await db
+		.select({ total: projectRevenueTotalSumExpr() })
+		.from(schema.revenue)
+		.where(and(eq(schema.revenue.projectId, projectId), isNull(schema.revenue.deletedAt)));
+	const revenueTotal = sumRow?.total ?? 0;
 
 	return {
 		revenueRecords,
 		invoices,
 		totals: {
-			total: revenueTotal + invoicedTotal,
+			// `invoices_out` is a view of `revenue` — do not double-count; all figures are SGD-equivalent.
+			total: revenueTotal,
 			revenue: revenueTotal,
-			invoiced: invoicedTotal
+			invoiced: revenueTotal
 		},
 		project
 	};
@@ -104,10 +107,11 @@ export const actions: Actions = {
 		const clientName = String(formData.get('clientName') || '') || null;
 		const date = String(formData.get('date') || now.slice(0, 10));
 		const amount = Number(formData.get('amount') || 0);
-		const currency = String(formData.get('currency') || 'SGD');
+		const currency = String(formData.get('currency') || 'SGD').trim().toUpperCase();
 		const gstAmount = Number(formData.get('gstAmount') || 0);
 		const notes = String(formData.get('notes') || '') || null;
 
+		const sgdEq = await resolveSgdEquivalentForWrite({ amount, currency, dateYmd: date });
 		await db.insert(schema.revenue).values({
 			id,
 			invoiceType: invoiceType as 'standard' | 'zero_rate' | 'tax_invoice',
@@ -117,7 +121,7 @@ export const actions: Actions = {
 			date,
 			amount,
 			currency,
-			sgdEquivalent: currency === 'SGD' ? amount : 0,
+			sgdEquivalent: sgdEq,
 			gstAmount,
 			notes,
 			createdAt: now,

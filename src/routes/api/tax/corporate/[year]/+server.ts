@@ -4,6 +4,10 @@ import type { RequestHandler } from './$types';
 import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { fail, ok } from '$lib/server/http';
 import {
+	projectExpenseTotalSumExpr,
+	projectRevenueTotalSumExpr
+} from '$lib/server/modules/expense/repository';
+import {
 	staffCostPayoutJoinConditions,
 	staffCostPeriodBetween,
 	staffCostSumExpr
@@ -29,9 +33,10 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 	const end = `${year}-12-31`;
 
 	const db = getDb(platform.env);
-	const [revenue] = await db.select({ total: sql<number>`coalesce(sum(${schema.invoicesOut.total}), 0)` }).from(
-		schema.invoicesOut
-	).where(and(between(schema.invoicesOut.date, start, end), isNull(schema.invoicesOut.deletedAt)));
+	const [revenue] = await db
+		.select({ total: projectRevenueTotalSumExpr() })
+		.from(schema.revenue)
+		.where(and(between(schema.revenue.date, start, end), isNull(schema.revenue.deletedAt)));
 	const [purchase] = await db.select({ total: sql<number>`coalesce(sum(${schema.invoicesIn.amount}), 0)` }).from(
 		schema.invoicesIn
 	).where(and(between(schema.invoicesIn.invoiceDate, start, end), isNull(schema.invoicesIn.deletedAt)));
@@ -46,7 +51,7 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 			and(staffCostPeriodBetween(start, end), staffCostPayoutJoinConditions())
 		);
 	const [expense] = await db
-		.select({ total: sql<number>`coalesce(sum(${schema.expenses.amount}), 0)` })
+		.select({ total: projectExpenseTotalSumExpr() })
 		.from(schema.expenses)
 		.where(and(between(schema.expenses.date, start, end), isNull(schema.expenses.deletedAt)));
 

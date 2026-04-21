@@ -6,6 +6,7 @@
 	const quotations = $derived(data.quotations ?? []);
 	const purchaseOrders = $derived(data.purchaseOrders ?? []);
 	const expenseDocuments = $derived(data.expenseDocuments ?? []);
+	const revenueDocuments = $derived(data.revenueDocuments ?? []);
 
 	const money = (value: number | null, currency = 'SGD') =>
 		value != null
@@ -62,7 +63,8 @@
 			contracts.length +
 			quotations.length +
 			purchaseOrders.length +
-			expenseDocuments.length
+			expenseDocuments.length +
+			revenueDocuments.length
 	);
 
 	const expenseTypeBadgeClass = (expenseType: string) =>
@@ -102,7 +104,7 @@
 		</p>
 	</div>
 
-	<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+	<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
 		<div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
 			<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Total Documents</p>
 			<p class="mt-1 text-2xl font-semibold text-slate-900">{totalDocs}</p>
@@ -122,6 +124,10 @@
 		<div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
 			<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Expense Docs</p>
 			<p class="mt-1 text-2xl font-semibold text-slate-900">{expenseDocuments.length}</p>
+		</div>
+		<div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+			<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Revenue Docs</p>
+			<p class="mt-1 text-2xl font-semibold text-slate-900">{revenueDocuments.length}</p>
 		</div>
 	</div>
 
@@ -272,6 +278,54 @@
 							</td>
 							<td class="px-4 py-3 font-medium text-slate-800">
 								{money(exp.amount, exp.currency || 'SGD')}
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	{/if}
+
+	{#if revenueDocuments.length > 0}
+		<div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+			<div class="border-b border-slate-200 bg-slate-50 px-5 py-3">
+				<h3 class="text-sm font-semibold text-slate-900">Revenue documents</h3>
+				<p class="mt-0.5 text-xs text-slate-500">
+					Project customer invoice files and revenue records (same style as expense docs).
+				</p>
+			</div>
+			<table class="min-w-full divide-y divide-slate-200 text-sm">
+				<thead class="bg-white text-left text-slate-600">
+					<tr>
+						<th class="px-4 py-3 font-medium">Ref.</th>
+						<th class="px-4 py-3 font-medium">File name</th>
+						<th class="px-4 py-3 font-medium">Date</th>
+						<th class="px-4 py-3 font-medium">Status</th>
+						<th class="px-4 py-3 font-medium">Amount</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-slate-100">
+					{#each revenueDocuments as rev}
+						<tr
+							class={rowClass}
+							tabindex="0"
+							role="link"
+							onclick={() => go(`/projects/${data.project.id}/documents/revenue/${rev.id}`)}
+							onkeydown={(e) =>
+								rowKey(e, `/projects/${data.project.id}/documents/revenue/${rev.id}`)}
+						>
+							<td class="px-4 py-3 font-medium text-slate-800">{rev.displayNumber}</td>
+							<td class="max-w-xs truncate px-4 py-3 text-slate-700" title={rev.displayFileName}>
+								{rev.displayFileName}
+							</td>
+							<td class="px-4 py-3 text-slate-600">{formatDate(rev.date)}</td>
+							<td class="px-4 py-3">
+								<span class="rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700">
+									{rev.statusLabel}
+								</span>
+							</td>
+							<td class="px-4 py-3 font-medium text-slate-800">
+								{money(rev.amount, rev.currency || 'SGD')}
 							</td>
 						</tr>
 					{/each}

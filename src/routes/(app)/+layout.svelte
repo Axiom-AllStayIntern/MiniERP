@@ -55,6 +55,17 @@
 			]
 		},
 		{
+			title: 'Revenue',
+			items: [
+				{
+					href: '/finance/revenue/customer-invoice-upload',
+					label: 'Customer invoice upload',
+					moduleId: 'ar',
+					icon: '◧'
+				}
+			]
+		},
+		{
 			title: 'Documents',
 			items: [{ href: '/finance/doc-hub', label: 'Doc Hub', moduleId: 'ar', icon: '▤' }]
 		}
@@ -169,6 +180,9 @@
 		}
 		if (itemPath === '/expenses') {
 			return path === '/expenses' || (path.startsWith('/expenses/') && !path.startsWith('/expenses/reimbursements'));
+		}
+		if (itemPath.startsWith('/finance/revenue/')) {
+			return path.startsWith('/finance/revenue');
 		}
 		if (itemPath === '/finance/doc-hub') {
 			return path.startsWith('/finance/doc-hub');

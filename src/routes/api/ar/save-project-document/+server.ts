@@ -6,6 +6,17 @@ import { buildDocumentMetadata } from '$lib/server/document-metadata';
 import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { fail, ok } from '$lib/server/http';
 import { objectExists } from '$lib/server/r2';
+import {
+	beginIdempotentRequest,
+	claimFileHash,
+	completeIdempotentRequest,
+	failIdempotentRequest,
+	getObjectSha256,
+	normalizeProjectScope,
+	releaseFileHashClaim,
+	UploadGuardSchemaError
+} from '$lib/server/upload-guards';
+import { resolveSgdEquivalentForWrite } from '$lib/server/fx/resolve-sgd-equivalent';
 
 function errorChainText(e: unknown): string {
 	if (e instanceof Error) {
@@ -230,20 +241,93 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 				return ok({ entityId: id, entityType: 'purchase_order' }, 201);
 			}
 			case 'invoice_out': {
+				const idempotencyKey = str(body.idempotencyKey);
+				if (!idempotencyKey) {
+					return fail('idempotencyKey is required for invoice_out upload');
+				}
+				const projectScope = normalizeProjectScope(projectId);
+				let idem: Awaited<ReturnType<typeof beginIdempotentRequest>>;
+				try {
+					idem = await beginIdempotentRequest(db, {
+						idempotencyKey,
+						endpoint: 'POST:/api/ar/save-project-document:invoice_out',
+						userId: locals.user?.id ?? null,
+						projectScope
+					});
+				} catch (e) {
+					if (e instanceof UploadGuardSchemaError) {
+						return fail('Upload dedupe guard is initializing. Please run DB migration and retry.', 503);
+					}
+					throw e;
+				}
+				if (idem.state === 'completed') {
+					if (idem.responseBody) {
+						try {
+							const parsed = JSON.parse(idem.responseBody) as unknown;
+							return ok(parsed as object, 200);
+						} catch {
+							return ok({ message: 'Request already processed' }, 200);
+						}
+					}
+					return ok({ message: 'Request already processed' }, 200);
+				}
+				if (idem.state === 'in_progress') {
+					return fail('A request with the same idempotency key is still processing', 409);
+				}
+
+				const fileHash = await getObjectSha256(platform.env, key);
+				if (!fileHash) {
+					await failIdempotentRequest(
+						db,
+						idempotencyKey,
+						'Uploaded file missing in storage during hash check'
+					);
+					return fail('Uploaded file was not found in storage during dedupe check', 404);
+				}
+
 				const reissueNumber = body.invoiceOutReissueNumber === true;
 				const desiredInvoiceNo = str(body.invoiceOutNo);
 				const total = num0(body.invoiceOutTotal);
 				const gst = num0(body.invoiceOutGstAmount);
-				const subtotal = Math.max(0, total - gst);
 				const gstTypeRaw = str(body.invoiceOutGstType);
 				const gstType =
 					gstTypeRaw === 'zero' || gstTypeRaw === 'exempt' || gstTypeRaw === 'standard'
 						? gstTypeRaw
 						: 'standard';
 				const extractedCustomer = str(body.invoiceOutCustomer);
+				const outCurrency = (str(body.invoiceOutCurrency) || 'SGD').trim().toUpperCase();
+				const invoiceDate = str(body.invoiceOutDate) || now.slice(0, 10);
 				const id = crypto.randomUUID();
-
-				const buildLineItems = (opts: { systemReassigned?: boolean }) => {
+				let hashClaim: Awaited<ReturnType<typeof claimFileHash>>;
+				try {
+					hashClaim = await claimFileHash(db, {
+						domain: 'revenue',
+						projectScope,
+						fileHash,
+						entityType: 'invoice_out',
+						entityId: id,
+						createdBy: locals.user?.id ?? null
+					});
+				} catch (e) {
+					if (e instanceof UploadGuardSchemaError) {
+						await failIdempotentRequest(db, idempotencyKey, e.message);
+						return fail('Upload dedupe guard is initializing. Please run DB migration and retry.', 503);
+					}
+					throw e;
+				}
+				if (!hashClaim.ok) {
+					await failIdempotentRequest(db, idempotencyKey, 'Duplicate file hash detected');
+					return fail(
+						'Duplicate upload detected: this customer invoice file was already recorded',
+						409,
+						{
+							code: 'DUPLICATE_FILE_UPLOAD',
+							existingEntityId: hashClaim.duplicateEntityId
+						}
+					);
+				}
+				try {
+					const buildLineItems = (opts: { systemReassigned?: boolean }) => {
 					const o: Record<string, unknown> = {};
 					if (extractedCustomer) o.extractedCustomerLabel = extractedCustomer;
 					if (desiredInvoiceNo) o.extractedInvoiceNoFromDocument = desiredInvoiceNo;
@@ -252,24 +336,29 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 							'System invoice number reassigned after user confirmed save despite duplicate document number.';
 					}
 					return Object.keys(o).length ? JSON.stringify(o) : null;
-				};
+					};
 
-				const insertOut = async (no: string, lineItems: string | null) => {
-					await db.insert(schema.invoicesOut).values({
+				const insertRevenueRow = async (no: string, lineItems: string | null) => {
+					const sgdEq = await resolveSgdEquivalentForWrite({
+						amount: total,
+						currency: outCurrency,
+						dateYmd: invoiceDate
+					});
+					const invoiceType =
+						gstType === 'zero' || gstType === 'exempt' ? 'zero_rate' : 'standard';
+					await db.insert(schema.revenue).values({
 						id,
 						projectId,
-						customerId: project.customerId,
-						invoiceNo: no,
-						date: str(body.invoiceOutDate) || now.slice(0, 10),
-						dueDate: str(body.invoiceOutDueDate) || null,
-						currency: str(body.invoiceOutCurrency) || 'SGD',
-						subtotal,
-						gstType,
+						invoiceType: invoiceType as 'standard' | 'zero_rate',
+						invoiceNumber: no,
+						clientName: extractedCustomer || null,
+						date: invoiceDate,
+						amount: total,
+						currency: outCurrency,
+						sgdEquivalent: sgdEq,
 						gstAmount: gst,
-						total,
-						status: 'draft',
-						pdfUrl: key,
-						lineItems,
+						documentRef: key,
+						notes: lineItems,
 						createdAt: now,
 						updatedAt: now
 					});
@@ -280,21 +369,23 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 				if (reissueNumber) {
 					invoiceNo = `INV-UP-${crypto.randomUUID().replace(/-/g, '').slice(0, 14).toUpperCase()}`;
 					try {
-						await insertOut(invoiceNo, buildLineItems({ systemReassigned: true }));
+						await insertRevenueRow(invoiceNo, buildLineItems({ systemReassigned: true }));
 					} catch (e) {
 						const t = errorChainText(e);
 						if (!isUniqueConstraintError(t)) throw e;
 						invoiceNo = `INV-UP-${crypto.randomUUID().replace(/-/g, '').slice(0, 14).toUpperCase()}`;
-						await insertOut(invoiceNo, buildLineItems({ systemReassigned: true }));
+						await insertRevenueRow(invoiceNo, buildLineItems({ systemReassigned: true }));
 					}
 				} else {
 					invoiceNo =
 						desiredInvoiceNo || `INV-UP-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 					try {
-						await insertOut(invoiceNo, buildLineItems({}));
+						await insertRevenueRow(invoiceNo, buildLineItems({}));
 					} catch (e) {
 						const t = errorChainText(e);
 						if (!isUniqueConstraintError(t)) throw e;
+						await failIdempotentRequest(db, idempotencyKey, 'Duplicate invoice number');
+						await releaseFileHashClaim(db, { domain: 'revenue', projectScope, fileHash });
 						return fail(
 							'This customer invoice number already exists in the system. Cancel or confirm to save with a new system-generated number.',
 							409,
@@ -310,17 +401,29 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 					projectId,
 					metadata: { fileName, invoiceNo, extractedInvoiceNo: desiredInvoiceNo || undefined }
 				});
-				return ok({ entityId: id, entityType: 'invoice_out', invoiceNo }, 201);
+				const responseBody = { entityId: id, entityType: 'invoice_out', invoiceNo };
+				await completeIdempotentRequest(db, idempotencyKey, JSON.stringify(responseBody));
+				return ok(responseBody, 201);
+				} catch (e) {
+					await releaseFileHashClaim(db, { domain: 'revenue', projectScope, fileHash });
+					await failIdempotentRequest(
+						db,
+						idempotencyKey,
+						e instanceof Error ? e.message : String(e)
+					);
+					throw e;
+				}
 			}
 			case 'expense': {
 				const id = crypto.randomUUID();
 				const category =
 					str(body.expenseCategory) || str(body.otherTag) || str(docTitle) || 'others';
 				const amount = num0(body.expenseAmount);
-				const currency = str(body.expenseCurrency) || 'SGD';
+				const currency = (str(body.expenseCurrency) || 'SGD').trim().toUpperCase();
 				const date = str(body.expenseDate) || now.slice(0, 10);
 				const staffName = str(body.expenseStaffName) || null;
 				const expenseType = str(body.expenseCostLayer) === 'sales_cost' ? 'sales_cost' : 'opex';
+				const sgdEq = await resolveSgdEquivalentForWrite({ amount, currency, dateYmd: date });
 				await db.insert(schema.expenses).values({
 					id,
 					projectId,
@@ -328,7 +431,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 					category,
 					amount,
 					currency,
-					sgdEquivalent: currency === 'SGD' ? amount : 0,
+					sgdEquivalent: sgdEq,
 					date,
 					staffName,
 					reimbursement: false,

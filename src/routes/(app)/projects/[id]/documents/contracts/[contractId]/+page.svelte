@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import StorageTextPreview from '$lib/components/StorageTextPreview.svelte';
 	import { documentPreviewMode } from '$lib/document-preview-mode';
 
 	let { data, form } = $props();
@@ -153,9 +154,12 @@
 						src={data.fileViewUrl}
 					/>
 				</div>
+			{:else if previewMode === 'text' && data.fileViewUrl}
+				<p class="mb-2 text-xs text-slate-500">Extracted text (Word, plain text, CSV, etc.)</p>
+				<StorageTextPreview fileViewUrl={data.fileViewUrl} />
 			{:else}
 				<p class="text-sm text-slate-600">
-					Preview is not embedded for this file type.
+					Inline preview is not available for this file type (e.g. Excel, PowerPoint, or legacy .doc).
 					<a class="ml-1 font-medium text-[var(--sf-green)] hover:underline" href={data.fileViewUrl} target="_blank" rel="noreferrer"
 						>Open / download</a
 					>

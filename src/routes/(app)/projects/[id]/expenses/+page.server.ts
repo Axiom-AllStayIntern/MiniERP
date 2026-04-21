@@ -4,6 +4,7 @@ import { fail } from '@sveltejs/kit';
 
 import { parseDocumentMetadata } from '$lib/server/document-metadata';
 import { getDb, schema } from '$lib/server/modules/legacy-db';
+import { resolveSgdEquivalentForWrite } from '$lib/server/fx/resolve-sgd-equivalent';
 import { ALLOWANCE_RATES } from '$lib/constants/expense-upload';
 
 const DOCUMENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -157,7 +158,7 @@ export const actions: Actions = {
 		const expenseType = (formData.get('expenseType') as string) || 'opex';
 		const category = String(formData.get('category') || 'others');
 		const amount = Number(formData.get('amount') || 0);
-		const currency = String(formData.get('currency') || 'SGD');
+		const currency = String(formData.get('currency') || 'SGD').trim().toUpperCase();
 		const date = String(formData.get('date') || now.slice(0, 10));
 		const vendorOrSupplier = String(formData.get('vendorOrSupplier') || '') || null;
 		const staffName = String(formData.get('staffName') || '') || null;
@@ -166,6 +167,7 @@ export const actions: Actions = {
 		const destinationVal = String(formData.get('destination') || '') || null;
 		const notes = String(formData.get('notes') || '') || null;
 
+		const sgdEq = await resolveSgdEquivalentForWrite({ amount, currency, dateYmd: date });
 		await db.insert(schema.expenses).values({
 			id,
 			projectId: params.id,
@@ -174,7 +176,7 @@ export const actions: Actions = {
 			date,
 			amount,
 			currency,
-			sgdEquivalent: currency === 'SGD' ? amount : 0,
+			sgdEquivalent: sgdEq,
 			gstAmount: 0,
 			vendorOrSupplier,
 			staffName,

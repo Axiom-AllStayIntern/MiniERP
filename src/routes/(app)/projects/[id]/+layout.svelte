@@ -34,7 +34,6 @@
 	const isExpenses = $derived(path.startsWith(`${base}/expenses`));
 	const isRevenue = $derived(path.startsWith(`${base}/revenue`));
 	const isMembers = $derived(path.startsWith(`${base}/employees`) || path.startsWith(`${base}/members`));
-	const isInvoices = $derived(path.startsWith(`${base}/invoices`));
 
 	// Project workspace nav items
 	type NavItem = {
@@ -59,7 +58,7 @@
 				data.submoduleCounts.expenses
 		},
 		{ href: `${base}/expenses`, label: 'Expenses', icon: '⊟', active: isExpenses, count: data.submoduleCounts.expenses },
-		{ href: `${base}/revenue`, label: 'Revenue', icon: '¥', active: isRevenue || isInvoices },
+		{ href: `${base}/revenue`, label: 'Revenue', icon: '¥', active: isRevenue },
 		{ href: `${base}/employees`, label: 'Team & Cost', icon: '◎', active: isMembers }
 	]);
 
@@ -199,7 +198,7 @@
 						{#if !isDashboard}
 							<span class="text-slate-300">/</span>
 							<span class="text-slate-600">
-								{#if isDocuments}Documents{:else if isExpenses}Expenses{:else if isRevenue || isInvoices}Revenue{:else if isMembers}Team & Cost{/if}
+								{#if isDocuments}Documents{:else if isExpenses}Expenses{:else if isRevenue}Revenue{:else if isMembers}Team & Cost{/if}
 							</span>
 						{/if}
 					</nav>

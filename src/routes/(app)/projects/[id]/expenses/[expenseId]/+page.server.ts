@@ -6,6 +6,8 @@ import { writeAuditLog } from '$lib/server/audit';
 import { buildDocumentMetadata, parseDocumentMetadata } from '$lib/server/document-metadata';
 import { resolveExpenseFilePreview } from '$lib/server/expense-file-preview';
 import { getDb, schema } from '$lib/server/modules/legacy-db';
+import { resolveSgdEquivalentForWrite } from '$lib/server/fx/resolve-sgd-equivalent';
+import { deleteUploadedFileHashForEntity } from '$lib/server/uploaded-file-hash';
 
 export const load: PageServerLoad = async ({ params, platform, parent }) => {
 	await parent();
@@ -43,7 +45,7 @@ export const actions: Actions = {
 		const category = String(form.get('category') ?? '').trim();
 		const expenseType = String(form.get('expenseType') ?? 'opex');
 		const amount = Number.parseFloat(String(form.get('amount') ?? '0'));
-		const currency = String(form.get('currency') ?? 'SGD');
+		const currency = String(form.get('currency') ?? 'SGD').trim().toUpperCase();
 		const date = String(form.get('date') ?? '');
 		const staffName = String(form.get('staffName') ?? '').trim();
 		const vendorOrSupplier = String(form.get('vendorOrSupplier') ?? '').trim();
@@ -69,14 +71,17 @@ export const actions: Actions = {
 			notes: notes || undefined
 		});
 
+		const amt = Number.isFinite(amount) ? amount : 0;
+		const sgdEq = await resolveSgdEquivalentForWrite({ amount: amt, currency, dateYmd: date });
+
 		await db
 			.update(schema.expenses)
 			.set({
 				expenseType: expenseType as 'opex' | 'sales_cost',
 				category,
-				amount: Number.isFinite(amount) ? amount : 0,
+				amount: amt,
 				currency,
-				sgdEquivalent: currency === 'SGD' ? (Number.isFinite(amount) ? amount : 0) : 0,
+				sgdEquivalent: sgdEq,
 				date,
 				staffName: staffName || null,
 				vendorOrSupplier: vendorOrSupplier || null,
@@ -117,6 +122,10 @@ export const actions: Actions = {
 					isNull(schema.expenses.deletedAt)
 				)
 			);
+		await deleteUploadedFileHashForEntity(platform.env, {
+			entityType: 'expense',
+			entityId: params.expenseId
+		});
 
 		await writeAuditLog(platform, locals.user, {
 			action: 'expense.delete',

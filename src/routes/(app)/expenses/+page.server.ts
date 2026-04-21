@@ -3,6 +3,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 
 import { getDb, schema } from '$lib/server/modules/legacy-db';
+import { resolveSgdEquivalentForWrite } from '$lib/server/fx/resolve-sgd-equivalent';
 import type { ExpenseType, ExpenseCategory } from '$lib/constants/expense-upload';
 
 export const load: PageServerLoad = async ({ platform }) => {
@@ -84,7 +85,7 @@ export const actions: Actions = {
 		const expenseType = (formData.get('expenseType') as ExpenseType) || 'opex';
 		const category = (formData.get('category') as string) || 'others';
 		const amount = Number(formData.get('amount') || 0);
-		const currency = String(formData.get('currency') || 'SGD');
+		const currency = String(formData.get('currency') || 'SGD').trim().toUpperCase();
 		const date = String(formData.get('date') || now.slice(0, 10));
 		const vendorOrSupplier = String(formData.get('vendorOrSupplier') || '') || null;
 		const staffName = String(formData.get('staffName') || '') || null;
@@ -93,6 +94,7 @@ export const actions: Actions = {
 		const destinationVal = String(formData.get('destination') || '') || null;
 		const notes = String(formData.get('notes') || '') || null;
 
+		const sgdEq = await resolveSgdEquivalentForWrite({ amount, currency, dateYmd: date });
 		await db.insert(schema.expenses).values({
 			id,
 			projectId: null,
@@ -101,7 +103,7 @@ export const actions: Actions = {
 			date,
 			amount,
 			currency,
-			sgdEquivalent: currency === 'SGD' ? amount : 0,
+			sgdEquivalent: sgdEq,
 			gstAmount: 0,
 			vendorOrSupplier,
 			staffName,

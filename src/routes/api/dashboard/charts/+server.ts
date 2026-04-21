@@ -4,6 +4,12 @@ import type { RequestHandler } from './$types';
 import { getDb, schema } from '$lib/server/modules/legacy-db';
 import { fail, ok } from '$lib/server/http';
 import {
+	expenseSgdAmountExpr,
+	projectExpenseTotalSumExpr,
+	projectRevenueTotalSumExpr,
+	revenueSgdAmountExpr
+} from '$lib/server/modules/expense/repository';
+import {
 	staffCostPayoutJoinConditions,
 	staffCostPeriodBetween,
 	staffCostSumExpr
@@ -82,7 +88,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 		});
 	}
 
-	const baseRevenueRange = [isNull(schema.invoicesOut.deletedAt), inArray(schema.invoicesOut.projectId, projectIds)];
+	const baseRevenueRange = [isNull(schema.revenue.deletedAt), inArray(schema.revenue.projectId, projectIds)];
 	const baseSupplierRange = [isNull(schema.invoicesIn.deletedAt), inArray(schema.invoicesIn.projectId, projectIds)];
 	const baseStaffRange = [
 		isNull(schema.payoutRecords.deletedAt),
@@ -107,7 +113,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 				and(...baseStaffRange, staffCostPeriodBetween(current.start, current.end))
 			),
 		db
-			.select({ total: sql<number>`coalesce(sum(${schema.expenses.amount}), 0)` })
+			.select({ total: projectExpenseTotalSumExpr() })
 			.from(schema.expenses)
 			.where(and(...baseExpenseRange, between(schema.expenses.date, current.start, current.end)))
 	]);
@@ -135,12 +141,12 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 	const [revenueRows, supplierRows, staffRows, expenseRows] = await Promise.all([
 		db
 			.select({
-				date: schema.invoicesOut.date,
-				projectId: schema.invoicesOut.projectId,
-				amount: schema.invoicesOut.total
+				date: schema.revenue.date,
+				projectId: schema.revenue.projectId,
+				amount: revenueSgdAmountExpr()
 			})
-			.from(schema.invoicesOut)
-			.where(and(...baseRevenueRange, between(schema.invoicesOut.date, quarterStart, quarterEnd))),
+			.from(schema.revenue)
+			.where(and(...baseRevenueRange, between(schema.revenue.date, quarterStart, quarterEnd))),
 		db
 			.select({
 				date: schema.invoicesIn.invoiceDate,
@@ -165,7 +171,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 			.select({
 				date: schema.expenses.date,
 				projectId: schema.expenses.projectId,
-				amount: schema.expenses.amount
+				amount: expenseSgdAmountExpr()
 			})
 			.from(schema.expenses)
 			.where(and(...baseExpenseRange, between(schema.expenses.date, quarterStart, quarterEnd)))
@@ -198,12 +204,12 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 	const [rangeRevenueRows, rangeSupplierRows, rangeStaffRows, rangeExpenseRows] = await Promise.all([
 		db
 			.select({
-				projectId: schema.invoicesOut.projectId,
-				total: sql<number>`coalesce(sum(${schema.invoicesOut.total}), 0)`
+				projectId: schema.revenue.projectId,
+				total: projectRevenueTotalSumExpr()
 			})
-			.from(schema.invoicesOut)
-			.where(and(...baseRevenueRange, between(schema.invoicesOut.date, current.start, current.end)))
-			.groupBy(schema.invoicesOut.projectId),
+			.from(schema.revenue)
+			.where(and(...baseRevenueRange, between(schema.revenue.date, current.start, current.end)))
+			.groupBy(schema.revenue.projectId),
 		db
 			.select({
 				projectId: schema.invoicesIn.projectId,
@@ -227,7 +233,7 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 		db
 			.select({
 				projectId: schema.expenses.projectId,
-				total: sql<number>`coalesce(sum(${schema.expenses.amount}), 0)`
+				total: projectExpenseTotalSumExpr()
 			})
 			.from(schema.expenses)
 			.where(and(...baseExpenseRange, between(schema.expenses.date, current.start, current.end)))

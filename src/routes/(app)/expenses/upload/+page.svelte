@@ -101,6 +101,7 @@
 	let detectSnapshot = $state<unknown>(null);
 	let detectRawText = $state('');
 	let expenseId = $state<string | null>(null);
+	let duplicateExpenseId = $state<string | null>(null);
 
 	/** Plain-text preview for .docx (same extraction path as detection) */
 	let wordPreviewText = $state('');
@@ -472,6 +473,7 @@
 		uploading = true;
 		error = '';
 		message = '';
+		duplicateExpenseId = null;
 
 		try {
 			const payload = buildPayload();
@@ -547,6 +549,7 @@
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({
+					idempotencyKey: crypto.randomUUID(),
 					key: presignJson.data.key,
 					fileName: selectedFile!.name,
 					fileType: selectedFile!.type || 'application/octet-stream',
@@ -554,11 +557,25 @@
 				})
 			});
 			const saveTxt = await saveRes.text();
-			let saveJson: any = null;
+			let saveJson:
+				| {
+						ok?: boolean;
+						error?: string;
+						details?: { code?: string; existingEntityId?: string; message?: string };
+						data?: { documentId?: string; expenseId?: string };
+				  }
+				| null = null;
 			try {
 				saveJson = saveTxt ? JSON.parse(saveTxt) : null;
 			} catch {
 				// keep saveJson null
+			}
+			if (saveRes.status === 409 && saveJson?.details?.code === 'DUPLICATE_FILE_UPLOAD') {
+				duplicateExpenseId = saveJson.details.existingEntityId ?? null;
+				error = duplicateExpenseId
+					? 'This file has already been recorded as an expense. Duplicate upload is not allowed. You can open the existing record below.'
+					: 'This file has already been recorded as an expense. Duplicate upload is not allowed.';
+				return;
 			}
 			if (!saveRes.ok || !saveJson?.ok) {
 				const detailMsg = saveJson?.details?.message;
@@ -847,6 +864,13 @@
 				{/if}
 				{#if error}
 					<p class="text-sm text-rose-700">{error}</p>
+					{#if duplicateExpenseId}
+						<p class="text-xs text-slate-600">
+							<a class="text-[var(--sf-green)] hover:underline" href={`/expenses/${duplicateExpenseId}`}>
+								View existing expense record
+							</a>
+						</p>
+					{/if}
 				{/if}
 			</div>
 		</section>

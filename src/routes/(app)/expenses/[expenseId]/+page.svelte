@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import PageShell from '$lib/components/PageShell.svelte';
+	import StorageTextPreview from '$lib/components/StorageTextPreview.svelte';
 	import { CATEGORY_LABELS, EXPENSE_CATEGORY_OPTIONS } from '$lib/constants/expense-upload';
 
 	let { data, form } = $props();
@@ -133,9 +134,12 @@
 							src={data.fileViewUrl}
 						/>
 					</div>
+				{:else if data.previewDisplay === 'text' && data.fileViewUrl}
+					<p class="mb-2 text-xs text-slate-500">Extracted text (Word, plain text, CSV, etc.)</p>
+					<StorageTextPreview fileViewUrl={data.fileViewUrl} />
 				{:else}
 					<p class="text-sm text-slate-600">
-						Preview not available.
+						Inline preview is not available for this file type (e.g. Excel, PowerPoint, or legacy .doc).
 						<a
 							class="ml-1 font-medium text-[var(--sf-green)] hover:underline"
 							href={data.fileViewUrl}

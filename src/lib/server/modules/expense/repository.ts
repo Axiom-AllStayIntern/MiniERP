@@ -1,4 +1,4 @@
-import { eq, isNull, and, sql, desc } from 'drizzle-orm';
+import { eq, isNull, and, sql, desc, type SQL } from 'drizzle-orm';
 import type { DBClient } from '../../db';
 import { expenses, revenue, expenseCategories } from './schema';
 import { BaseRepository } from '../base-repository';
@@ -8,11 +8,11 @@ import { BaseRepository } from '../base-repository';
 // ---------------------------------------------------------------------------
 
 /**
- * Effective SGD amount for aggregation. Matches list UIs that use `sgdEquivalent || amount`:
- * writers often set `sgdEquivalent: 0` when FX is unknown; SQL coalesce(0, amount) wrongly yields 0.
+ * Effective SGD for aggregation: SGD rows use sgd_equivalent or amount; non-SGD only sgd_equivalent
+ * (never sum foreign `amount` as SGD).
  */
-const expenseSgdAmountExpr = () =>
-	sql`coalesce(nullif(${expenses.sgdEquivalent}, 0), ${expenses.amount})`;
+export const expenseSgdAmountExpr = (): SQL =>
+	sql`CASE WHEN coalesce(${expenses.currency}, 'SGD') = 'SGD' THEN coalesce(nullif(${expenses.sgdEquivalent}, 0), ${expenses.amount}) ELSE coalesce(nullif(${expenses.sgdEquivalent}, 0), 0) END`;
 
 /** Project-scoped operating expenses (expense_type = 'opex') */
 export const projectExpenseOpexSumExpr = () =>
@@ -25,6 +25,14 @@ export const projectExpenseSalesCostSumExpr = () =>
 /** Total project expenses */
 export const projectExpenseTotalSumExpr = () =>
 	sql<number>`coalesce(sum(${expenseSgdAmountExpr()}), 0)`;
+
+/** One revenue row in SGD (for joins / charts). */
+export const revenueSgdAmountExpr = (): SQL =>
+	sql`CASE WHEN coalesce(${revenue.currency}, 'SGD') = 'SGD' THEN coalesce(nullif(${revenue.sgdEquivalent}, 0), ${revenue.amount}) ELSE coalesce(nullif(${revenue.sgdEquivalent}, 0), 0) END`;
+
+/** Sum of project revenue in SGD. */
+export const projectRevenueTotalSumExpr = () =>
+	sql<number>`coalesce(sum(${revenueSgdAmountExpr()}), 0)`;
 
 // ---------------------------------------------------------------------------
 // ExpenseRepository
@@ -80,7 +88,7 @@ export class RevenueRepository extends BaseRepository<typeof revenue> {
 	async getProjectRevenueTotal(projectId: string) {
 		const rows = await this.db
 			.select({
-				total: sql<number>`coalesce(sum(coalesce(${revenue.sgdEquivalent}, ${revenue.amount})), 0)`
+				total: projectRevenueTotalSumExpr()
 			})
 			.from(revenue)
 			.where(and(eq(revenue.projectId, projectId), isNull(revenue.deletedAt)));

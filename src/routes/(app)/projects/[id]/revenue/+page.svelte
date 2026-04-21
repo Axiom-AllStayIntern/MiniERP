@@ -166,7 +166,7 @@
 								</span>
 							</td>
 							<td class="px-4 py-3">
-								<a class="text-[var(--sf-green)] hover:underline" href="/projects/{data.project.id}/invoices/out/{invoice.id}">View</a>
+								<a class="text-[var(--sf-green)] hover:underline" href="/projects/{data.project.id}/documents/revenue/{invoice.id}">View</a>
 							</td>
 						</tr>
 					{/each}

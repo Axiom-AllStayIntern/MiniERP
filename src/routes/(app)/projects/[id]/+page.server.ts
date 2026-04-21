@@ -4,7 +4,13 @@ import type { Actions, PageServerLoad } from './$types';
 
 import { writeAuditLog } from '$lib/server/audit';
 import { getDb, schema } from '$lib/server/modules/legacy-db';
-import { projectExpenseOpexSumExpr, projectExpenseSalesCostSumExpr } from '$lib/server/project-expense-sums';
+import { effectiveAmountSgd } from '$lib/server/fx/effective-amount-sgd';
+import {
+	projectExpenseOpexSumExpr,
+	projectExpenseSalesCostSumExpr,
+	projectRevenueTotalSumExpr,
+	revenueSgdAmountExpr
+} from '$lib/server/modules/expense/repository';
 import {
 	staffCostPayoutJoinConditions,
 	staffCostSumExpr
@@ -19,9 +25,9 @@ export const load: PageServerLoad = async ({ params, platform, parent }) => {
 	const db = getDb(platform.env);
 
 	const [revenue] = await db
-		.select({ total: sql<number>`coalesce(sum(${schema.invoicesOut.total}), 0)` })
-		.from(schema.invoicesOut)
-		.where(and(eq(schema.invoicesOut.projectId, params.id), isNull(schema.invoicesOut.deletedAt)));
+		.select({ total: projectRevenueTotalSumExpr() })
+		.from(schema.revenue)
+		.where(and(eq(schema.revenue.projectId, params.id), isNull(schema.revenue.deletedAt)));
 	const [purchaseCost] = await db
 		.select({ total: sql<number>`coalesce(sum(${schema.invoicesIn.amount}), 0)` })
 		.from(schema.invoicesIn)
@@ -44,18 +50,18 @@ export const load: PageServerLoad = async ({ params, platform, parent }) => {
 	const expenseSalesCost = expenseSalesCostRow[0]?.total ?? 0;
 	const expenseCost = expenseOpexCost + expenseSalesCost;
 
-	const [revenueItems, purchaseItems, staffItems, expenseRows] = await Promise.all([
+	const [revenueItemsRaw, purchaseItems, staffItems, expenseRows] = await Promise.all([
 		db
 			.select({
-				id: schema.invoicesOut.id,
-				label: schema.invoicesOut.invoiceNo,
-				date: schema.invoicesOut.date,
-				status: schema.invoicesOut.status,
-				amount: schema.invoicesOut.total
+				id: schema.revenue.id,
+				label: sql<string>`coalesce(${schema.revenue.invoiceNumber}, ${schema.revenue.id})`,
+				date: schema.revenue.date,
+				status: sql<string>`'completed'`,
+				amount: revenueSgdAmountExpr()
 			})
-			.from(schema.invoicesOut)
-			.where(and(eq(schema.invoicesOut.projectId, params.id), isNull(schema.invoicesOut.deletedAt)))
-			.orderBy(sql`${schema.invoicesOut.date} desc`, sql`${schema.invoicesOut.createdAt} desc`),
+			.from(schema.revenue)
+			.where(and(eq(schema.revenue.projectId, params.id), isNull(schema.revenue.deletedAt)))
+			.orderBy(sql`${schema.revenue.date} desc`, sql`${schema.revenue.createdAt} desc`),
 		db
 			.select({
 				id: schema.invoicesIn.id,
@@ -97,13 +103,17 @@ export const load: PageServerLoad = async ({ params, platform, parent }) => {
 			.orderBy(sql`${schema.expenses.date} desc`, sql`${schema.expenses.createdAt} desc`)
 	]);
 
+	const revenueItems = revenueItemsRaw.map((r) => ({
+		...r,
+		amount: Number(r.amount ?? 0)
+	}));
+
 	const expenseItems = expenseRows.map((row) => ({
 		id: row.id,
 		label: row.category,
 		date: row.date,
 		status: row.expenseType === 'sales_cost' ? 'Sales Cost' : 'OpEx',
-		// Align with project expense aggregates and list pages: treat 0 sgd_equivalent as unset
-		amount: Number(row.sgdEquivalent || row.amount || 0)
+		amount: effectiveAmountSgd(row.currency, row.sgdEquivalent, row.amount)
 	}));
 
 	const breakdown = {

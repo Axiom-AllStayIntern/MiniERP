@@ -29,7 +29,15 @@ export const load: PageServerLoad = async ({ params, platform, parent }) => {
 	const { project } = await parent();
 
 	if (!platform) {
-		return { documents: [], contracts: [], quotations: [], purchaseOrders: [], expenseDocuments: [], project };
+		return {
+			documents: [],
+			contracts: [],
+			quotations: [],
+			purchaseOrders: [],
+			expenseDocuments: [],
+			revenueDocuments: [],
+			project
+		};
 	}
 
 	const db = getDb(platform.env);
@@ -131,6 +139,23 @@ export const load: PageServerLoad = async ({ params, platform, parent }) => {
 		.where(and(eq(schema.expenses.projectId, projectId), isNull(schema.expenses.deletedAt)))
 		.orderBy(desc(schema.expenses.date), desc(schema.expenses.createdAt));
 
+	const revenueRows = await db
+		.select({
+			id: schema.revenue.id,
+			invoiceType: schema.revenue.invoiceType,
+			invoiceNumber: schema.revenue.invoiceNumber,
+			clientName: schema.revenue.clientName,
+			date: schema.revenue.date,
+			amount: schema.revenue.amount,
+			currency: schema.revenue.currency,
+			documentRef: schema.revenue.documentRef,
+			notes: schema.revenue.notes,
+			createdAt: schema.revenue.createdAt
+		})
+		.from(schema.revenue)
+		.where(and(eq(schema.revenue.projectId, projectId), isNull(schema.revenue.deletedAt)))
+		.orderBy(desc(schema.revenue.date), desc(schema.revenue.createdAt));
+
 	const contracts = contractRows.map((c) => ({
 		...c,
 		displayNumber: friendlyDocNumber(c.contractNumber, c.id),
@@ -171,5 +196,30 @@ export const load: PageServerLoad = async ({ params, platform, parent }) => {
 		};
 	});
 
-	return { documents, contracts, quotations, purchaseOrders, expenseDocuments, project };
+	const revenueDocuments = revenueRows.map((r) => {
+		const refName =
+			r.documentRef && !r.documentRef.startsWith('manual://')
+				? (() => {
+						const tail = r.documentRef.split('/').pop() ?? r.documentRef;
+						try {
+							return decodeURIComponent(tail) || tail;
+						} catch {
+							return tail;
+						}
+					})()
+				: null;
+		return {
+			...r,
+			displayNumber: friendlyDocNumber(r.invoiceNumber, r.id),
+			displayFileName: refName || r.clientName || 'Revenue Invoice',
+			statusLabel:
+				r.invoiceType === 'zero_rate'
+					? 'Zero Rate'
+					: r.invoiceType === 'tax_invoice'
+						? 'Tax Invoice'
+						: 'Standard'
+		};
+	});
+
+	return { documents, contracts, quotations, purchaseOrders, expenseDocuments, revenueDocuments, project };
 };

@@ -1,4 +1,4 @@
-import { eq, isNull, and, sum, sql, desc } from 'drizzle-orm';
+import { eq, isNull, and, sql, desc } from 'drizzle-orm';
 import type { DBClient } from '../../db';
 import {
 	contracts,
@@ -10,6 +10,8 @@ import {
 	arDocumentLinks
 } from './schema';
 import { BaseRepository } from '../base-repository';
+import { revenue } from '../expense/schema';
+import { projectRevenueTotalSumExpr } from '../expense/repository';
 
 // ---------------------------------------------------------------------------
 // ContractRepository
@@ -64,12 +66,12 @@ export class CustomerInvoiceRepository extends BaseRepository<typeof invoicesOut
 			.orderBy(desc(invoicesOut.createdAt));
 	}
 
-	/** Total revenue for a project (sum of confirmed invoice totals) */
+	/** Total revenue for a project (sum in SGD — uses `revenue` / FX equivalent, not face `amount` alone). */
 	async getProjectRevenue(projectId: string) {
 		const rows = await this.db
-			.select({ total: sql<number>`coalesce(sum(${invoicesOut.total}), 0)` })
-			.from(invoicesOut)
-			.where(and(eq(invoicesOut.projectId, projectId), isNull(invoicesOut.deletedAt)));
+			.select({ total: projectRevenueTotalSumExpr() })
+			.from(revenue)
+			.where(and(eq(revenue.projectId, projectId), isNull(revenue.deletedAt)));
 		return rows[0]?.total ?? 0;
 	}
 
