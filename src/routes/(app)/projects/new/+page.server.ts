@@ -1,31 +1,27 @@
-import { desc, isNull } from 'drizzle-orm';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { getDb, schema } from '$lib/server/modules/legacy-db';
+import { createModuleContext } from '$lib/server/modules';
+import { createBusinessPartnerApi } from '$lib/server/modules/business-partner/api';
+import { createProjectApi } from '$lib/server/modules/project/api';
 
-export const load: PageServerLoad = async ({ platform }) => {
-	if (!platform) {
+export const load: PageServerLoad = async (event) => {
+	if (!event.platform) {
 		return { customers: [] };
 	}
 
-	const db = getDb(platform.env);
-	const customers = await db
-		.select({ id: schema.customers.id, name: schema.customers.name })
-		.from(schema.customers)
-		.where(isNull(schema.customers.deletedAt))
-		.orderBy(desc(schema.customers.createdAt));
-
-	return { customers };
+	const ctx = await createModuleContext(event);
+	const businessPartner = createBusinessPartnerApi(ctx);
+	return { customers: await businessPartner.listCustomerOptions() };
 };
 
 export const actions: Actions = {
-	default: async ({ request, platform }) => {
-		if (!platform) {
+	default: async (event) => {
+		if (!event.platform) {
 			return fail(500, { message: 'Cloudflare platform bindings are required' });
 		}
 
-		const form = await request.formData();
+		const form = await event.request.formData();
 		const customerId = String(form.get('customerId') ?? '');
 		const name = String(form.get('name') ?? '').trim();
 		const status = String(form.get('status') ?? 'active');
@@ -37,20 +33,17 @@ export const actions: Actions = {
 			return fail(400, { message: 'Customer and project name are required.' });
 		}
 
-		const id = crypto.randomUUID();
-		const db = getDb(platform.env);
-		await db.insert(schema.projects).values({
-			id,
+		const ctx = await createModuleContext(event);
+		const project = createProjectApi(ctx);
+		const created = await project.create({
 			customerId,
 			name,
 			status,
-			startDate: startDate || null,
-			endDate: endDate || null,
-			description: description || null,
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString()
+			startDate: startDate || undefined,
+			endDate: endDate || undefined,
+			description: description || undefined
 		});
 
-		throw redirect(303, `/projects/${id}`);
+		throw redirect(303, `/projects/${created.id}`);
 	}
 };

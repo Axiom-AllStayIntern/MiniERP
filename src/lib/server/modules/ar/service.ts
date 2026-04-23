@@ -1,3 +1,4 @@
+import { and, eq, isNull } from 'drizzle-orm';
 import type { ModuleContext } from '../types';
 import {
 	CustomerInvoiceRepository,
@@ -10,6 +11,9 @@ import {
 } from './repository';
 import { NotFoundError, ConflictError } from '../errors';
 import { createEvent } from '../event-bus';
+import { buildDocumentMetadata, parseDocumentMetadata } from '$lib/server/document-metadata';
+import { r2FileUrls } from '$lib/server/r2-file-urls';
+import { schema } from '../../db';
 
 // ---------------------------------------------------------------------------
 // InvoiceService
@@ -122,6 +126,246 @@ export class InvoiceService {
 
 	async getSupplierInvoicesByProject(projectId: string) {
 		return this.supplierInvoiceRepo.findByProject(projectId);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ArDocumentService
+// ---------------------------------------------------------------------------
+
+export class ArDocumentService {
+	constructor(private ctx: ModuleContext) {}
+
+	async getContractDocumentDetail(projectId: string, contractId: string) {
+		const [contract] = await this.ctx.db
+			.select()
+			.from(schema.contracts)
+			.where(
+				and(
+					eq(schema.contracts.id, contractId),
+					eq(schema.contracts.projectId, projectId),
+					isNull(schema.contracts.deletedAt)
+				)
+			)
+			.limit(1);
+
+		if (!contract) return null;
+
+		const docMeta = parseDocumentMetadata(contract.metadata);
+		const { fileViewUrl, fileDownloadUrl } = r2FileUrls(contract.fileUrl);
+		return { contract, docMeta, fileViewUrl, fileDownloadUrl };
+	}
+
+	async updateContractDocument(
+		projectId: string,
+		contractId: string,
+		data: { amount: number; currency: string; date: string; notes: string }
+	) {
+		const [current] = await this.ctx.db
+			.select({ metadata: schema.contracts.metadata })
+			.from(schema.contracts)
+			.where(
+				and(
+					eq(schema.contracts.id, contractId),
+					eq(schema.contracts.projectId, projectId),
+					isNull(schema.contracts.deletedAt)
+				)
+			)
+			.limit(1);
+
+		const metadata = buildDocumentMetadata({
+			raw: current?.metadata ?? null,
+			notes: data.notes || undefined
+		});
+
+		await this.ctx.db
+			.update(schema.contracts)
+			.set({
+				amount: Number.isFinite(data.amount) ? data.amount : 0,
+				currency: data.currency,
+				effectiveDate: data.date || null,
+				metadata,
+				updatedAt: new Date().toISOString()
+			})
+			.where(
+				and(
+					eq(schema.contracts.id, contractId),
+					eq(schema.contracts.projectId, projectId),
+					isNull(schema.contracts.deletedAt)
+				)
+			);
+	}
+
+	async deleteContractDocument(projectId: string, contractId: string) {
+		const now = new Date().toISOString();
+		await this.ctx.db
+			.update(schema.contracts)
+			.set({ deletedAt: now, updatedAt: now })
+			.where(
+				and(
+					eq(schema.contracts.id, contractId),
+					eq(schema.contracts.projectId, projectId),
+					isNull(schema.contracts.deletedAt)
+				)
+			);
+	}
+
+	async getQuotationDocumentDetail(projectId: string, quotationId: string) {
+		const [quotation] = await this.ctx.db
+			.select()
+			.from(schema.quotations)
+			.where(
+				and(
+					eq(schema.quotations.id, quotationId),
+					eq(schema.quotations.projectId, projectId),
+					isNull(schema.quotations.deletedAt)
+				)
+			)
+			.limit(1);
+
+		if (!quotation) return null;
+
+		const docMeta = parseDocumentMetadata(quotation.metadata);
+		const { fileViewUrl, fileDownloadUrl } = r2FileUrls(quotation.fileUrl);
+		return { quotation, docMeta, fileViewUrl, fileDownloadUrl };
+	}
+
+	async updateQuotationDocument(
+		projectId: string,
+		quotationId: string,
+		data: { quotationNumber: string; amount: number; currency: string; date: string; notes: string }
+	) {
+		const [current] = await this.ctx.db
+			.select({ metadata: schema.quotations.metadata })
+			.from(schema.quotations)
+			.where(
+				and(
+					eq(schema.quotations.id, quotationId),
+					eq(schema.quotations.projectId, projectId),
+					isNull(schema.quotations.deletedAt)
+				)
+			)
+			.limit(1);
+
+		const metadata = buildDocumentMetadata({
+			raw: current?.metadata ?? null,
+			notes: data.notes || undefined
+		});
+
+		await this.ctx.db
+			.update(schema.quotations)
+			.set({
+				quotationNumber: data.quotationNumber || null,
+				amount: Number.isFinite(data.amount) ? data.amount : 0,
+				currency: data.currency,
+				date: data.date || null,
+				metadata,
+				updatedAt: new Date().toISOString()
+			})
+			.where(
+				and(
+					eq(schema.quotations.id, quotationId),
+					eq(schema.quotations.projectId, projectId),
+					isNull(schema.quotations.deletedAt)
+				)
+			);
+	}
+
+	async deleteQuotationDocument(projectId: string, quotationId: string) {
+		const now = new Date().toISOString();
+		await this.ctx.db
+			.update(schema.quotations)
+			.set({ deletedAt: now, updatedAt: now })
+			.where(
+				and(
+					eq(schema.quotations.id, quotationId),
+					eq(schema.quotations.projectId, projectId),
+					isNull(schema.quotations.deletedAt)
+				)
+			);
+	}
+
+	async getPurchaseOrderDocumentDetail(projectId: string, purchaseOrderId: string) {
+		const [purchaseOrder] = await this.ctx.db
+			.select()
+			.from(schema.purchaseOrders)
+			.where(
+				and(
+					eq(schema.purchaseOrders.id, purchaseOrderId),
+					eq(schema.purchaseOrders.projectId, projectId),
+					isNull(schema.purchaseOrders.deletedAt)
+				)
+			)
+			.limit(1);
+
+		if (!purchaseOrder) return null;
+
+		const docMeta = parseDocumentMetadata(purchaseOrder.metadata);
+		const { fileViewUrl, fileDownloadUrl } = r2FileUrls(purchaseOrder.fileUrl);
+		return { purchaseOrder, docMeta, fileViewUrl, fileDownloadUrl };
+	}
+
+	async updatePurchaseOrderDocument(
+		projectId: string,
+		purchaseOrderId: string,
+		data: {
+			poNumber: string;
+			supplierName: string;
+			amount: number;
+			currency: string;
+			date: string;
+			notes: string;
+		}
+	) {
+		const [current] = await this.ctx.db
+			.select({ metadata: schema.purchaseOrders.metadata })
+			.from(schema.purchaseOrders)
+			.where(
+				and(
+					eq(schema.purchaseOrders.id, purchaseOrderId),
+					eq(schema.purchaseOrders.projectId, projectId),
+					isNull(schema.purchaseOrders.deletedAt)
+				)
+			)
+			.limit(1);
+
+		const metadata = buildDocumentMetadata({
+			raw: current?.metadata ?? null,
+			notes: data.notes || undefined
+		});
+
+		await this.ctx.db
+			.update(schema.purchaseOrders)
+			.set({
+				poNumber: data.poNumber,
+				supplierName: data.supplierName,
+				amount: Number.isFinite(data.amount) ? data.amount : 0,
+				currency: data.currency,
+				date: data.date || null,
+				metadata,
+				updatedAt: new Date().toISOString()
+			})
+			.where(
+				and(
+					eq(schema.purchaseOrders.id, purchaseOrderId),
+					eq(schema.purchaseOrders.projectId, projectId),
+					isNull(schema.purchaseOrders.deletedAt)
+				)
+			);
+	}
+
+	async deletePurchaseOrderDocument(projectId: string, purchaseOrderId: string) {
+		const now = new Date().toISOString();
+		await this.ctx.db
+			.update(schema.purchaseOrders)
+			.set({ deletedAt: now, updatedAt: now })
+			.where(
+				and(
+					eq(schema.purchaseOrders.id, purchaseOrderId),
+					eq(schema.purchaseOrders.projectId, projectId),
+					isNull(schema.purchaseOrders.deletedAt)
+				)
+			);
 	}
 }
 

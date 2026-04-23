@@ -79,6 +79,14 @@ export class BusinessPartnerService {
 		return this.legacyCustomerRepo.findAll();
 	}
 
+	async listCustomerOptions() {
+		return this.legacyCustomerRepo.listOptions();
+	}
+
+	async listCustomerDirectory() {
+		return this.legacyCustomerRepo.listDirectory();
+	}
+
 	async createCustomer(data: { name: string; address?: string; contact?: string; gstRegNo?: string; metadata?: string }) {
 		return this.legacyCustomerRepo.create(data);
 	}

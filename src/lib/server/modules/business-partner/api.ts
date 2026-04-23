@@ -20,6 +20,8 @@ export function createBusinessPartnerApi(ctx: ModuleContext) {
 		// Legacy
 		getCustomerById: svc.getCustomerById.bind(svc),
 		listCustomers: svc.listCustomers.bind(svc),
+		listCustomerOptions: svc.listCustomerOptions.bind(svc),
+		listCustomerDirectory: svc.listCustomerDirectory.bind(svc),
 		createCustomer: svc.createCustomer.bind(svc)
 	};
 }

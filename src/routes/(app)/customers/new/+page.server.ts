@@ -1,15 +1,16 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 
-import { getDb, schema } from '$lib/server/modules/legacy-db';
+import { createModuleContext } from '$lib/server/modules';
+import { createBusinessPartnerApi } from '$lib/server/modules/business-partner/api';
 
 export const actions: Actions = {
-	default: async ({ request, platform }) => {
-		if (!platform) {
+	default: async (event) => {
+		if (!event.platform) {
 			return fail(500, { message: 'Cloudflare platform bindings are required' });
 		}
 
-		const form = await request.formData();
+		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '').trim();
 		const address = String(form.get('address') ?? '').trim();
 		const contact = String(form.get('contact') ?? '').trim();
@@ -19,17 +20,14 @@ export const actions: Actions = {
 			return fail(400, { message: 'Customer name is required.' });
 		}
 
-		const id = crypto.randomUUID();
-		const db = getDb(platform.env);
-		await db.insert(schema.customers).values({
-			id,
+		const ctx = await createModuleContext(event);
+		const businessPartner = createBusinessPartnerApi(ctx);
+		await businessPartner.createCustomer({
 			name,
-			address: address || null,
-			contact: contact || null,
-			gstRegNo: gstRegNo || null,
-			metadata: null,
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString()
+			address: address || undefined,
+			contact: contact || undefined,
+			gstRegNo: gstRegNo || undefined,
+			metadata: undefined
 		});
 
 		throw redirect(303, '/customers');

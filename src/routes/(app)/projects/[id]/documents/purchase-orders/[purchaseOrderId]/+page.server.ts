@@ -1,39 +1,26 @@
-import { and, eq, isNull } from 'drizzle-orm';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
 import { writeAuditLog } from '$lib/server/audit';
-import { buildDocumentMetadata, parseDocumentMetadata } from '$lib/server/document-metadata';
-import { getDb, schema } from '$lib/server/modules/legacy-db';
-import { r2FileUrls } from '$lib/server/r2-file-urls';
+import { createModuleContext } from '$lib/server/modules';
+import { createArApi } from '$lib/server/modules/ar/api';
 
-export const load: PageServerLoad = async ({ params, platform, parent }) => {
+export const load: PageServerLoad = async (event) => {
+	const { params, platform, parent } = event;
 	await parent();
 	if (!platform) throw error(500, 'Cloudflare platform bindings are required');
 
-	const db = getDb(platform.env);
-	const [purchaseOrder] = await db
-		.select()
-		.from(schema.purchaseOrders)
-		.where(
-			and(
-				eq(schema.purchaseOrders.id, params.purchaseOrderId),
-				eq(schema.purchaseOrders.projectId, params.id),
-				isNull(schema.purchaseOrders.deletedAt)
-			)
-		)
-		.limit(1);
+	const ctx = await createModuleContext(event);
+	const ar = createArApi(ctx);
+	const detail = await ar.getPurchaseOrderDocumentDetail(params.id, params.purchaseOrderId);
+	if (!detail) throw error(404, 'Purchase order not found');
 
-	if (!purchaseOrder) throw error(404, 'Purchase order not found');
-
-	const docMeta = parseDocumentMetadata(purchaseOrder.metadata);
-	const { fileViewUrl, fileDownloadUrl } = r2FileUrls(purchaseOrder.fileUrl);
-
-	return { purchaseOrder, docMeta, fileViewUrl, fileDownloadUrl };
+	return detail;
 };
 
 export const actions: Actions = {
-	update: async ({ params, request, platform, locals }) => {
+	update: async (event) => {
+		const { params, request, platform, locals } = event;
 		if (!platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
 		const form = await request.formData();
 		const poNumber = String(form.get('poNumber') ?? '').trim();
@@ -47,42 +34,16 @@ export const actions: Actions = {
 			return fail(400, { message: 'PO number and supplier name are required.' });
 		}
 
-		const db = getDb(platform.env);
-		const [current] = await db
-			.select({ metadata: schema.purchaseOrders.metadata })
-			.from(schema.purchaseOrders)
-			.where(
-				and(
-					eq(schema.purchaseOrders.id, params.purchaseOrderId),
-					eq(schema.purchaseOrders.projectId, params.id),
-					isNull(schema.purchaseOrders.deletedAt)
-				)
-			)
-			.limit(1);
-
-		const metadata = buildDocumentMetadata({
-			raw: current?.metadata ?? null,
-			notes: notes || undefined
+		const ctx = await createModuleContext(event);
+		const ar = createArApi(ctx);
+		await ar.updatePurchaseOrderDocument(params.id, params.purchaseOrderId, {
+			poNumber,
+			supplierName,
+			amount,
+			currency,
+			date,
+			notes
 		});
-
-		await db
-			.update(schema.purchaseOrders)
-			.set({
-				poNumber,
-				supplierName,
-				amount: Number.isFinite(amount) ? amount : 0,
-				currency,
-				date: date || null,
-				metadata,
-				updatedAt: new Date().toISOString()
-			})
-			.where(
-				and(
-					eq(schema.purchaseOrders.id, params.purchaseOrderId),
-					eq(schema.purchaseOrders.projectId, params.id),
-					isNull(schema.purchaseOrders.deletedAt)
-				)
-			);
 
 		await writeAuditLog(platform, locals.user, {
 			action: 'purchase_order.update',
@@ -94,21 +55,13 @@ export const actions: Actions = {
 
 		return { ok: true };
 	},
-	delete: async ({ params, platform, locals }) => {
+	delete: async (event) => {
+		const { params, platform, locals } = event;
 		if (!platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
 
-		const db = getDb(platform.env);
-		const now = new Date().toISOString();
-		await db
-			.update(schema.purchaseOrders)
-			.set({ deletedAt: now, updatedAt: now })
-			.where(
-				and(
-					eq(schema.purchaseOrders.id, params.purchaseOrderId),
-					eq(schema.purchaseOrders.projectId, params.id),
-					isNull(schema.purchaseOrders.deletedAt)
-				)
-			);
+		const ctx = await createModuleContext(event);
+		const ar = createArApi(ctx);
+		await ar.deletePurchaseOrderDocument(params.id, params.purchaseOrderId);
 
 		await writeAuditLog(platform, locals.user, {
 			action: 'purchase_order.delete',

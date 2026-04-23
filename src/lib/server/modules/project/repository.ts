@@ -1,4 +1,4 @@
-import { eq, isNull, and, like, or, desc } from 'drizzle-orm';
+import { eq, isNull, and, like, or, desc, sql } from 'drizzle-orm';
 import type { DBClient } from '../../db';
 import { projects, projectEmployees } from './schema';
 import { customers } from '../business-partner/schema';
@@ -58,6 +58,21 @@ export class ProjectRepository extends BaseRepository<typeof projects> {
 			.offset((page - 1) * pageSize);
 
 		return rows;
+	}
+
+	async getListCounts() {
+		const [[allProjectsCountRow], [activeProjectsCountRow]] = await Promise.all([
+			this.db.select({ n: sql<number>`count(*)` }).from(projects).where(isNull(projects.deletedAt)),
+			this.db
+				.select({ n: sql<number>`count(*)` })
+				.from(projects)
+				.where(and(isNull(projects.deletedAt), eq(projects.status, 'active')))
+		]);
+
+		return {
+			all: Number(allProjectsCountRow?.n ?? 0),
+			active: Number(activeProjectsCountRow?.n ?? 0)
+		};
 	}
 
 	async getMembers(projectId: string) {

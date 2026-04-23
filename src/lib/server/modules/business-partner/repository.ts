@@ -1,4 +1,4 @@
-import { eq, isNull, and, like, or } from 'drizzle-orm';
+import { desc, eq, isNull, and, like, or } from 'drizzle-orm';
 import type { DBClient } from '../../db';
 import { businessPartners, customers } from './schema';
 import { BaseRepository } from '../base-repository';
@@ -42,5 +42,26 @@ export class BusinessPartnerRepository extends BaseRepository<typeof businessPar
 export class CustomerRepository extends BaseRepository<typeof customers> {
 	constructor(db: DBClient) {
 		super(db, customers);
+	}
+
+	async listOptions() {
+		return this.db
+			.select({ id: customers.id, name: customers.name })
+			.from(customers)
+			.where(isNull(customers.deletedAt))
+			.orderBy(desc(customers.createdAt));
+	}
+
+	async listDirectory() {
+		return this.db
+			.select({
+				id: customers.id,
+				name: customers.name,
+				contact: customers.contact,
+				address: customers.address
+			})
+			.from(customers)
+			.where(isNull(customers.deletedAt))
+			.orderBy(desc(customers.createdAt));
 	}
 }

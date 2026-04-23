@@ -1,8 +1,14 @@
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { ModuleContext } from '../types';
 import { ExpenseRepository, RevenueRepository, ExpenseCategoryRepository } from './repository';
 import { createEvent } from '../event-bus';
 import type { ExpenseType } from '$lib/constants/expense-upload';
 import { resolveSgdEquivalentForWrite } from '$lib/server/fx/resolve-sgd-equivalent';
+import { buildDocumentMetadata, parseDocumentMetadata } from '$lib/server/document-metadata';
+import { resolveExpenseFilePreview } from '$lib/server/expense-file-preview';
+import { schema } from '../../db';
+
+const DOCUMENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ---------------------------------------------------------------------------
 // ExpenseService
@@ -25,6 +31,155 @@ export class ExpenseService {
 
 	async getProjectExpenseSums(projectId: string) {
 		return this.repo.getProjectExpenseSums(projectId);
+	}
+
+	async getProjectExpenseDetail(projectId: string, expenseId: string) {
+		const [expense] = await this.ctx.db
+			.select()
+			.from(schema.expenses)
+			.where(
+				and(
+					eq(schema.expenses.id, expenseId),
+					eq(schema.expenses.projectId, projectId),
+					isNull(schema.expenses.deletedAt)
+				)
+			)
+			.limit(1);
+
+		if (!expense) return null;
+
+		const docMeta = parseDocumentMetadata(expense.metadata);
+		const { fileViewUrl, fileDownloadUrl, previewDisplay } = await resolveExpenseFilePreview(
+			this.ctx.db,
+			expense.documentRef,
+			docMeta
+		);
+
+		return { expense, docMeta, fileViewUrl, fileDownloadUrl, previewDisplay };
+	}
+
+	async getProjectExpensePage(projectId: string, projectName: string) {
+		const db = this.ctx.db;
+		const expenseRows = await db
+			.select({
+				id: schema.expenses.id,
+				expenseType: schema.expenses.expenseType,
+				category: schema.expenses.category,
+				docType: schema.expenses.docType,
+				amount: schema.expenses.amount,
+				sgdEquivalent: schema.expenses.sgdEquivalent,
+				currency: schema.expenses.currency,
+				date: schema.expenses.date,
+				gstAmount: schema.expenses.gstAmount,
+				vendorOrSupplier: schema.expenses.vendorOrSupplier,
+				staffName: schema.expenses.staffName,
+				reimbursement: schema.expenses.reimbursement,
+				businessTrip: schema.expenses.businessTrip,
+				destination: schema.expenses.destination,
+				documentRef: schema.expenses.documentRef,
+				metadata: schema.expenses.metadata,
+				notes: schema.expenses.notes,
+				createdAt: schema.expenses.createdAt
+			})
+			.from(schema.expenses)
+			.where(and(eq(schema.expenses.projectId, projectId), isNull(schema.expenses.deletedAt)))
+			.orderBy(desc(schema.expenses.date), desc(schema.expenses.createdAt));
+
+		const docIdRefs = [
+			...new Set(
+				expenseRows
+					.map((e) => e.documentRef)
+					.filter((r): r is string => !!r && DOCUMENT_ID_RE.test(r))
+			)
+		];
+		const fileKeyByDocumentId = new Map<string, string>();
+		if (docIdRefs.length > 0) {
+			const docRows = await db
+				.select({ id: schema.documents.id, fileKey: schema.documents.fileKey })
+				.from(schema.documents)
+				.where(inArray(schema.documents.id, docIdRefs));
+			for (const d of docRows) {
+				fileKeyByDocumentId.set(d.id, d.fileKey);
+			}
+		}
+
+		function resolveStorageKey(documentRef: string | null): string | null {
+			if (!documentRef || documentRef.startsWith('manual://')) return null;
+			if (DOCUMENT_ID_RE.test(documentRef)) {
+				return fileKeyByDocumentId.get(documentRef) ?? null;
+			}
+			return documentRef;
+		}
+
+		const expenses = expenseRows.map((exp) => {
+			const storageKey = resolveStorageKey(exp.documentRef);
+			const hasAttachment = Boolean(exp.documentRef && !exp.documentRef.startsWith('manual://'));
+			const meta = parseDocumentMetadata(exp.metadata ?? null);
+			let statusLabel = '—';
+			if (meta.parseStatus === 'reviewed') statusLabel = 'Reviewed';
+			else if (meta.parseStatus === 'parsed') statusLabel = 'Parsed';
+			else if (meta.parseStatus === 'not_parsed') statusLabel = 'Pending review';
+			else if (storageKey || (exp.documentRef && !exp.documentRef.startsWith('manual://')))
+				statusLabel = 'Document';
+			else statusLabel = 'Manual';
+
+			return {
+				...exp,
+				projectName,
+				hasAttachment,
+				statusLabel
+			};
+		});
+
+		const totals = expenseRows.reduce(
+			(acc, exp) => {
+				const amt = exp.sgdEquivalent ?? exp.amount ?? 0;
+				acc.total += amt;
+				if (exp.expenseType === 'sales_cost') {
+					acc.salesCost += amt;
+				} else {
+					acc.opex += amt;
+				}
+				return acc;
+			},
+			{ total: 0, opex: 0, salesCost: 0 }
+		);
+
+		const employees = await db
+			.select({
+				id: schema.employees.id,
+				name: schema.employees.name
+			})
+			.from(schema.employees)
+			.where(isNull(schema.employees.deletedAt))
+			.orderBy(schema.employees.name);
+
+		let businessTrips: Array<{
+			id: string;
+			destination: string | null;
+			startDate: string | null;
+			endDate: string | null;
+			days: number | null;
+			dailyAllowanceRate: number | null;
+		}> = [];
+		try {
+			businessTrips = await db
+				.select({
+					id: schema.businessTrips.id,
+					destination: schema.businessTrips.destination,
+					startDate: schema.businessTrips.startDate,
+					endDate: schema.businessTrips.endDate,
+					days: schema.businessTrips.days,
+					dailyAllowanceRate: schema.businessTrips.dailyAllowanceRate
+				})
+				.from(schema.businessTrips)
+				.where(and(eq(schema.businessTrips.projectId, projectId), isNull(schema.businessTrips.deletedAt)))
+				.orderBy(desc(schema.businessTrips.startDate));
+		} catch {
+			businessTrips = [];
+		}
+
+		return { expenses, employees, totals, businessTrips };
 	}
 
 	async create(data: {
@@ -69,8 +224,130 @@ export class ExpenseService {
 		return result;
 	}
 
+	async createBusinessTripWithAllowance(data: {
+		projectId: string;
+		employeeId: string;
+		destination: string;
+		startDate: string;
+		endDate: string;
+		dailyAllowanceRate: number;
+	}) {
+		const { projectId, employeeId, destination, startDate, endDate, dailyAllowanceRate } = data;
+		const start = new Date(startDate);
+		const end = new Date(endDate);
+		const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+		if (days < 1) {
+			return { ok: false as const, error: 'End date must be after start date' };
+		}
+
+		const [employee] = await this.ctx.db
+			.select({ name: schema.employees.name })
+			.from(schema.employees)
+			.where(eq(schema.employees.id, employeeId))
+			.limit(1);
+
+		const now = new Date().toISOString();
+		const tripId = crypto.randomUUID();
+		await this.ctx.db.insert(schema.businessTrips).values({
+			id: tripId,
+			employeeId,
+			projectId,
+			destination,
+			startDate,
+			endDate,
+			days,
+			dailyAllowanceRate,
+			status: 'active',
+			createdAt: now,
+			updatedAt: now
+		});
+
+		const allowanceAmount = days * dailyAllowanceRate;
+		await this.create({
+			projectId,
+			expenseType: 'opex',
+			category: 'allowance',
+			date: startDate,
+			amount: allowanceAmount,
+			currency: 'SGD',
+			vendorOrSupplier: null,
+			staffName: employee?.name || null,
+			reimbursement: false,
+			businessTrip: true,
+			destination,
+			notes: `Travel allowance: ${destination} (${days} days @ $${dailyAllowanceRate}/day)`,
+			metadata: JSON.stringify({
+				days,
+				daily_rate: dailyAllowanceRate,
+				date_start: startDate,
+				date_end: endDate
+			})
+		});
+
+		return { ok: true as const, tripId };
+	}
+
 	async update(id: string, data: Record<string, unknown>) {
 		return this.repo.update(id, data);
+	}
+
+	async updateProjectExpense(
+		projectId: string,
+		expenseId: string,
+		data: {
+			category: string;
+			expenseType: string;
+			amount: number;
+			currency: string;
+			date: string;
+			staffName?: string | null;
+			vendorOrSupplier?: string | null;
+			notes?: string | null;
+		}
+	) {
+		const [current] = await this.ctx.db
+			.select({ metadata: schema.expenses.metadata })
+			.from(schema.expenses)
+			.where(
+				and(
+					eq(schema.expenses.id, expenseId),
+					eq(schema.expenses.projectId, projectId),
+					isNull(schema.expenses.deletedAt)
+				)
+			)
+			.limit(1);
+
+		const metadata = buildDocumentMetadata({
+			raw: current?.metadata ?? null,
+			notes: data.notes || undefined
+		});
+
+		const amt = Number.isFinite(data.amount) ? data.amount : 0;
+		const currency = data.currency.trim().toUpperCase();
+		const sgdEq = await resolveSgdEquivalentForWrite({ amount: amt, currency, dateYmd: data.date });
+
+		await this.ctx.db
+			.update(schema.expenses)
+			.set({
+				expenseType: data.expenseType as 'opex' | 'sales_cost',
+				category: data.category,
+				amount: amt,
+				currency,
+				sgdEquivalent: sgdEq,
+				date: data.date,
+				staffName: data.staffName || null,
+				vendorOrSupplier: data.vendorOrSupplier || null,
+				metadata,
+				notes: data.notes || null,
+				updatedAt: new Date().toISOString()
+			})
+			.where(
+				and(
+					eq(schema.expenses.id, expenseId),
+					eq(schema.expenses.projectId, projectId),
+					isNull(schema.expenses.deletedAt)
+				)
+			);
 	}
 
 	async softDelete(id: string) {
@@ -87,6 +364,20 @@ export class ExpenseService {
 		);
 	}
 
+	async softDeleteProjectExpense(projectId: string, expenseId: string) {
+		const now = new Date().toISOString();
+		await this.ctx.db
+			.update(schema.expenses)
+			.set({ deletedAt: now, updatedAt: now })
+			.where(
+				and(
+					eq(schema.expenses.id, expenseId),
+					eq(schema.expenses.projectId, projectId),
+					isNull(schema.expenses.deletedAt)
+				)
+			);
+	}
+
 	// Revenue methods
 	async getRevenueByProject(projectId: string) {
 		return this.revenueRepo.findByProject(projectId);
@@ -94,6 +385,96 @@ export class ExpenseService {
 
 	async getProjectRevenueTotal(projectId: string) {
 		return this.revenueRepo.getProjectRevenueTotal(projectId);
+	}
+
+	async getProjectRevenuePage(projectId: string) {
+		const db = this.ctx.db;
+		const revenueRecords = await db
+			.select({
+				id: schema.revenue.id,
+				invoiceType: schema.revenue.invoiceType,
+				invoiceNumber: schema.revenue.invoiceNumber,
+				clientName: schema.revenue.clientName,
+				date: schema.revenue.date,
+				amount: schema.revenue.amount,
+				currency: schema.revenue.currency,
+				sgdEquivalent: schema.revenue.sgdEquivalent,
+				gstAmount: schema.revenue.gstAmount,
+				notes: schema.revenue.notes,
+				createdAt: schema.revenue.createdAt
+			})
+			.from(schema.revenue)
+			.where(and(eq(schema.revenue.projectId, projectId), isNull(schema.revenue.deletedAt)))
+			.orderBy(desc(schema.revenue.date), desc(schema.revenue.createdAt));
+
+		let invoices: Array<{
+			id: string;
+			invoiceNo: string;
+			date: string | null;
+			dueDate: string | null;
+			currency: string;
+			subtotal: number | null;
+			gstType: string | null;
+			gstAmount: number | null;
+			total: number | null;
+			status: string | null;
+		}> = [];
+		try {
+			invoices = await db
+				.select({
+					id: schema.invoicesOut.id,
+					invoiceNo: schema.invoicesOut.invoiceNo,
+					date: schema.invoicesOut.date,
+					dueDate: schema.invoicesOut.dueDate,
+					currency: schema.invoicesOut.currency,
+					subtotal: schema.invoicesOut.subtotal,
+					gstType: schema.invoicesOut.gstType,
+					gstAmount: schema.invoicesOut.gstAmount,
+					total: schema.invoicesOut.total,
+					status: schema.invoicesOut.status
+				})
+				.from(schema.invoicesOut)
+				.where(and(eq(schema.invoicesOut.projectId, projectId), isNull(schema.invoicesOut.deletedAt)))
+				.orderBy(desc(schema.invoicesOut.date));
+		} catch {
+			invoices = [];
+		}
+
+		const revenueTotal = await this.getProjectRevenueTotal(projectId);
+		return {
+			revenueRecords,
+			invoices,
+			totals: {
+				total: revenueTotal,
+				revenue: revenueTotal,
+				invoiced: revenueTotal
+			}
+		};
+	}
+
+	async getProjectRevenueDocumentDetail(projectId: string, revenueId: string) {
+		const [revenue] = await this.ctx.db
+			.select()
+			.from(schema.revenue)
+			.where(
+				and(
+					eq(schema.revenue.id, revenueId),
+					eq(schema.revenue.projectId, projectId),
+					isNull(schema.revenue.deletedAt)
+				)
+			)
+			.limit(1);
+
+		if (!revenue) return null;
+
+		const docMeta = parseDocumentMetadata(null);
+		const { fileViewUrl, fileDownloadUrl, previewDisplay } = await resolveExpenseFilePreview(
+			this.ctx.db,
+			revenue.documentRef,
+			docMeta
+		);
+
+		return { revenue, docMeta, fileViewUrl, fileDownloadUrl, previewDisplay };
 	}
 
 	async createRevenue(data: {

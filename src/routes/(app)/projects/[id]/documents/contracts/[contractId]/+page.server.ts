@@ -1,39 +1,26 @@
-import { and, eq, isNull } from 'drizzle-orm';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
 import { writeAuditLog } from '$lib/server/audit';
-import { buildDocumentMetadata, parseDocumentMetadata } from '$lib/server/document-metadata';
-import { getDb, schema } from '$lib/server/modules/legacy-db';
-import { r2FileUrls } from '$lib/server/r2-file-urls';
+import { createModuleContext } from '$lib/server/modules';
+import { createArApi } from '$lib/server/modules/ar/api';
 
-export const load: PageServerLoad = async ({ params, platform, parent }) => {
+export const load: PageServerLoad = async (event) => {
+	const { params, platform, parent } = event;
 	await parent();
 	if (!platform) throw error(500, 'Cloudflare platform bindings are required');
 
-	const db = getDb(platform.env);
-	const [contract] = await db
-		.select()
-		.from(schema.contracts)
-		.where(
-			and(
-				eq(schema.contracts.id, params.contractId),
-				eq(schema.contracts.projectId, params.id),
-				isNull(schema.contracts.deletedAt)
-			)
-		)
-		.limit(1);
+	const ctx = await createModuleContext(event);
+	const ar = createArApi(ctx);
+	const detail = await ar.getContractDocumentDetail(params.id, params.contractId);
+	if (!detail) throw error(404, 'Contract not found');
 
-	if (!contract) throw error(404, 'Contract not found');
-
-	const docMeta = parseDocumentMetadata(contract.metadata);
-	const { fileViewUrl, fileDownloadUrl } = r2FileUrls(contract.fileUrl);
-
-	return { contract, docMeta, fileViewUrl, fileDownloadUrl };
+	return detail;
 };
 
 export const actions: Actions = {
-	update: async ({ params, request, platform, locals }) => {
+	update: async (event) => {
+		const { params, request, platform, locals } = event;
 		if (!platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
 		const form = await request.formData();
 		const amount = Number.parseFloat(String(form.get('amount') ?? '0'));
@@ -41,40 +28,14 @@ export const actions: Actions = {
 		const date = String(form.get('date') ?? '');
 		const notes = String(form.get('notes') ?? '').trim();
 
-		const db = getDb(platform.env);
-		const [current] = await db
-			.select({ metadata: schema.contracts.metadata })
-			.from(schema.contracts)
-			.where(
-				and(
-					eq(schema.contracts.id, params.contractId),
-					eq(schema.contracts.projectId, params.id),
-					isNull(schema.contracts.deletedAt)
-				)
-			)
-			.limit(1);
-
-		const metadata = buildDocumentMetadata({
-			raw: current?.metadata ?? null,
-			notes: notes || undefined
+		const ctx = await createModuleContext(event);
+		const ar = createArApi(ctx);
+		await ar.updateContractDocument(params.id, params.contractId, {
+			amount,
+			currency,
+			date,
+			notes
 		});
-
-		await db
-			.update(schema.contracts)
-			.set({
-				amount: Number.isFinite(amount) ? amount : 0,
-				currency,
-				effectiveDate: date || null,
-				metadata,
-				updatedAt: new Date().toISOString()
-			})
-			.where(
-				and(
-					eq(schema.contracts.id, params.contractId),
-					eq(schema.contracts.projectId, params.id),
-					isNull(schema.contracts.deletedAt)
-				)
-			);
 
 		await writeAuditLog(platform, locals.user, {
 			action: 'contract.update',
@@ -85,21 +46,13 @@ export const actions: Actions = {
 
 		return { ok: true };
 	},
-	delete: async ({ params, platform, locals }) => {
+	delete: async (event) => {
+		const { params, platform, locals } = event;
 		if (!platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
 
-		const db = getDb(platform.env);
-		const now = new Date().toISOString();
-		await db
-			.update(schema.contracts)
-			.set({ deletedAt: now, updatedAt: now })
-			.where(
-				and(
-					eq(schema.contracts.id, params.contractId),
-					eq(schema.contracts.projectId, params.id),
-					isNull(schema.contracts.deletedAt)
-				)
-			);
+		const ctx = await createModuleContext(event);
+		const ar = createArApi(ctx);
+		await ar.deleteContractDocument(params.id, params.contractId);
 
 		await writeAuditLog(platform, locals.user, {
 			action: 'contract.delete',

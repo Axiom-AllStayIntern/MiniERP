@@ -4,6 +4,7 @@ import path from 'node:path';
 const ROOT = process.cwd();
 const ROUTES_DIR = path.join(ROOT, 'src', 'routes');
 const EXTS = new Set(['.ts', '.js']);
+const REPORT_ONLY = process.argv.includes('--report-only');
 
 const ALLOWLIST_PATH = path.join(ROOT, 'scripts', 'modular-boundary-allowlist.txt');
 
@@ -17,9 +18,21 @@ async function readAllowlist() {
 	);
 }
 
+function normalize(filePath) {
+	return filePath.replace(/\\/g, '/');
+}
+
 function isRouteServerFile(filePath) {
-	const normalized = filePath.replace(/\\/g, '/');
+	const normalized = normalize(filePath);
 	return normalized.endsWith('+server.ts') || normalized.endsWith('+page.server.ts');
+}
+
+function isLayoutServerFile(filePath) {
+	return normalize(filePath).endsWith('+layout.server.ts');
+}
+
+function isAnalyzedRouteFile(filePath) {
+	return isRouteServerFile(filePath) || isLayoutServerFile(filePath);
 }
 
 async function walk(dir) {
@@ -32,17 +45,17 @@ async function walk(dir) {
 			continue;
 		}
 		if (!EXTS.has(path.extname(entry.name))) continue;
-		if (!isRouteServerFile(fullPath)) continue;
+		if (!isAnalyzedRouteFile(fullPath)) continue;
 		files.push(fullPath);
 	}
 	return files;
 }
 
 function rel(filePath) {
-	return path.relative(ROOT, filePath).replace(/\\/g, '/');
+	return normalize(path.relative(ROOT, filePath));
 }
 
-function hasForbiddenImport(source) {
+function hasDirectDbImport(source) {
 	return (
 		source.includes("from '$lib/server/db'") ||
 		source.includes('from "$lib/server/db"') ||
@@ -51,15 +64,79 @@ function hasForbiddenImport(source) {
 	);
 }
 
-async function main() {
-	const files = await walk(ROUTES_DIR);
-	const allowlist = await readAllowlist();
-	const offenders = [];
+function hasLegacyDbImport(source) {
+	return (
+		source.includes("from '$lib/server/modules/legacy-db'") ||
+		source.includes('from "$lib/server/modules/legacy-db"')
+	);
+}
+
+function hasModuleInternalImport(source) {
+	return /from\s+['"]\$lib\/server\/modules\/[^'"]+\/(repository|service|schema|handlers|events)['"]/.test(
+		source
+	);
+}
+
+function printList(title, files) {
+	console.log(`${title}: ${files.length}`);
+	for (const file of files) {
+		console.log(` - ${file}`);
+	}
+}
+
+async function collectReport(files) {
+	const report = {
+		hardGateDirectRouteDbImports: [],
+		legacyRouteDbBridgeImports: [],
+		routeInternalModuleImports: [],
+		layoutDirectDbImports: [],
+		layoutLegacyDbBridgeImports: []
+	};
 
 	for (const file of files) {
 		const relative = rel(file);
 		const source = await readFile(file, 'utf8');
-		if (!hasForbiddenImport(source)) continue;
+		const routeServer = isRouteServerFile(file);
+		const layoutServer = isLayoutServerFile(file);
+
+		if (routeServer && hasDirectDbImport(source)) {
+			report.hardGateDirectRouteDbImports.push(relative);
+		}
+		if (routeServer && hasLegacyDbImport(source)) {
+			report.legacyRouteDbBridgeImports.push(relative);
+		}
+		if (routeServer && hasModuleInternalImport(source)) {
+			report.routeInternalModuleImports.push(relative);
+		}
+		if (layoutServer && hasDirectDbImport(source)) {
+			report.layoutDirectDbImports.push(relative);
+		}
+		if (layoutServer && hasLegacyDbImport(source)) {
+			report.layoutLegacyDbBridgeImports.push(relative);
+		}
+	}
+
+	return report;
+}
+
+async function runReport(files) {
+	const report = await collectReport(files);
+	console.log('Architecture boundary report');
+	printList('Hard-gated direct route DB imports', report.hardGateDirectRouteDbImports);
+	printList('Legacy route DB bridge imports', report.legacyRouteDbBridgeImports);
+	printList('Route imports of module internals', report.routeInternalModuleImports);
+	printList('Layout direct DB imports', report.layoutDirectDbImports);
+	printList('Layout legacy DB bridge imports', report.layoutLegacyDbBridgeImports);
+}
+
+async function runHardGate(files) {
+	const allowlist = await readAllowlist();
+	const offenders = [];
+
+	for (const file of files.filter(isRouteServerFile)) {
+		const relative = rel(file);
+		const source = await readFile(file, 'utf8');
+		if (!hasDirectDbImport(source)) continue;
 		if (allowlist.has(relative)) continue;
 		offenders.push(relative);
 	}
@@ -75,6 +152,16 @@ async function main() {
 	}
 
 	console.log('Modular boundary check passed.');
+}
+
+async function main() {
+	const files = await walk(ROUTES_DIR);
+	if (REPORT_ONLY) {
+		await runReport(files);
+		return;
+	}
+
+	await runHardGate(files);
 }
 
 main().catch((err) => {
