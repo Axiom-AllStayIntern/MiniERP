@@ -1,7 +1,7 @@
-import { eq, desc, isNull, and } from 'drizzle-orm';
-import type { RequestHandler } from './$types';
+﻿import type { RequestHandler } from './$types';
 
-import { getDb, schema } from '$lib/server/modules/legacy-db';
+import { createModuleContext } from '$lib/server/modules';
+import { createFinanceApi } from '$lib/server/modules/finance';
 import { fail, ok } from '$lib/server/http';
 
 const DESTINATION_ALLOWANCE_RATES: Record<string, number> = {
@@ -19,49 +19,28 @@ const DESTINATION_ALLOWANCE_RATES: Record<string, number> = {
  * GET /api/business-trips
  * List all business trips, optionally filtered by project or employee
  */
-export const GET: RequestHandler = async ({ url, platform }) => {
+export const GET: RequestHandler = async (event) => {
+	const { url, platform } = event;
 	if (!platform) {
 		return fail('Cloudflare platform bindings are required', 500);
 	}
 
-	const projectId = url.searchParams.get('projectId');
-	const employeeId = url.searchParams.get('employeeId');
-
-	const db = getDb(platform.env);
-
-	let query = db.select().from(schema.businessTrips).where(isNull(schema.businessTrips.deletedAt));
-
-	// Apply filters if provided
-	const trips = await db
-		.select()
-		.from(schema.businessTrips)
-		.where(
-			and(
-				isNull(schema.businessTrips.deletedAt),
-				projectId ? eq(schema.businessTrips.projectId, projectId) : undefined,
-				employeeId ? eq(schema.businessTrips.employeeId, employeeId) : undefined
-			)
-		)
-		.orderBy(desc(schema.businessTrips.startDate));
+	const ctx = await createModuleContext(event);
+	const { expenses } = createFinanceApi(ctx);
+	const trips = await expenses.listBusinessTrips({
+		projectId: url.searchParams.get('projectId'),
+		employeeId: url.searchParams.get('employeeId')
+	});
 
 	return ok({ trips });
 };
 
 /**
  * POST /api/business-trips
- * Create a new business trip and auto-generate allowance expense
- *
- * Body: {
- *   employeeId: string - Required
- *   projectId?: string - Optional
- *   destination: string - Required
- *   startDate: string - Required (YYYY-MM-DD)
- *   endDate: string - Required (YYYY-MM-DD)
- *   dailyAllowanceRate?: number - Optional, defaults based on destination
- *   notes?: string - Optional
- * }
+ * Create a new business trip and auto-generate allowance expense.
  */
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async (event) => {
+	const { request, platform } = event;
 	if (!platform) {
 		return fail('Cloudflare platform bindings are required', 500);
 	}
@@ -76,12 +55,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		notes?: string;
 	};
 
-	// Validate required fields
 	if (!body.employeeId || !body.destination || !body.startDate || !body.endDate) {
 		return fail('Missing required fields: employeeId, destination, startDate, endDate');
 	}
 
-	// Validate dates
 	const startDate = new Date(body.startDate);
 	const endDate = new Date(body.endDate);
 
@@ -93,81 +70,35 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		return fail('End date must be on or after start date');
 	}
 
-	// Calculate days
-	const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-	// Get allowance rate
 	const dailyAllowanceRate =
 		body.dailyAllowanceRate ?? DESTINATION_ALLOWANCE_RATES[body.destination] ?? 50;
 
-	const db = getDb(platform.env);
-	const now = new Date().toISOString();
-	const tripId = crypto.randomUUID();
-
-	// Get employee name for expense record
-	const [employee] = await db
-		.select({ name: schema.employees.name })
-		.from(schema.employees)
-		.where(eq(schema.employees.id, body.employeeId))
-		.limit(1);
-
-	if (!employee) {
-		return fail('Employee not found', 404);
-	}
-
-	// Create business trip
-	await db.insert(schema.businessTrips).values({
-		id: tripId,
+	const ctx = await createModuleContext(event);
+	const { expenses } = createFinanceApi(ctx);
+	const result = await expenses.createBusinessTripWithAllowance({
 		employeeId: body.employeeId,
 		projectId: body.projectId || null,
 		destination: body.destination,
 		startDate: body.startDate,
 		endDate: body.endDate,
-		days,
 		dailyAllowanceRate,
-		status: 'active',
 		notes: body.notes || null,
-		createdAt: now,
-		updatedAt: now
+		requireEmployee: true
 	});
 
-	// Auto-create allowance expense
-	const allowanceAmount = days * dailyAllowanceRate;
-	const expenseId = crypto.randomUUID();
-
-	await db.insert(schema.expenses).values({
-		id: expenseId,
-		projectId: body.projectId || null,
-		expenseType: 'opex',
-		category: 'allowance',
-		date: body.startDate,
-		amount: allowanceAmount,
-		currency: 'SGD',
-		sgdEquivalent: allowanceAmount,
-		gstAmount: 0,
-		staffName: employee.name,
-		reimbursement: false,
-		businessTrip: true,
-		destination: body.destination,
-		notes: `Travel allowance: ${body.destination} (${days} days @ $${dailyAllowanceRate}/day)`,
-		metadata: JSON.stringify({
-			days,
-			daily_rate: dailyAllowanceRate,
-			date_start: body.startDate,
-			date_end: body.endDate
-		}),
-		createdAt: now,
-		updatedAt: now
-	});
+	if (!result.ok) {
+		return fail(result.error, result.status ?? 400);
+	}
 
 	return ok(
 		{
-			tripId,
-			expenseId,
-			days,
-			allowanceAmount,
+			tripId: result.tripId,
+			expenseId: result.expenseId,
+			days: result.days,
+			allowanceAmount: result.allowanceAmount,
 			message: 'Business trip created with allowance expense'
 		},
 		201
 	);
 };
+

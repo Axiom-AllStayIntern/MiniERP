@@ -1,15 +1,16 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 
-import { getDb, schema } from '$lib/server/modules/legacy-db';
+import { createModuleContext } from '$lib/server/modules';
+import { createEmployeeApi } from '../../../../modules/hr';
 
 export const actions: Actions = {
-	default: async ({ request, platform }) => {
-		if (!platform) {
+	default: async (event) => {
+		if (!event.platform) {
 			return fail(500, { message: 'Cloudflare platform bindings are required' });
 		}
 
-		const form = await request.formData();
+		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '').trim();
 		const type = String(form.get('type') ?? 'full_time');
 		const status = String(form.get('status') ?? 'active');
@@ -22,22 +23,18 @@ export const actions: Actions = {
 			return fail(400, { message: 'Employee name is required.' });
 		}
 
-		const id = crypto.randomUUID();
-		const db = getDb(platform.env);
-		await db.insert(schema.employees).values({
-			id,
+		const ctx = await createModuleContext(event);
+		const employee = createEmployeeApi(ctx);
+		const result = await employee.createEmployeeProfile({
 			name,
-			type: type as (typeof schema.employees.$inferInsert)['type'],
+			type,
 			status,
-			startDate: startDate || null,
-			endDate: endDate || null,
-			contact: contact || null,
-			taxId: taxId || null,
-			metadata: null,
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString()
+			startDate,
+			endDate,
+			contact,
+			taxId
 		});
 
-		throw redirect(303, `/employees/${id}`);
+		throw redirect(303, `/employees/${result.id}`);
 	}
 };

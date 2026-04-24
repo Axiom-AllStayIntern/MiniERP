@@ -1,161 +1,24 @@
-import { and, asc, between, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { getDb, schema } from '$lib/server/modules/legacy-db';
-import { estimateSingaporeResidentTax } from '$lib/server/singapore-resident-tax-estimate';
+import { createModuleContext } from '$lib/server/modules';
+import { createEmployeeApi } from '../../../../modules/hr';
 
-export const load: PageServerLoad = async ({ params, platform, url }) => {
-	if (!platform) throw error(500, 'Cloudflare platform bindings are required');
+export const load: PageServerLoad = async (event) => {
+	if (!event.platform) throw error(500, 'Cloudflare platform bindings are required');
 
-	const db = getDb(platform.env);
-	const [employee] = await db
-		.select()
-		.from(schema.employees)
-		.where(and(eq(schema.employees.id, params.id), isNull(schema.employees.deletedAt)))
-		.limit(1);
+	const ctx = await createModuleContext(event);
+	const employee = createEmployeeApi(ctx);
+	const page = await employee.getEmployeeDetailPage(event.params.id, event.url.searchParams.get('taxYear'));
+	if (!page) throw error(404, 'Employee not found');
 
-	if (!employee) throw error(404, 'Employee not found');
-
-	const calendarYear = new Date().getFullYear();
-	const parsedYear = Number.parseInt(url.searchParams.get('taxYear') ?? String(calendarYear), 10);
-	const taxYear =
-		Number.isFinite(parsedYear) && parsedYear >= 2000 && parsedYear <= calendarYear + 1
-			? parsedYear
-			: calendarYear;
-	const periodStart = `${taxYear}-01-01`;
-	const periodEnd = `${taxYear}-12-31`;
-
-	const payoutTaxFilter = and(
-		eq(schema.projectEmployees.employeeId, params.id),
-		between(schema.payoutRecords.period, periodStart, periodEnd),
-		inArray(schema.payoutRecords.status, ['confirmed', 'paid'])
-	);
-
-	const [companyComponents, allocations, participation, taxAgg, taxByIncomeType] = await Promise.all([
-		db
-			.select()
-			.from(schema.employeeCompensationComponents)
-			.where(
-				and(
-					eq(schema.employeeCompensationComponents.employeeId, params.id),
-					isNull(schema.employeeCompensationComponents.deletedAt)
-				)
-			)
-			.orderBy(desc(schema.employeeCompensationComponents.effectiveFrom)),
-		db
-			.select({
-				id: schema.employeeProjectAllocations.id,
-				projectId: schema.employeeProjectAllocations.projectId,
-				projectName: schema.projects.name,
-				weightPct: schema.employeeProjectAllocations.weightPct,
-				allocationMode: schema.employeeProjectAllocations.allocationMode,
-				effectiveFrom: schema.employeeProjectAllocations.effectiveFrom
-			})
-			.from(schema.employeeProjectAllocations)
-			.innerJoin(schema.projects, eq(schema.employeeProjectAllocations.projectId, schema.projects.id))
-			.where(
-				and(
-					eq(schema.employeeProjectAllocations.employeeId, params.id),
-					isNull(schema.employeeProjectAllocations.deletedAt),
-					isNull(schema.projects.deletedAt)
-				)
-			)
-			.orderBy(asc(schema.projects.name)),
-		db
-			.select({
-				peId: schema.projectEmployees.id,
-				projectId: schema.projectEmployees.projectId,
-				projectName: schema.projects.name,
-				role: schema.projectEmployees.role,
-				dateIn: schema.projectEmployees.dateIn,
-				dateOut: schema.projectEmployees.dateOut,
-				staffType: schema.projectEmployees.staffType
-			})
-			.from(schema.projectEmployees)
-			.innerJoin(schema.projects, eq(schema.projectEmployees.projectId, schema.projects.id))
-			.where(
-				and(
-					eq(schema.projectEmployees.employeeId, params.id),
-					isNull(schema.projectEmployees.deletedAt),
-					isNull(schema.projects.deletedAt)
-				)
-			)
-			.orderBy(asc(schema.projects.name)),
-		db
-			.select({
-				taxableTotal: sql<number>`coalesce(sum(${schema.payoutRecords.taxableAmount}), 0)`,
-				computedTotal: sql<number>`coalesce(sum(${schema.payoutRecords.computedAmount}), 0)`,
-				cpfEmployeeTotal: sql<number>`coalesce(sum(${schema.payoutRecords.cpfEmployee}), 0)`,
-				payoutCount: sql<number>`count(*)`
-			})
-			.from(schema.payoutRecords)
-			.innerJoin(
-				schema.compensationComponents,
-				eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
-			)
-			.innerJoin(
-				schema.projectEmployees,
-				eq(schema.compensationComponents.projectEmployeeId, schema.projectEmployees.id)
-			)
-			.where(payoutTaxFilter),
-		db
-			.select({
-				incomeType: schema.compensationComponents.incomeType,
-				computedSum: sql<number>`coalesce(sum(${schema.payoutRecords.computedAmount}), 0)`,
-				taxableSum: sql<number>`coalesce(sum(${schema.payoutRecords.taxableAmount}), 0)`,
-				cpfEmployeeSum: sql<number>`coalesce(sum(${schema.payoutRecords.cpfEmployee}), 0)`,
-				lineCount: sql<number>`count(*)`
-			})
-			.from(schema.payoutRecords)
-			.innerJoin(
-				schema.compensationComponents,
-				eq(schema.payoutRecords.componentId, schema.compensationComponents.id)
-			)
-			.innerJoin(
-				schema.projectEmployees,
-				eq(schema.compensationComponents.projectEmployeeId, schema.projectEmployees.id)
-			)
-			.where(payoutTaxFilter)
-			.groupBy(schema.compensationComponents.incomeType)
-	]);
-
-	const allocationByProjectId = Object.fromEntries(allocations.map((a) => [a.projectId, a.weightPct] as const));
-
-	const [aggRow] = taxAgg;
-	const taxableTotal = aggRow?.taxableTotal ?? 0;
-	const cpfEmployeeTotal = aggRow?.cpfEmployeeTotal ?? 0;
-	const chargeableBeforeOtherReliefs = taxableTotal - cpfEmployeeTotal;
-	const estimatedResidentTax = estimateSingaporeResidentTax(chargeableBeforeOtherReliefs);
-
-	const byIncomeType = [...taxByIncomeType].sort((a, b) => String(a.incomeType).localeCompare(String(b.incomeType)));
-
-	return {
-		employee,
-		companyComponents,
-		allocations,
-		allocationByProjectId,
-		participation,
-		individualTax: {
-			year: taxYear,
-			range: { start: periodStart, end: periodEnd },
-			payoutCount: aggRow?.payoutCount ?? 0,
-			taxableTotal,
-			computedTotal: aggRow?.computedTotal ?? 0,
-			cpfEmployeeTotal,
-			chargeableBeforeOtherReliefs,
-			estimatedResidentTax,
-			byIncomeType,
-			note:
-				'Figures sum project-linked payout lines (status confirmed or paid) in the selected calendar year. IRAS reliefs beyond employee CPF are not stored; estimated tax uses resident progressive bands for illustration only — verify with IRAS / your tax advisor.'
-		}
-	};
+	return page;
 };
 
 export const actions: Actions = {
-	updateProfile: async ({ params, request, platform }) => {
-		if (!platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
-		const form = await request.formData();
+	updateProfile: async (event) => {
+		if (!event.platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
+		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '').trim();
 		const type = String(form.get('type') ?? 'full_time');
 		const status = String(form.get('status') ?? 'active');
@@ -168,28 +31,25 @@ export const actions: Actions = {
 
 		if (!name) return fail(400, { message: 'Employee name is required.' });
 
-		const db = getDb(platform.env);
-		await db
-			.update(schema.employees)
-			.set({
-				name,
-				type: type as (typeof schema.employees.$inferInsert)['type'],
-				status,
-				startDate: startDate || null,
-				endDate: endDate || null,
-				contact: contact || null,
-				taxId: taxId || null,
-				cpfApplicable,
-				taxResidentLabel: taxResidentLabel || null,
-				updatedAt: new Date().toISOString()
-			})
-			.where(and(eq(schema.employees.id, params.id), isNull(schema.employees.deletedAt)));
+		const ctx = await createModuleContext(event);
+		const employee = createEmployeeApi(ctx);
+		await employee.updateEmployeeProfile(event.params.id, {
+			name,
+			type,
+			status,
+			startDate,
+			endDate,
+			contact,
+			taxId,
+			taxResidentLabel,
+			cpfApplicable
+		});
 
 		return { ok: true, profileUpdated: true as const };
 	},
-	addCompanyComponent: async ({ params, request, platform }) => {
-		if (!platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
-		const form = await request.formData();
+	addCompanyComponent: async (event) => {
+		if (!event.platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
+		const form = await event.request.formData();
 		const label = String(form.get('label') ?? '').trim();
 		const incomeType = String(form.get('incomeType') ?? 'salary');
 		const ruleType = String(form.get('ruleType') ?? 'fixed');
@@ -201,109 +61,60 @@ export const actions: Actions = {
 		if (!label) return fail(400, { message: 'Component label is required.' });
 		if (!effectiveFrom) return fail(400, { message: 'Effective from date is required.' });
 
-		const db = getDb(platform.env);
-		await db.insert(schema.employeeCompensationComponents).values({
-			id: crypto.randomUUID(),
-			employeeId: params.id,
+		const ctx = await createModuleContext(event);
+		const employee = createEmployeeApi(ctx);
+		await employee.addCompanyComponent(event.params.id, {
 			label,
-			incomeType: incomeType as (typeof schema.employeeCompensationComponents.$inferInsert)['incomeType'],
-			ruleType: ruleType as (typeof schema.employeeCompensationComponents.$inferInsert)['ruleType'],
-			value: Number.isFinite(value) ? value : 0,
-			floor: null,
-			cap: null,
-			frequency: frequency as (typeof schema.employeeCompensationComponents.$inferInsert)['frequency'],
-			taxable,
+			incomeType,
+			ruleType,
+			value,
+			frequency,
 			effectiveFrom,
-			effectiveTo: null,
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString()
+			taxable
 		});
 
 		return { ok: true };
 	},
-	removeCompanyComponent: async ({ params, request, platform }) => {
-		if (!platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
-		const form = await request.formData();
+	removeCompanyComponent: async (event) => {
+		if (!event.platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
+		const form = await event.request.formData();
 		const componentId = String(form.get('componentId') ?? '');
 		if (!componentId) return fail(400, { message: 'Missing component id.' });
 
-		const db = getDb(platform.env);
-		const now = new Date().toISOString();
-		await db
-			.update(schema.employeeCompensationComponents)
-			.set({ deletedAt: now, updatedAt: now })
-			.where(
-				and(
-					eq(schema.employeeCompensationComponents.id, componentId),
-					eq(schema.employeeCompensationComponents.employeeId, params.id),
-					isNull(schema.employeeCompensationComponents.deletedAt)
-				)
-			);
+		const ctx = await createModuleContext(event);
+		const employee = createEmployeeApi(ctx);
+		await employee.removeCompanyComponent(event.params.id, componentId);
 
 		return { ok: true };
 	},
-	saveAllocations: async ({ params, request, platform }) => {
-		if (!platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
-		const form = await request.formData();
+	saveAllocations: async (event) => {
+		if (!event.platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
+		const form = await event.request.formData();
 		const effectiveFrom = String(form.get('effectiveFrom') ?? '').trim() || new Date().toISOString().slice(0, 10);
-
-		const db = getDb(platform.env);
-		const participating = await db
-			.select({ projectId: schema.projectEmployees.projectId })
-			.from(schema.projectEmployees)
-			.where(and(eq(schema.projectEmployees.employeeId, params.id), isNull(schema.projectEmployees.deletedAt)));
-
-		const weights: { projectId: string; pct: number }[] = [];
-		for (const row of participating) {
-			const raw = String(form.get(`w_${row.projectId}`) ?? '').trim();
-			if (!raw) continue;
-			const pct = Number.parseFloat(raw);
-			if (!Number.isFinite(pct) || pct <= 0) continue;
-			weights.push({ projectId: row.projectId, pct });
+		const weightsByProjectId: Record<string, string> = {};
+		for (const [key, value] of form.entries()) {
+			if (key.startsWith('w_')) {
+				weightsByProjectId[key.slice(2)] = String(value);
+			}
 		}
 
-		const sum = weights.reduce((a, b) => a + b.pct, 0);
-		if (weights.length > 0 && Math.abs(sum - 100) > 0.02) {
-			return fail(400, {
-				message: `Project weights must sum to 100% (currently ${sum.toFixed(2)}%).`
-			});
-		}
-
-		const now = new Date().toISOString();
-		await db
-			.update(schema.employeeProjectAllocations)
-			.set({ deletedAt: now, updatedAt: now })
-			.where(
-				and(
-					eq(schema.employeeProjectAllocations.employeeId, params.id),
-					isNull(schema.employeeProjectAllocations.deletedAt)
-				)
-			);
-
-		for (const row of weights) {
-			await db.insert(schema.employeeProjectAllocations).values({
-				id: crypto.randomUUID(),
-				employeeId: params.id,
-				projectId: row.projectId,
-				weightPct: row.pct,
-				allocationMode: 'manual',
-				effectiveFrom,
-				effectiveTo: null,
-				createdAt: now,
-				updatedAt: now
-			});
+		const ctx = await createModuleContext(event);
+		const employee = createEmployeeApi(ctx);
+		const result = await employee.saveEmployeeProjectAllocations(event.params.id, {
+			effectiveFrom,
+			weightsByProjectId
+		});
+		if (!result.ok) {
+			return fail(400, { message: result.message });
 		}
 
 		return { ok: true };
 	},
-	deleteEmployee: async ({ params, platform }) => {
-		if (!platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
-		const db = getDb(platform.env);
-		const now = new Date().toISOString();
-		await db
-			.update(schema.employees)
-			.set({ deletedAt: now, updatedAt: now, status: 'inactive' })
-			.where(and(eq(schema.employees.id, params.id), isNull(schema.employees.deletedAt)));
+	deleteEmployee: async (event) => {
+		if (!event.platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
+		const ctx = await createModuleContext(event);
+		const employee = createEmployeeApi(ctx);
+		await employee.deleteEmployee(event.params.id);
 
 		throw redirect(303, '/employees');
 	}

@@ -1,5 +1,7 @@
 import type { DomainAgentDef } from '../types';
-import { arActions } from '$lib/server/modules/ar';
+import { financeAgentActionSets } from '$lib/server/modules/finance';
+
+const actions = financeAgentActionSets.ar;
 
 export const arDomainAgent: DomainAgentDef = {
 	descriptor: {
@@ -19,13 +21,13 @@ export const arDomainAgent: DomainAgentDef = {
 			'doc hub'
 		]
 	},
-	actions: arActions,
+	actions,
 	buildSystemPrompt: () => `You are the Accounts Receivable (AR) expert assistant for SmartFin.
 You handle all requests related to invoices, contracts, quotations, purchase orders, and financial documents.
 
 Available actions:
 ${JSON.stringify(
-	arActions.map((a) => ({
+	actions.map((a) => ({
 		id: a.id,
 		description: a.description,
 		layer: a.layer,

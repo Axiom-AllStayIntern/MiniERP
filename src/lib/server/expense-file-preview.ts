@@ -1,10 +1,9 @@
 import { eq } from 'drizzle-orm';
 
 import type { DocumentMetadata } from '$lib/server/document-metadata';
-import type { DBClient } from '$lib/server/db';
 import { inferFileInlinePreviewKind, type FileInlinePreviewKind } from '$lib/file-inline-preview';
-import { schema } from '$lib/server/modules/legacy-db';
 import { r2FileUrls } from '$lib/server/r2-file-urls';
+import { schema, type DBClient } from '../../infrastructure/db';
 
 export const EXPENSE_DOCUMENT_ID_RE =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

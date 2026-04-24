@@ -3,7 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 import { writeAuditLog } from '$lib/server/audit';
 import { createModuleContext } from '$lib/server/modules';
-import { createArApi } from '$lib/server/modules/ar/api';
+import { createFinanceApi } from '$lib/server/modules/finance';
 
 export const load: PageServerLoad = async (event) => {
 	const { params, platform, parent } = event;
@@ -11,8 +11,8 @@ export const load: PageServerLoad = async (event) => {
 	if (!platform) throw error(500, 'Cloudflare platform bindings are required');
 
 	const ctx = await createModuleContext(event);
-	const ar = createArApi(ctx);
-	const detail = await ar.getContractDocumentDetail(params.id, params.contractId);
+	const { documents } = createFinanceApi(ctx);
+	const detail = await documents.getContractDocumentDetail(params.id, params.contractId);
 	if (!detail) throw error(404, 'Contract not found');
 
 	return detail;
@@ -29,8 +29,8 @@ export const actions: Actions = {
 		const notes = String(form.get('notes') ?? '').trim();
 
 		const ctx = await createModuleContext(event);
-		const ar = createArApi(ctx);
-		await ar.updateContractDocument(params.id, params.contractId, {
+		const { documents } = createFinanceApi(ctx);
+		await documents.updateContractDocument(params.id, params.contractId, {
 			amount,
 			currency,
 			date,
@@ -51,8 +51,8 @@ export const actions: Actions = {
 		if (!platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
 
 		const ctx = await createModuleContext(event);
-		const ar = createArApi(ctx);
-		await ar.deleteContractDocument(params.id, params.contractId);
+		const { documents } = createFinanceApi(ctx);
+		await documents.deleteContractDocument(params.id, params.contractId);
 
 		await writeAuditLog(platform, locals.user, {
 			action: 'contract.delete',

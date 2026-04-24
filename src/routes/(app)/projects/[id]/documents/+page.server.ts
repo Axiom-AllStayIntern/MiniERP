@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 
 import { createModuleContext } from '$lib/server/modules';
-import { createReportingApi } from '$lib/server/modules/reporting/api';
+import { createFinanceApi } from '$lib/server/modules/finance';
 
 const emptySummary = {
 	documents: [],
@@ -21,8 +21,8 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const ctx = await createModuleContext(event);
-	const reporting = createReportingApi(ctx);
-	const summary = await reporting.getProjectDocumentsSummary(params.id);
+	const { insights } = createFinanceApi(ctx);
+	const summary = await insights.getProjectDocumentsSummary(params.id);
 
 	return { ...summary, project };
 };

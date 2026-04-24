@@ -1,11 +1,12 @@
 import type { RequestHandler } from './$types';
 
-import { getDb, schema } from '$lib/server/modules/legacy-db';
+import { createModuleContext } from '$lib/server/modules';
+import { createDocumentIntakeApi } from '../../../../modules/document-intake';
 import { fail, ok } from '$lib/server/http';
 import type { OcrQueueMessage } from '$lib/server/ocr/types';
-import { objectExists } from '$lib/server/r2';
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async (event) => {
+	const { request, platform } = event;
 	if (!platform) {
 		return fail('Cloudflare platform bindings are required', 500);
 	}
@@ -24,37 +25,21 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		return fail('Missing required fields: key, fileType, projectId, entityType');
 	}
 
-	const exists = body.skipObjectCheck ? true : await objectExists(platform.env, body.key);
-	if (!exists) {
-		return fail('Uploaded object was not found in R2', 404);
+	const ctx = await createModuleContext(event);
+	const intake = createDocumentIntakeApi(ctx);
+	const result = await intake.confirmUploadedObject({
+		key: body.key,
+		fileType: body.fileType,
+		projectId: body.projectId,
+		entityType: body.entityType,
+		entityId: body.entityId,
+		triggerOcr: body.triggerOcr,
+		skipObjectCheck: body.skipObjectCheck
+	});
+
+	if (!result.ok) {
+		return fail(result.message, result.status);
 	}
 
-	const db = getDb(platform.env);
-	const entityId = body.entityId ?? crypto.randomUUID();
-
-	if (body.entityType === 'invoice_in') {
-		await db.insert(schema.invoicesIn).values({
-			id: entityId,
-			projectId: body.projectId,
-			fileUrl: body.key,
-			status: 'processing',
-			createdAt: new Date().toISOString(),
-			updatedAt: new Date().toISOString()
-		});
-	}
-
-	const shouldQueue = body.triggerOcr ?? body.entityType === 'invoice_in';
-	if (shouldQueue) {
-		const message: OcrQueueMessage = {
-			id: crypto.randomUUID(),
-			fileKey: body.key,
-			fileType: body.fileType,
-			entityType: body.entityType,
-			entityId,
-			projectId: body.projectId
-		};
-		await platform.env.OCR_QUEUE.send(message);
-	}
-
-	return ok({ entityId, status: shouldQueue ? 'queued' : 'saved' }, 201);
+	return ok({ entityId: result.entityId, status: result.status }, 201);
 };

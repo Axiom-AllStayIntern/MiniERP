@@ -1,14 +1,14 @@
-import type { RequestHandler } from './$types';
+﻿import type { RequestHandler } from './$types';
 
 import { createModuleContext } from '$lib/server/modules';
-import { createReportingApi } from '$lib/server/modules/reporting/api';
+import { createFinanceApi } from '$lib/server/modules/finance';
 import { fail } from '$lib/server/http';
 
 export const GET: RequestHandler = async (event) => {
 	try {
 		const ctx = await createModuleContext(event);
-		const reporting = createReportingApi(ctx);
-		const csv = await reporting.getProjectsProfitCsv({
+		const { insights } = createFinanceApi(ctx);
+		const csv = await insights.getProjectsProfitCsv({
 			projectId: event.url.searchParams.get('projectId'),
 			projectStatus: event.url.searchParams.get('projectStatus'),
 			from: event.url.searchParams.get('from'),
@@ -25,3 +25,4 @@ export const GET: RequestHandler = async (event) => {
 		return fail((e as Error).message, 500);
 	}
 };
+

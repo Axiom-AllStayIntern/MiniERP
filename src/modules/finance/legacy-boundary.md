@@ -19,6 +19,14 @@ This map is intentionally descriptive. It does not move code in Phase 1.
 | `employee-lookup` | HR module | Weak for enrichment, strong for payroll/staff-cost workflows | Degrade for enrichment; block or fail for payroll |
 | `file-source` | Platform files / Document Intake | Strong for document workflows | Retry or block |
 
+## Current Internal Adapter Step
+
+- `src/modules/finance/contracts.ts` defines the explicit Finance-facing
+  contracts consumed by grouped Finance APIs.
+- `src/modules/finance/adapters.ts` is the only target-layer location that
+  adapts legacy `ar`, `expense`, `tax`, and `reporting` APIs into those
+  contracts.
+
 ## Phase 1 Constraints
 
 - Do not rewrite business formulas.

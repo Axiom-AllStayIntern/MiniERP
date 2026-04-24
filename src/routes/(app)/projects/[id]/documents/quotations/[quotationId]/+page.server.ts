@@ -3,7 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 import { writeAuditLog } from '$lib/server/audit';
 import { createModuleContext } from '$lib/server/modules';
-import { createArApi } from '$lib/server/modules/ar/api';
+import { createFinanceApi } from '$lib/server/modules/finance';
 
 export const load: PageServerLoad = async (event) => {
 	const { params, platform, parent } = event;
@@ -11,8 +11,8 @@ export const load: PageServerLoad = async (event) => {
 	if (!platform) throw error(500, 'Cloudflare platform bindings are required');
 
 	const ctx = await createModuleContext(event);
-	const ar = createArApi(ctx);
-	const detail = await ar.getQuotationDocumentDetail(params.id, params.quotationId);
+	const { documents } = createFinanceApi(ctx);
+	const detail = await documents.getQuotationDocumentDetail(params.id, params.quotationId);
 	if (!detail) throw error(404, 'Quotation not found');
 
 	return detail;
@@ -30,8 +30,8 @@ export const actions: Actions = {
 		const notes = String(form.get('notes') ?? '');
 
 		const ctx = await createModuleContext(event);
-		const ar = createArApi(ctx);
-		await ar.updateQuotationDocument(params.id, params.quotationId, {
+		const { documents } = createFinanceApi(ctx);
+		await documents.updateQuotationDocument(params.id, params.quotationId, {
 			quotationNumber,
 			amount,
 			currency,
@@ -53,8 +53,8 @@ export const actions: Actions = {
 		if (!platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
 
 		const ctx = await createModuleContext(event);
-		const ar = createArApi(ctx);
-		await ar.deleteQuotationDocument(params.id, params.quotationId);
+		const { documents } = createFinanceApi(ctx);
+		await documents.deleteQuotationDocument(params.id, params.quotationId);
 
 		await writeAuditLog(platform, locals.user, {
 			action: 'quotation.delete',

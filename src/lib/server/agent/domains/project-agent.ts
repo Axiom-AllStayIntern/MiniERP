@@ -1,5 +1,5 @@
 import type { DomainAgentDef } from '../types';
-import { projectActions } from '$lib/server/modules/project';
+import { projectActions } from '../../../../modules/project';
 
 export const projectDomainAgent: DomainAgentDef = {
 	descriptor: {

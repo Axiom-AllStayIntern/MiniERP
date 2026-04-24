@@ -22,6 +22,5 @@ Does not own:
 - HR rules
 - Document Intake classification semantics
 
-Phase 1 keeps existing runtime code under `src/lib/server` and
-`src/lib/server/modules`; this directory is the target boundary for the
-platform extraction.
+Phase 3 starts moving active runtime implementations here behind compatibility
+re-exports from `src/lib/server/modules`.

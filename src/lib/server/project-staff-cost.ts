@@ -1,6 +1,6 @@
 /**
- * @deprecated Import from '$lib/server/modules/employee/repository' instead.
- * Re-exports for backward compatibility with existing route handlers.
+ * @deprecated Import from '$lib/server/modules/hr/compat' instead.
+ * Re-export kept only for backward compatibility.
  */
 export {
 	staffCostPayoutStatuses,
@@ -8,4 +8,4 @@ export {
 	staffCostPayoutJoinConditions,
 	staffCostSumExpr,
 	staffCostPeriodBetween
-} from '$lib/server/modules/employee/repository';
+} from '$lib/server/modules/hr/compat';

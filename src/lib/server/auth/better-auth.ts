@@ -3,8 +3,7 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { sveltekitCookies } from 'better-auth/svelte-kit';
 
-import { getDb } from '$lib/server/db';
-import * as schema from '$lib/server/db/schema';
+import { getDb, schema } from '../../../infrastructure/db';
 
 import { sendTransactionalEmail } from './email';
 

@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
 import { createModuleContext } from '$lib/server/modules';
-import { createTaxApi } from '$lib/server/modules/tax/api';
+import { createFinanceApi } from '$lib/server/modules/finance';
 import { fail, ok } from '$lib/server/http';
 
 export const GET: RequestHandler = async (event) => {
@@ -12,8 +12,8 @@ export const GET: RequestHandler = async (event) => {
 		}
 
 		const ctx = await createModuleContext(event);
-		const tax = createTaxApi(ctx);
-		return ok(await tax.getCorporateTaxEstimate(year));
+		const { taxes } = createFinanceApi(ctx);
+		return ok(await taxes.getCorporateTaxEstimate(year));
 	} catch (e) {
 		return fail((e as Error).message, 500);
 	}

@@ -2,7 +2,7 @@
  * @deprecated Use `createCoreApi(ctx).writeAuditLog()` from the core module instead.
  * This file re-exports for backward compatibility with existing route handlers.
  */
-import { getDb, schema } from '$lib/server/db';
+import { getDb, schema } from '../../infrastructure/db';
 
 type AuditInput = {
 	action: string;

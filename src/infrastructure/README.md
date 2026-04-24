@@ -18,5 +18,9 @@ Does not own:
 - Product navigation
 - Workflow semantics
 
-Phase 1 keeps existing infrastructure code in place and documents the target
-extraction boundary.
+Phase 3 starts moving concrete runtime implementations here behind compatibility
+re-exports from legacy `src/lib/server` entrypoints.
+
+Current Phase 3 scope includes the active DB client assembly and the schema
+barrel under `src/infrastructure/db`, while legacy `src/lib/server/db`
+entrypoints remain compatibility shells.

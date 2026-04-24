@@ -16,6 +16,7 @@ import { employeeModule } from './employee';
 import { expenseModule } from './expense';
 import { taxModule } from './tax';
 import { reportingModule } from './reporting';
+import { documentIntakeModule } from './document-intake';
 
 // Register in dependency order (though the registry handles any order)
 registry.register(coreModule);
@@ -27,3 +28,4 @@ registry.register(employeeModule);
 registry.register(expenseModule);
 registry.register(taxModule);
 registry.register(reportingModule);
+registry.register(documentIntakeModule);

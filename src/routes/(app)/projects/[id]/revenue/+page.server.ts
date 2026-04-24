@@ -2,7 +2,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 
 import { createModuleContext } from '$lib/server/modules';
-import { createExpenseApi } from '$lib/server/modules/expense/api';
+import { createFinanceApi } from '$lib/server/modules/finance';
 
 export const load: PageServerLoad = async (event) => {
 	const { params, platform, parent } = event;
@@ -18,8 +18,8 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const ctx = await createModuleContext(event);
-	const expense = createExpenseApi(ctx);
-	const revenuePage = await expense.getProjectRevenuePage(params.id);
+	const { revenue } = createFinanceApi(ctx);
+	const revenuePage = await revenue.getProjectRevenuePage(params.id);
 
 	return {
 		...revenuePage,
@@ -45,8 +45,8 @@ export const actions: Actions = {
 		const notes = String(formData.get('notes') || '') || null;
 
 		const ctx = await createModuleContext(event);
-		const expense = createExpenseApi(ctx);
-		await expense.createRevenue({
+		const { revenue } = createFinanceApi(ctx);
+		await revenue.createRevenue({
 			invoiceType: invoiceType as 'standard' | 'zero_rate' | 'tax_invoice',
 			invoiceNumber,
 			clientName,

@@ -7,8 +7,8 @@ import { getAuth } from '$lib/server/auth/better-auth';
 import { resolveWorkerAuthEnv } from '$lib/server/auth/resolve-worker-env';
 import type { AuthRole } from '$lib/server/auth/config';
 import { isRouteAllowed } from '$lib/server/auth/permissions';
-import { getDb } from '$lib/server/db';
-import { getEnabledModuleIds, isPathEnabled } from '$lib/server/modules/enabled';
+import { getDb } from './infrastructure/db';
+import { getEnabledModuleIds, isPathEnabled } from './platform/config';
 
 // Register all modules at app startup (side-effect import)
 import '$lib/server/modules/register-all';

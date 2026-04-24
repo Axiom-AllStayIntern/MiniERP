@@ -1,5 +1,5 @@
 import type { DomainAgentDef } from '../types';
-import { employeeActions } from '$lib/server/modules/employee';
+import { employeeActions } from '../../../../modules/hr';
 
 export const employeeDomainAgent: DomainAgentDef = {
 	descriptor: {

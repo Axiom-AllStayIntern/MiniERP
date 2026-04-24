@@ -3,7 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 import { writeAuditLog } from '$lib/server/audit';
 import { createModuleContext } from '$lib/server/modules';
-import { createExpenseApi } from '$lib/server/modules/expense/api';
+import { createFinanceApi } from '$lib/server/modules/finance';
 import { deleteUploadedFileHashForEntity } from '$lib/server/uploaded-file-hash';
 
 export const load: PageServerLoad = async (event) => {
@@ -11,8 +11,8 @@ export const load: PageServerLoad = async (event) => {
 	if (!event.platform) throw error(500, 'Cloudflare platform bindings are required');
 
 	const ctx = await createModuleContext(event);
-	const expenseApi = createExpenseApi(ctx);
-	const detail = await expenseApi.getProjectExpenseDetail(event.params.id, event.params.expenseId);
+	const expenses = createFinanceApi(ctx).expenses;
+	const detail = await expenses.getProjectExpenseDetail(event.params.id, event.params.expenseId);
 	if (!detail) throw error(404, 'Expense not found');
 
 	return detail;
@@ -34,8 +34,8 @@ export const actions: Actions = {
 		if (!category || !date) return fail(400, { message: 'Category and date are required.' });
 
 		const ctx = await createModuleContext(event);
-		const expenseApi = createExpenseApi(ctx);
-		await expenseApi.updateProjectExpense(event.params.id, event.params.expenseId, {
+		const expenses = createFinanceApi(ctx).expenses;
+		await expenses.updateProjectExpense(event.params.id, event.params.expenseId, {
 			category,
 			expenseType,
 			amount,
@@ -60,8 +60,8 @@ export const actions: Actions = {
 		if (!event.platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
 
 		const ctx = await createModuleContext(event);
-		const expenseApi = createExpenseApi(ctx);
-		await expenseApi.softDeleteProjectExpense(event.params.id, event.params.expenseId);
+		const expenses = createFinanceApi(ctx).expenses;
+		await expenses.softDeleteProjectExpense(event.params.id, event.params.expenseId);
 		await deleteUploadedFileHashForEntity(event.platform.env, {
 			entityType: 'expense',
 			entityId: event.params.expenseId

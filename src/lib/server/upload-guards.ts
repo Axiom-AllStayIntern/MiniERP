@@ -1,6 +1,6 @@
 import { and, eq, isNull } from 'drizzle-orm';
 
-import { schema } from '$lib/server/db';
+import { schema, type DBClient } from '../../infrastructure/db';
 
 const COMPANY_SCOPE = '__company__';
 
@@ -60,7 +60,7 @@ export async function getObjectSha256(env: Env, key: string): Promise<string | n
 }
 
 export async function beginIdempotentRequest(
-	db: ReturnType<typeof import('$lib/server/modules/legacy-db').getDb>,
+	db: DBClient,
 	input: {
 		idempotencyKey: string;
 		endpoint: string;
@@ -107,7 +107,7 @@ export async function beginIdempotentRequest(
 }
 
 export async function completeIdempotentRequest(
-	db: ReturnType<typeof import('$lib/server/modules/legacy-db').getDb>,
+	db: DBClient,
 	idempotencyKey: string,
 	responseBody: string
 ): Promise<void> {
@@ -118,7 +118,7 @@ export async function completeIdempotentRequest(
 }
 
 export async function failIdempotentRequest(
-	db: ReturnType<typeof import('$lib/server/modules/legacy-db').getDb>,
+	db: DBClient,
 	idempotencyKey: string,
 	errorMessage: string
 ): Promise<void> {
@@ -129,7 +129,7 @@ export async function failIdempotentRequest(
 }
 
 export async function claimFileHash(
-	db: ReturnType<typeof import('$lib/server/modules/legacy-db').getDb>,
+	db: DBClient,
 	input: {
 		domain: 'expense' | 'revenue';
 		projectScope: string;
@@ -215,7 +215,7 @@ export async function claimFileHash(
 }
 
 export async function releaseFileHashClaim(
-	db: ReturnType<typeof import('$lib/server/modules/legacy-db').getDb>,
+	db: DBClient,
 	input: { domain: 'expense' | 'revenue'; projectScope: string; fileHash: string }
 ): Promise<void> {
 	await db

@@ -3,8 +3,8 @@ import type { Actions, PageServerLoad } from './$types';
 
 import { writeAuditLog } from '$lib/server/audit';
 import { createModuleContext } from '$lib/server/modules';
-import { createProjectApi } from '$lib/server/modules/project/api';
-import { createReportingApi } from '$lib/server/modules/reporting/api';
+import { createProjectApi } from '../../../../modules/project';
+import { createFinanceApi } from '$lib/server/modules/finance';
 
 export const load: PageServerLoad = async (event) => {
 	const { params, platform, parent } = event;
@@ -14,8 +14,8 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const ctx = await createModuleContext(event);
-	const reporting = createReportingApi(ctx);
-	return reporting.getProjectFinancialDetail(params.id);
+	const { insights } = createFinanceApi(ctx);
+	return insights.getProjectFinancialDetail(params.id);
 };
 
 export const actions: Actions = {

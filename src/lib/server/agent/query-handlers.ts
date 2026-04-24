@@ -1,9 +1,8 @@
 import type { QueryContext, QueryDataResult } from './types';
-import { createWorkerContext } from '$lib/server/modules/context';
-import { createProjectApi } from '$lib/server/modules/project/api';
-import { createArApi } from '$lib/server/modules/ar/api';
-import { createEmployeeApi } from '$lib/server/modules/employee/api';
-import { createExpenseApi } from '$lib/server/modules/expense/api';
+import { createFinanceApi } from '$lib/server/modules/finance';
+import { createProjectApi } from '../../../modules/project';
+import { createEmployeeApi } from '../../../modules/hr';
+import { createWorkerContext } from '../../../platform/context';
 
 async function resolveProjectId(
 	project: ReturnType<typeof createProjectApi>,
@@ -75,16 +74,15 @@ async function handleProjectProfitQuery(
 			return { success: false, error: 'A project name or ID is required to look up profit.' };
 		}
 
-		const ar = createArApi(moduleCtx);
 		const employee = createEmployeeApi(moduleCtx);
-		const expense = createExpenseApi(moduleCtx);
+		const finance = createFinanceApi(moduleCtx);
 
 		const financials = await project.getProjectFinancials(resolved.id, {
-			getRevenue: () => ar.getProjectRevenue(resolved.id),
-			getPurchaseCost: () => ar.getProjectPurchaseCost(resolved.id),
+			getRevenue: () => finance.billing.getProjectRevenue(resolved.id),
+			getPurchaseCost: () => finance.billing.getProjectPurchaseCost(resolved.id),
 			getStaffCost: () => employee.getProjectStaffCost(resolved.id),
 			getExpenseSums: async () => {
-				const sums = await expense.getProjectExpenseSums(resolved.id);
+				const sums = await finance.expenses.getProjectExpenseSums(resolved.id);
 				return { cogs: sums.salesCost, opex: sums.opex };
 			}
 		});
@@ -156,11 +154,11 @@ async function handleInvoiceListQuery(
 			role: ctx.userRole as 'owner' | 'finance' | 'project_manager' | 'employee'
 		});
 
-		const ar = createArApi(moduleCtx);
+		const finance = createFinanceApi(moduleCtx);
 		const projectId = params.project_id as string | undefined;
 
 		if (projectId) {
-			const invoices = await ar.getCustomerInvoicesByProject(projectId);
+			const invoices = await finance.billing.getCustomerInvoicesByProject(projectId);
 			return {
 				success: true,
 				data: {

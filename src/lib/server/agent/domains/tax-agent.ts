@@ -1,5 +1,7 @@
 import type { DomainAgentDef } from '../types';
-import { taxActions } from '$lib/server/modules/tax';
+import { financeAgentActionSets } from '$lib/server/modules/finance';
+
+const actions = financeAgentActionSets.tax;
 
 export const taxDomainAgent: DomainAgentDef = {
 	descriptor: {
@@ -8,13 +10,13 @@ export const taxDomainAgent: DomainAgentDef = {
 		description: 'GST quarters, corporate tax views, and tax reporting',
 		keywords: ['tax', 'GST', 'quarter', 'corporate tax', 'filing', 'IRAS']
 	},
-	actions: taxActions,
+	actions,
 	buildSystemPrompt: () => `You are the Tax Management expert assistant for SmartFin.
 You handle all requests related to GST, corporate tax, and other tax matters.
 
 Available actions:
 ${JSON.stringify(
-	taxActions.map((a) => ({
+	actions.map((a) => ({
 		id: a.id,
 		description: a.description,
 		layer: a.layer,

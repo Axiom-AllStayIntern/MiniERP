@@ -21,9 +21,9 @@
 import type { RequestEvent } from '@sveltejs/kit';
 
 import { createModuleContext } from '$lib/server/modules';
-import { createProjectApi } from '$lib/server/modules/project/api';
 import { normalizeDocTypeHint } from '$lib/server/ocr/classify';
 import { resolveKindSelection } from '$lib/components/workflow-panel/layers/intake/field-specs';
+import { createProjectApi } from '../../../modules/project';
 
 import { classifyIntake } from './classify';
 import { extractByCategory } from './extract';

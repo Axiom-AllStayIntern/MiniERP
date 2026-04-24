@@ -3,7 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 import { writeAuditLog } from '$lib/server/audit';
 import { createModuleContext } from '$lib/server/modules';
-import { createArApi } from '$lib/server/modules/ar/api';
+import { createFinanceApi } from '$lib/server/modules/finance';
 
 export const load: PageServerLoad = async (event) => {
 	const { params, platform, parent } = event;
@@ -11,8 +11,8 @@ export const load: PageServerLoad = async (event) => {
 	if (!platform) throw error(500, 'Cloudflare platform bindings are required');
 
 	const ctx = await createModuleContext(event);
-	const ar = createArApi(ctx);
-	const detail = await ar.getPurchaseOrderDocumentDetail(params.id, params.purchaseOrderId);
+	const { documents } = createFinanceApi(ctx);
+	const detail = await documents.getPurchaseOrderDocumentDetail(params.id, params.purchaseOrderId);
 	if (!detail) throw error(404, 'Purchase order not found');
 
 	return detail;
@@ -35,8 +35,8 @@ export const actions: Actions = {
 		}
 
 		const ctx = await createModuleContext(event);
-		const ar = createArApi(ctx);
-		await ar.updatePurchaseOrderDocument(params.id, params.purchaseOrderId, {
+		const { documents } = createFinanceApi(ctx);
+		await documents.updatePurchaseOrderDocument(params.id, params.purchaseOrderId, {
 			poNumber,
 			supplierName,
 			amount,
@@ -60,8 +60,8 @@ export const actions: Actions = {
 		if (!platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
 
 		const ctx = await createModuleContext(event);
-		const ar = createArApi(ctx);
-		await ar.deletePurchaseOrderDocument(params.id, params.purchaseOrderId);
+		const { documents } = createFinanceApi(ctx);
+		await documents.deletePurchaseOrderDocument(params.id, params.purchaseOrderId);
 
 		await writeAuditLog(platform, locals.user, {
 			action: 'purchase_order.delete',

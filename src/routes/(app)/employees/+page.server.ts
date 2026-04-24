@@ -1,19 +1,16 @@
-import { desc, isNull } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 
-import { getDb, schema } from '$lib/server/modules/legacy-db';
+import { createModuleContext } from '$lib/server/modules';
+import { createEmployeeApi } from '../../../modules/hr';
 
-export const load: PageServerLoad = async ({ platform }) => {
-	if (!platform) {
+export const load: PageServerLoad = async (event) => {
+	if (!event.platform) {
 		return { employees: [] };
 	}
 
-	const db = getDb(platform.env);
-	const employees = await db
-		.select()
-		.from(schema.employees)
-		.where(isNull(schema.employees.deletedAt))
-		.orderBy(desc(schema.employees.updatedAt));
+	const ctx = await createModuleContext(event);
+	const employee = createEmployeeApi(ctx);
+	const employees = await employee.listEmployees();
 
 	return { employees };
 };

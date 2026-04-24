@@ -2,7 +2,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 
 import { createModuleContext } from '$lib/server/modules';
-import { createExpenseApi } from '$lib/server/modules/expense/api';
+import { createFinanceApi } from '$lib/server/modules/finance';
 
 export const load: PageServerLoad = async (event) => {
 	const { project } = await event.parent();
@@ -17,8 +17,8 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const ctx = await createModuleContext(event);
-	const expense = createExpenseApi(ctx);
-	return { ...(await expense.getProjectExpensePage(event.params.id, project.name)), project };
+	const { expenses } = createFinanceApi(ctx);
+	return { ...(await expenses.getProjectExpensePage(event.params.id, project.name)), project };
 };
 
 export const actions: Actions = {
@@ -39,8 +39,8 @@ export const actions: Actions = {
 		const notes = String(formData.get('notes') || '') || null;
 
 		const ctx = await createModuleContext(event);
-		const expense = createExpenseApi(ctx);
-		await expense.create({
+		const { expenses } = createFinanceApi(ctx);
+		await expenses.create({
 			projectId: event.params.id,
 			expenseType: expenseType as 'opex' | 'sales_cost',
 			category,
@@ -73,8 +73,8 @@ export const actions: Actions = {
 		}
 
 		const ctx = await createModuleContext(event);
-		const expense = createExpenseApi(ctx);
-		const result = await expense.createBusinessTripWithAllowance({
+		const { expenses } = createFinanceApi(ctx);
+		const result = await expenses.createBusinessTripWithAllowance({
 			projectId: event.params.id,
 			employeeId,
 			destination,

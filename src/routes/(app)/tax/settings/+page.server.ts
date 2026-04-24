@@ -1,9 +1,9 @@
-import { fail } from '@sveltejs/kit';
+﻿import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
 import { writeAuditLog } from '$lib/server/audit';
 import { createModuleContext } from '$lib/server/modules';
-import { createTaxApi } from '$lib/server/modules/tax/api';
+import { createFinanceApi } from '$lib/server/modules/finance';
 
 const MANUAL_BOX_KEYS = ['gst_box9_manual', 'gst_box10_manual', 'gst_box11_manual', 'gst_box12_manual'] as const;
 
@@ -40,8 +40,8 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const ctx = await createModuleContext(event);
-	const tax = createTaxApi(ctx);
-	const values = await tax.getGstManualBoxValues();
+	const { taxes } = createFinanceApi(ctx);
+	const values = await taxes.getGstManualBoxValues();
 
 	return {
 		year: safeYear,
@@ -73,8 +73,8 @@ export const actions: Actions = {
 		) as Record<ManualBoxKey, number>;
 
 		const ctx = await createModuleContext(event);
-		const tax = createTaxApi(ctx);
-		await tax.saveGstManualBoxValues(values);
+		const { taxes } = createFinanceApi(ctx);
+		await taxes.saveGstManualBoxValues(values);
 
 		await writeAuditLog(platform, locals.user, {
 			action: 'tax.manual_boxes.update',
@@ -90,3 +90,4 @@ export const actions: Actions = {
 		return { ok: true, year, quarter };
 	}
 };
+

@@ -1,10 +1,9 @@
 import type { RequestHandler } from './$types';
 
 import { createModuleContext } from '$lib/server/modules';
-import { createProjectApi } from '$lib/server/modules/project/api';
-import { createArApi } from '$lib/server/modules/ar/api';
-import { createEmployeeApi } from '$lib/server/modules/employee/api';
-import { createExpenseApi } from '$lib/server/modules/expense/api';
+import { createProjectApi } from '../../../../../modules/project';
+import { createEmployeeApi } from '../../../../../modules/hr';
+import { createFinanceApi } from '$lib/server/modules/finance';
 import { NotFoundError } from '$lib/server/modules/errors';
 import { fail, ok } from '$lib/server/http';
 
@@ -12,19 +11,20 @@ export const GET: RequestHandler = async (event) => {
 	try {
 		const ctx = await createModuleContext(event);
 		const project = createProjectApi(ctx);
-		const ar = createArApi(ctx);
+		const finance = createFinanceApi(ctx);
+		const billing = finance.billing;
 		const employee = createEmployeeApi(ctx);
-		const expense = createExpenseApi(ctx);
+		const expenses = finance.expenses;
 
 		// Verify project exists
 		await project.getById(event.params.id);
 
 		const financials = await project.getProjectFinancials(event.params.id, {
-			getRevenue: () => ar.getProjectRevenue(event.params.id),
-			getPurchaseCost: () => ar.getProjectPurchaseCost(event.params.id),
+			getRevenue: () => billing.getProjectRevenue(event.params.id),
+			getPurchaseCost: () => billing.getProjectPurchaseCost(event.params.id),
 			getStaffCost: () => employee.getProjectStaffCost(event.params.id),
 			getExpenseSums: async () => {
-				const sums = await expense.getProjectExpenseSums(event.params.id);
+				const sums = await expenses.getProjectExpenseSums(event.params.id);
 				return { cogs: sums.salesCost, opex: sums.opex };
 			}
 		});

@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
 import { createModuleContext } from '$lib/server/modules';
-import { createProjectApi } from '$lib/server/modules/project/api';
+import { createProjectApi } from '../../../modules/project';
 import { fail, ok } from '$lib/server/http';
 
 export const GET: RequestHandler = async (event) => {

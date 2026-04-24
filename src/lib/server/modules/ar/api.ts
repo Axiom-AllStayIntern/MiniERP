@@ -1,5 +1,7 @@
 import type { ModuleContext } from '../types';
 import { InvoiceService, PaymentService, DocumentLinkService, ArDocumentService } from './service';
+import { ArUploadService } from './upload-service';
+import { ArDocHubService } from './doc-hub-service';
 
 export type ArApi = ReturnType<typeof createArApi>;
 
@@ -8,11 +10,18 @@ export function createArApi(ctx: ModuleContext) {
 	const payment = new PaymentService(ctx);
 	const docLink = new DocumentLinkService(ctx);
 	const arDocument = new ArDocumentService(ctx);
+	const upload = new ArUploadService(ctx);
+	const docHub = new ArDocHubService(ctx);
 
 	return {
 		// Customer invoices
 		createCustomerInvoice: invoice.createCustomerInvoice.bind(invoice),
 		updateCustomerInvoice: invoice.updateCustomerInvoice.bind(invoice),
+		updateCustomerInvoiceDraft: invoice.updateCustomerInvoiceDraft.bind(invoice),
+		getCustomerInvoicePreview: invoice.getCustomerInvoicePreview.bind(invoice),
+		issueCustomerInvoicePdf: invoice.issueCustomerInvoicePdf.bind(invoice),
+		importContractLinesToCustomerInvoice: invoice.importContractLinesToCustomerInvoice.bind(invoice),
+		saveProjectDocument: upload.saveProjectDocument.bind(upload),
 		confirmInvoice: invoice.confirmInvoice.bind(invoice),
 		getProjectRevenue: invoice.getProjectRevenue.bind(invoice),
 		getProjectPurchaseCost: invoice.getProjectPurchaseCost.bind(invoice),
@@ -27,6 +36,12 @@ export function createArApi(ctx: ModuleContext) {
 		getPurchaseOrderDocumentDetail: arDocument.getPurchaseOrderDocumentDetail.bind(arDocument),
 		updatePurchaseOrderDocument: arDocument.updatePurchaseOrderDocument.bind(arDocument),
 		deletePurchaseOrderDocument: arDocument.deletePurchaseOrderDocument.bind(arDocument),
+		getContractDocHubPage: docHub.getContractDocHubPage.bind(docHub),
+		getQuotationDocHubPage: docHub.getQuotationDocHubPage.bind(docHub),
+		getPurchaseOrderDocHubPage: docHub.getPurchaseOrderDocHubPage.bind(docHub),
+		getSupplierInvoiceDocHubPage: docHub.getSupplierInvoiceDocHubPage.bind(docHub),
+		getCustomerInvoiceDocHubPage: docHub.getCustomerInvoiceDocHubPage.bind(docHub),
+		getCustomerInvoiceGeneratePage: docHub.getCustomerInvoiceGeneratePage.bind(docHub),
 		// GST helper
 		calculateGst: InvoiceService.calculateGst,
 		// Payments

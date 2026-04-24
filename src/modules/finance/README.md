@@ -26,3 +26,20 @@ Integration rule:
 
 Phase 1 keeps all legacy code in place and only establishes this umbrella
 boundary for incremental migration.
+
+Current bridge status:
+- Executable Finance facade assembly now lives under this target directory.
+- `src/lib/server/modules/finance` remains as the compatibility entrypoint for
+  existing callers while migration continues.
+- The compatibility shell has been reduced to root-level entrypoints rather than
+  mirroring per-group Finance files under `src/lib/server/modules/finance`.
+
+Phase 2 focus:
+- Consolidate external Finance entrypoints so routes, agent domains, and query
+  handlers all consume Finance instead of legacy finance submodules.
+- Keep `ar`, `expense`, `tax`, and `reporting` as internal implementation slices
+  until their internals can be lifted safely.
+- Route helper-style compatibility exports through `finance/compat` instead of
+  exposing `expense/repository` or `tax/service` directly to outside callers.
+- Keep raw legacy API coupling isolated to `contracts.ts` and `adapters.ts`
+  rather than spreading legacy types across Finance group files.

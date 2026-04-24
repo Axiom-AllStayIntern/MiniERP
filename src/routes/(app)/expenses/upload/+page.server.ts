@@ -1,71 +1,23 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
-import type { PageServerLoad } from './$types';
+﻿import type { PageServerLoad } from './$types';
 
-import { getDb, schema } from '$lib/server/modules/legacy-db';
+import { createModuleContext } from '$lib/server/modules';
+import { createFinanceApi } from '$lib/server/modules/finance';
 
-export const load: PageServerLoad = async ({ platform, url }) => {
-	const projectIdParam = url.searchParams.get('projectId')?.trim() ?? '';
+export const load: PageServerLoad = async (event) => {
+	const projectIdParam = event.url.searchParams.get('projectId')?.trim() ?? '';
+	const empty = { employees: [], preselectedProject: null };
 
-	let preselectedProject: {
-		id: string;
-		name: string;
-		customerName: string | null;
-		status: string;
-		startDate: string | null;
-		endDate: string | null;
-	} | null = null;
-
-	if (platform && projectIdParam) {
-		const db = getDb(platform.env);
-		const [row] = await db
-			.select({
-				id: schema.projects.id,
-				name: schema.projects.name,
-				status: schema.projects.status,
-				startDate: schema.projects.startDate,
-				endDate: schema.projects.endDate,
-				customerId: schema.projects.customerId
-			})
-			.from(schema.projects)
-			.where(and(eq(schema.projects.id, projectIdParam), isNull(schema.projects.deletedAt)))
-			.limit(1);
-
-		if (row) {
-			const [customer] = await db
-				.select({ name: schema.customers.name })
-				.from(schema.customers)
-				.where(eq(schema.customers.id, row.customerId))
-				.limit(1);
-			preselectedProject = {
-				id: row.id,
-				name: row.name,
-				customerName: customer?.name ?? null,
-				status: row.status,
-				startDate: row.startDate,
-				endDate: row.endDate
-			};
-		}
+	if (!event.platform) {
+		return empty;
 	}
-
-	if (!platform) {
-		return { employees: [], preselectedProject };
-	}
-
-	const db = getDb(platform.env);
-	let employees: Array<{ id: string; name: string }> = [];
 
 	try {
-		employees = await db
-			.select({
-				id: schema.employees.id,
-				name: schema.employees.name
-			})
-			.from(schema.employees)
-			.where(isNull(schema.employees.deletedAt))
-			.orderBy(asc(schema.employees.name));
+		const ctx = await createModuleContext(event);
+		const { expenses } = createFinanceApi(ctx);
+		return expenses.getExpenseUploadPage(projectIdParam);
 	} catch (error) {
 		console.error('[expenses/upload] failed to load employees:', error);
+		return empty;
 	}
-
-	return { employees, preselectedProject };
 };
+

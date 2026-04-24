@@ -1,5 +1,7 @@
 import type { DomainAgentDef } from '../types';
-import { expenseActions } from '$lib/server/modules/expense';
+import { financeAgentActionSets } from '$lib/server/modules/finance';
+
+const actions = financeAgentActionSets.expense;
 
 export const expenseDomainAgent: DomainAgentDef = {
 	descriptor: {
@@ -8,13 +10,13 @@ export const expenseDomainAgent: DomainAgentDef = {
 		description: 'Record costs, reimbursements, and review spend by project',
 		keywords: ['expense', 'reimbursement', 'claim', 'cost', 'spend', 'receipt', 'upload']
 	},
-	actions: expenseActions,
+	actions,
 	buildSystemPrompt: () => `You are the Expense Management expert assistant for SmartFin.
 You handle all requests related to project expenses and reimbursements.
 
 Available actions:
 ${JSON.stringify(
-	expenseActions.map((a) => ({
+	actions.map((a) => ({
 		id: a.id,
 		description: a.description,
 		layer: a.layer,

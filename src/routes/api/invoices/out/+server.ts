@@ -1,14 +1,14 @@
-import type { RequestHandler } from './$types';
+﻿import type { RequestHandler } from './$types';
 
 import { createModuleContext } from '$lib/server/modules';
-import { createArApi } from '$lib/server/modules/ar/api';
+import { createFinanceApi } from '$lib/server/modules/finance';
 import { ConflictError } from '$lib/server/modules/errors';
 import { fail, ok } from '$lib/server/http';
 
 export const POST: RequestHandler = async (event) => {
 	try {
 		const ctx = await createModuleContext(event);
-		const ar = createArApi(ctx);
+		const { billing } = createFinanceApi(ctx);
 
 		const body = (await event.request.json()) as {
 			projectId?: string;
@@ -42,7 +42,7 @@ export const POST: RequestHandler = async (event) => {
 				? JSON.stringify({ version: 2, lines: lineItems, generator: body.generatorMeta })
 				: JSON.stringify(lineItems);
 
-		const result = await ar.createCustomerInvoice({
+		const result = await billing.createCustomerInvoice({
 			projectId: body.projectId,
 			customerId: body.customerId,
 			invoiceNo,
@@ -62,3 +62,4 @@ export const POST: RequestHandler = async (event) => {
 		return fail((e as Error).message, 500);
 	}
 };
+

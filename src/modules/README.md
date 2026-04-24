@@ -24,3 +24,7 @@ Each module should eventually own:
 
 Phase 1 does not move existing runtime code out of `src/lib/server/modules`.
 This directory records the target boundaries and compatibility path.
+
+Phase 4 starts moving active public entrypoint assembly for `project`, `hr`,
+and `document-intake` into this target layer, while legacy business module
+entrypoints remain compatibility-oriented.

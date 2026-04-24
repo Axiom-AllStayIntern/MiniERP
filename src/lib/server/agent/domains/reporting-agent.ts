@@ -1,5 +1,7 @@
 import type { DomainAgentDef } from '../types';
-import { reportingActions } from '$lib/server/modules/reporting';
+import { financeAgentActionSets } from '$lib/server/modules/finance';
+
+const actions = financeAgentActionSets.reporting;
 
 export const reportingDomainAgent: DomainAgentDef = {
 	descriptor: {
@@ -8,13 +10,13 @@ export const reportingDomainAgent: DomainAgentDef = {
 		description: 'Reports, exports, and project profit analysis',
 		keywords: ['report', 'analytics', 'export', 'profit', 'dashboard', 'data']
 	},
-	actions: reportingActions,
+	actions,
 	buildSystemPrompt: () => `You are the Reporting & Analytics expert assistant for SmartFin.
 You handle all requests related to reports and data analysis.
 
 Available actions:
 ${JSON.stringify(
-	reportingActions.map((a) => ({
+	actions.map((a) => ({
 		id: a.id,
 		description: a.description,
 		layer: a.layer,

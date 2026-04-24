@@ -1,7 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 
-import { schema } from '$lib/server/db';
-import { getDb } from '$lib/server/modules/legacy-db';
+import { getDb, schema } from '../../infrastructure/db';
 
 /**
  * Backward-compatible helper kept for routes that already reference this symbol.

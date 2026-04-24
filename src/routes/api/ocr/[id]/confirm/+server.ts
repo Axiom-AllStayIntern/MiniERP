@@ -1,10 +1,11 @@
-import { eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 
-import { getDb, schema } from '$lib/server/modules/legacy-db';
+import { createModuleContext } from '$lib/server/modules';
+import { createDocumentIntakeApi } from '../../../../../modules/document-intake';
 import { fail, ok } from '$lib/server/http';
 
-export const POST: RequestHandler = async ({ params, request, platform }) => {
+export const POST: RequestHandler = async (event) => {
+	const { params, request, platform } = event;
 	if (!platform) {
 		return fail('Cloudflare platform bindings are required', 500);
 	}
@@ -19,21 +20,9 @@ export const POST: RequestHandler = async ({ params, request, platform }) => {
 		poNumber?: string;
 	};
 
-	const db = getDb(platform.env);
-	await db
-		.update(schema.invoicesIn)
-		.set({
-			supplierName: payload.supplierName,
-			invoiceDate: payload.invoiceDate,
-			amount: payload.amount,
-			currency: payload.currency,
-			gstAmount: payload.gstAmount,
-			dueDate: payload.dueDate,
-			poNumber: payload.poNumber,
-			status: 'confirmed',
-			updatedAt: new Date().toISOString()
-		})
-		.where(eq(schema.invoicesIn.id, params.id));
+	const ctx = await createModuleContext(event);
+	const intake = createDocumentIntakeApi(ctx);
+	const result = await intake.confirmSupplierInvoiceOcr(params.id, payload);
 
-	return ok({ id: params.id, status: 'confirmed' });
+	return ok(result);
 };
