@@ -199,3 +199,32 @@ From this point onward:
   retirement across the system
 - Use report-only metrics to expose remaining debt before turning anything into
   a hard gate
+
+## Post-Plan Alignment Track
+
+The six-phase plan completed the boundary migration, but it did not guarantee
+full internal topology alignment with `代码架构设计.pdf`.
+
+Current internal-alignment rule:
+- Treat `src/modules/finance` as the template module for third-layer
+  convergence.
+- Add internal subdirectories before moving ownership deeper:
+  `app/`, `contracts/`, `workflows/`, `capabilities/`, `services/`, `rules/`,
+  `policies/`, `schemas/`, `repositories/`, `adapters/`, `events/`, and
+  `config/`.
+- Keep root-level module entrypoints stable while introducing deeper target
+  paths.
+- Do not rewrite business logic while landing the directory skeleton.
+- After Finance is stable, apply the same internal layering pattern to
+  `src/modules/project`, `src/modules/hr`, and
+  `src/modules/document-intake`.
+
+Current status:
+- `src/modules/finance` now uses the target third-layer directory shape.
+- Finance public groups (`billing`, `documents`, `expenses`, `revenue`,
+  `taxes`, `insights`) now execute from Finance-owned services/repositories.
+- Finance root compatibility files have been retired; the module root now keeps
+  `index.ts` plus documentation only.
+- The next module-internal alignment target should move to
+  `src/modules/project`, then `src/modules/hr`, then
+  `src/modules/document-intake`.

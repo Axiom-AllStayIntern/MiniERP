@@ -295,3 +295,28 @@ The six-phase migration plan is now complete.
 
 Any further work should be treated as optional internal ownership cleanup rather
 than a continuation of the boundary-migration plan.
+
+The first follow-up target is Finance internal topology alignment:
+
+- Land third-layer directories under `src/modules/finance`:
+  `app/`, `contracts/`, `workflows/`, `capabilities/`, `services/`, `rules/`,
+  `policies/`, `schemas/`, `repositories/`, `adapters/`, `events/`, and
+  `config/`.
+- Keep existing root-level Finance entrypoints stable as thin target-module
+  re-exports during the transition.
+- Use Finance as the template before applying the same internal layering
+  pattern to Project, HR, and Document Intake.
+
+Current follow-up status:
+
+- Finance third-layer directories are now landed under `src/modules/finance`.
+- Finance public runtime ownership for `billing`, `documents`, `expenses`,
+  `revenue`, `taxes`, and `insights` now runs from Finance-owned services and
+  repositories.
+- Finance helper and compatibility entrypoints (`compat.ts`,
+  `adapters/legacy.ts`, `adapters/compat.ts`) have been retired.
+- Finance agent action catalogs now live in
+  `src/modules/finance/capabilities/agent-actions.ts` instead of importing the
+  legacy module root entrypoints.
+- The next internal-topology alignment target should move to Project, then HR,
+  then Document Intake.

@@ -21,11 +21,18 @@ This map is intentionally descriptive. It does not move code in Phase 1.
 
 ## Current Internal Adapter Step
 
-- `src/modules/finance/contracts.ts` defines the explicit Finance-facing
+- `src/modules/finance/contracts/` defines the explicit Finance-facing
   contracts consumed by grouped Finance APIs.
-- `src/modules/finance/adapters.ts` is the only target-layer location that
-  adapts legacy `ar`, `expense`, `tax`, and `reporting` APIs into those
-  contracts.
+- The former runtime legacy adapter file
+  `src/modules/finance/adapters/legacy.ts` has been retired.
+- The former helper compatibility adapter file
+  `src/modules/finance/adapters/compat.ts` has also been retired in favor of
+  Finance-owned repository and rule exports.
+- The former root compatibility entrypoint `src/modules/finance/compat.ts` has
+  also been retired after its final external caller moved to `rules/`.
+- Expense, revenue, documents, billing, taxes, and insights public APIs now
+  execute from Finance-owned services and repositories instead of going through
+  a root-level legacy adapter facade.
 
 ## Phase 1 Constraints
 

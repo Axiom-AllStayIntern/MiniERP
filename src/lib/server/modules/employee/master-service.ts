@@ -1,7 +1,7 @@
 import { and, asc, between, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { ModuleContext } from '../types';
 import { schema } from '../../db';
-import { estimateSingaporeResidentTax } from '../../../../modules/finance/compat';
+import { estimateSingaporeResidentTax } from '../../../../modules/finance/rules';
 
 type EmployeeProfileInput = {
 	name: string;
