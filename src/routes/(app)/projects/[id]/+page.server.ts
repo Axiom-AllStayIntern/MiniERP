@@ -1,10 +1,10 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { writeAuditLog } from '$lib/server/audit';
+import { createCoreApi } from '$lib/server/modules/core';
 import { createModuleContext } from '$lib/server/modules';
 import { createProjectApi } from '../../../../modules/project';
-import { createFinanceApi } from '$lib/server/modules/finance';
+import { createFinanceApi } from '../../../../modules/finance';
 
 export const load: PageServerLoad = async (event) => {
 	const { params, platform, parent } = event;
@@ -46,7 +46,7 @@ export const actions: Actions = {
 			description: description || null
 		});
 
-		await writeAuditLog(platform, locals.user, {
+		await createCoreApi(ctx).writeAuditLog({
 			action: 'project.update',
 			entityType: 'project',
 			entityId: params.id,
@@ -66,7 +66,7 @@ export const actions: Actions = {
 		const project = createProjectApi(ctx);
 		await project.update(params.id, { status: 'archived' });
 
-		await writeAuditLog(platform, locals.user, {
+		await createCoreApi(ctx).writeAuditLog({
 			action: 'project.archive',
 			entityType: 'project',
 			entityId: params.id,
@@ -86,7 +86,7 @@ export const actions: Actions = {
 		const project = createProjectApi(ctx);
 		await project.update(params.id, { deletedAt: now });
 
-		await writeAuditLog(platform, locals.user, {
+		await createCoreApi(ctx).writeAuditLog({
 			action: 'project.remove',
 			entityType: 'project',
 			entityId: params.id,

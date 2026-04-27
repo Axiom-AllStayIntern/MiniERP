@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { createModuleContext } from '$lib/server/modules';
 import { createProjectApi } from '../../../../../modules/project';
 import { createEmployeeApi } from '../../../../../modules/hr';
-import { createFinanceApi } from '$lib/server/modules/finance';
+import { createFinanceApi } from '../../../../../modules/finance';
 import { NotFoundError } from '$lib/server/modules/errors';
 import { fail, ok } from '$lib/server/http';
 

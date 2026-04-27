@@ -1,9 +1,9 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { writeAuditLog } from '$lib/server/audit';
+import { createCoreApi } from '$lib/server/modules/core';
 import { createModuleContext } from '$lib/server/modules';
-import { createFinanceApi } from '$lib/server/modules/finance';
+import { createFinanceApi } from '../../../../../../../modules/finance';
 
 export const load: PageServerLoad = async (event) => {
 	const { params, platform, parent } = event;
@@ -45,7 +45,7 @@ export const actions: Actions = {
 			notes
 		});
 
-		await writeAuditLog(platform, locals.user, {
+		await createCoreApi(ctx).writeAuditLog({
 			action: 'purchase_order.update',
 			entityType: 'purchase_order',
 			entityId: params.purchaseOrderId,
@@ -63,7 +63,7 @@ export const actions: Actions = {
 		const { documents } = createFinanceApi(ctx);
 		await documents.deletePurchaseOrderDocument(params.id, params.purchaseOrderId);
 
-		await writeAuditLog(platform, locals.user, {
+		await createCoreApi(ctx).writeAuditLog({
 			action: 'purchase_order.delete',
 			entityType: 'purchase_order',
 			entityId: params.purchaseOrderId,

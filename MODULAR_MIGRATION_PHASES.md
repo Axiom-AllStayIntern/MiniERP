@@ -38,8 +38,8 @@ The migration is complete only when all of the following are true:
 | Phase 2 | Finance umbrella boundary and compatibility convergence | Completed |
 | Phase 3 | Platform / infrastructure extraction into target layers | Completed |
 | Phase 4 | Horizontal target-layer coverage for remaining business modules | Completed |
-| Phase 5 | Internal ownership migration inside each target module | In progress |
-| Phase 6 | Compatibility shell retirement and legacy cleanup | Pending |
+| Phase 5 | Internal ownership migration inside each target module | Completed |
+| Phase 6 | Compatibility shell retirement and legacy cleanup | Completed |
 
 ## Phase 1
 
@@ -149,8 +149,14 @@ Current Phase 5 progress:
   `src/modules/*/handlers.ts` instead of importing legacy handler files.
 - Legacy handler files under `src/lib/server/modules/*/handlers.ts` have been
   reduced to compatibility re-exports.
+- App startup now imports `src/platform/registry/register-all.ts` directly,
+  while `src/lib/server/modules/register-all.ts` has been reduced to a
+  compatibility side-effect shim.
 - Architecture report now tracks `Phase 5 target legacy handler imports`; the
   current count is 0.
+
+Phase 5 status:
+- Phase 5 exit criteria are now satisfied.
 
 ## Phase 6
 
@@ -168,10 +174,28 @@ Exit criteria:
 - The target architecture is the active architecture, not just the preferred
   one
 
+Current Phase 6 progress:
+- Added a report-only metric for legacy business compatibility entrypoint
+  imports and fully reduced the count from 44 to 0.
+- Added a report-only metric for deprecated server shim imports and fully
+  reduced the count from 8 to 0.
+- Retired the zero-caller compatibility entrypoints for Project, HR, and
+  Document Intake by deleting the old `api.ts`, `index.ts`, and `handlers.ts`
+  re-export shells under `src/lib/server/modules/*`.
+- Moved the remaining route/API Finance callers to `src/modules/finance`
+  imports, removing production pressure from `$lib/server/modules/finance`.
+- Retired the remaining zero-caller Finance, registry bootstrap, audit, and
+  deprecated helper shims once the architecture report reached all-zero
+  compatibility metrics.
+
+Phase 6 status:
+- Phase 6 exit criteria are now satisfied.
+
 ## Current Execution Rule
 
 From this point onward:
-- Prefer horizontal progress across Project, HR, and Document Intake
-- Do not keep deepening Finance unless it blocks a cross-module migration step
+- Prefer retiring compatibility shells with the lowest caller counts first
+- Do not keep deepening Finance internals unless it blocks compatibility
+  retirement across the system
 - Use report-only metrics to expose remaining debt before turning anything into
   a hard gate

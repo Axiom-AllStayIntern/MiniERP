@@ -41,6 +41,9 @@ Last verified with `npm.cmd run check:architecture-report`:
 | Route direct Project/HR/Document Intake legacy API imports | 22 | 0 |
 | Phase 4 target non-bridge legacy imports | 7 | 0 |
 | Phase 5 target legacy handler imports | 4 | 0 |
+| Legacy module bootstrap imports | 1 | 0 |
+| Legacy business compatibility entrypoint imports | 44 | 0 |
+| Deprecated server shim imports | 8 | 0 |
 | Layout direct DB imports | 0 | 0 |
 | Layout legacy DB bridge imports | 0 | 0 |
 
@@ -61,6 +64,9 @@ Additional verification:
 - Added a Phase 3 report metric for legacy runtime entrypoint imports and reduced it from 10 to 0 by moving the first caller batch to target-layer runtime paths.
 - Added a Phase 3 report metric for legacy DB compatibility imports and reduced it from 5 to 0 by moving remaining `legacy-db` and `db/schema` callers to `src/infrastructure/db`.
 - Moved the active schema barrel assembly into `src/infrastructure/db/schema.ts` and reduced `src/lib/server/db/schema.ts` to a compatibility re-export.
+- Moved active module bootstrap registration into `src/platform/registry/register-all.ts` and reduced `src/lib/server/modules/register-all.ts` to a compatibility side-effect shim.
+- Retired the remaining zero-caller Finance, audit, bootstrap, and deprecated
+  helper compatibility shells after the Phase 6 metrics reached zero.
 
 ## Phase 2 Goal: Finance Internal Convergence
 
@@ -80,9 +86,10 @@ Phase 2 objectives:
 
 Phase 2 exit criteria:
 
-- Non-Finance callers enter Finance through `src/lib/server/modules/finance` or
-  `src/modules/finance`, not through `ar`, `expense`, `tax`, or `reporting`.
-- `src/lib/server/modules/finance` is compatibility-oriented and thin.
+- Non-Finance callers enter Finance through Finance-owned entrypoints, not
+  through `ar`, `expense`, `tax`, or `reporting`.
+- Former compatibility entrypoints under `src/lib/server/modules/finance` are
+  removable and were later retired once caller count reached zero.
 - Architecture report remains green and `npm.cmd run check` still passes.
 - Business rules, formulas, schema, and migrations remain unchanged.
 
@@ -91,7 +98,8 @@ Phase 2 exit criteria:
 Phase 2 exit criteria are now satisfied.
 
 - Non-Finance callers enter Finance through Finance-owned entrypoints.
-- `src/lib/server/modules/finance` is thin and compatibility-oriented.
+- The former `src/lib/server/modules/finance` compatibility entrypoints were
+  later retired once no production callers remained.
 - Architecture report is green and `npm.cmd run check` passes.
 - No business formulas, schema, or migrations were changed.
 
@@ -215,14 +223,61 @@ Phase 5 exit criteria:
 
 ## Phase 5 Status
 
-Phase 5 has started.
+Phase 5 exit criteria are now satisfied.
 
 - Project, HR, and Document Intake now register handlers from target-layer
   files under `src/modules/*/handlers.ts`.
 - Legacy handler files under `src/lib/server/modules/*/handlers.ts` are thin
   compatibility re-exports.
+- App startup now imports `src/platform/registry/register-all.ts` directly
+  instead of bootstrapping through the legacy `src/lib/server/modules/register-all.ts`
+  entrypoint.
+- Architecture report is green, including the new legacy module bootstrap
+  metric at 0.
 - Architecture report is green, including the new Phase 5 handler-import
   metric at 0.
+- `npm.cmd run check` still passes with 0 errors and the existing 12 Svelte
+  warnings.
+
+## Phase 6 Goal: Compatibility Shell Retirement and Legacy Cleanup
+
+Phase 6 removes compatibility layers once caller pressure is low enough to do
+so safely.
+
+Phase 6 objectives:
+
+- Quantify remaining imports of business compatibility entrypoints and
+  deprecated top-level shims before deleting anything.
+- Retire unused compatibility entrypoints first, then reduce high-traffic
+  compatibility shells such as Finance and audit helpers.
+- Keep the architecture report green while shrinking the number of production
+  callers that depend on compatibility paths.
+
+Phase 6 exit criteria:
+
+- Compatibility shells are removable or removed.
+- Legacy module entrypoints no longer serve production callers.
+- Architecture report remains green and `npm.cmd run check` still passes.
+- No schema, workflow, or business-rule changes are introduced.
+
+## Phase 6 Status
+
+Phase 6 exit criteria are now satisfied.
+
+- Added a Phase 6 report metric for legacy business compatibility entrypoint
+  imports and established a first baseline of 44.
+- Reduced that compatibility-import count from 44 to 0 by moving the remaining
+  Finance route/API callers to target-layer imports and then deleting the
+  zero-caller compatibility entrypoints.
+- Retired the zero-caller compatibility entrypoints for Project, HR, and
+  Document Intake by deleting their old `api.ts`, `index.ts`, and `handlers.ts`
+  re-export shells under `src/lib/server/modules/*`.
+- Added a Phase 6 report metric for deprecated server shim imports and reduced
+  it from 8 to 0 by replacing route-level audit shim usage and retiring the
+  remaining zero-caller top-level helper shims.
+- Retired the final zero-caller compatibility shells for Finance facade
+  entrypoints, startup bootstrap, audit logging, and deprecated helper bridges.
+- `npm.cmd run check:architecture-report` remains green.
 - `npm.cmd run check` still passes with 0 errors and the existing 12 Svelte
   warnings.
 
@@ -234,8 +289,9 @@ Phase 5 has started.
 - No deletion of `legacy-db`.
 - No hard CI failure for existing architecture debt beyond the current hard gate.
 
-## Next Migration Order
+## Post-Plan Follow-Up
 
-1. Phase 5A: keep moving small executable seams from legacy slices into target modules.
-2. Phase 5B: isolate any remaining legacy helper/shim debt behind explicit target-layer bridge files.
-3. Phase 6: retire compatibility shells once external callers are gone.
+The six-phase migration plan is now complete.
+
+Any further work should be treated as optional internal ownership cleanup rather
+than a continuation of the boundary-migration plan.

@@ -1,5 +1,5 @@
 import type { DomainAgentDef } from '../types';
-import { financeAgentActionSets } from '$lib/server/modules/finance';
+import { financeAgentActionSets } from '../../../../modules/finance';
 
 const actions = financeAgentActionSets.tax;
 

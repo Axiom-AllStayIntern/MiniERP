@@ -11,7 +11,7 @@ import { getDb } from './infrastructure/db';
 import { getEnabledModuleIds, isPathEnabled } from './platform/config';
 
 // Register all modules at app startup (side-effect import)
-import '$lib/server/modules/register-all';
+import './platform/registry/register-all';
 
 function isPublicAppPath(pathname: string) {
 	return (

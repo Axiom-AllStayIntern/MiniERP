@@ -1,5 +1,5 @@
 import type { QueryContext, QueryDataResult } from './types';
-import { createFinanceApi } from '$lib/server/modules/finance';
+import { createFinanceApi } from '../../../modules/finance';
 import { createProjectApi } from '../../../modules/project';
 import { createEmployeeApi } from '../../../modules/hr';
 import { createWorkerContext } from '../../../platform/context';

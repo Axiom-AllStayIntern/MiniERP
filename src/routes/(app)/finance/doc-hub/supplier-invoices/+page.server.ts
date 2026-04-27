@@ -1,7 +1,7 @@
-﻿import type { PageServerLoad } from './$types';
+import type { PageServerLoad } from './$types';
 
 import { createModuleContext } from '$lib/server/modules';
-import { createFinanceApi } from '$lib/server/modules/finance';
+import { createFinanceApi } from '../../../../../modules/finance';
 
 export const load: PageServerLoad = async (event) => {
 	if (!event.platform) {

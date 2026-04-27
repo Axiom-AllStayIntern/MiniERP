@@ -1,9 +1,9 @@
-﻿import { fail } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { writeAuditLog } from '$lib/server/audit';
+import { createCoreApi } from '$lib/server/modules/core';
 import { createModuleContext } from '$lib/server/modules';
-import { createFinanceApi } from '$lib/server/modules/finance';
+import { createFinanceApi } from '../../../../modules/finance';
 
 const MANUAL_BOX_KEYS = ['gst_box9_manual', 'gst_box10_manual', 'gst_box11_manual', 'gst_box12_manual'] as const;
 
@@ -76,7 +76,7 @@ export const actions: Actions = {
 		const { taxes } = createFinanceApi(ctx);
 		await taxes.saveGstManualBoxValues(values);
 
-		await writeAuditLog(platform, locals.user, {
+		await createCoreApi(ctx).writeAuditLog({
 			action: 'tax.manual_boxes.update',
 			entityType: 'tax_settings',
 			entityId: `gst_${year}_q${quarter}`,

@@ -2,7 +2,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 
 import { createModuleContext } from '$lib/server/modules';
-import { createFinanceApi } from '$lib/server/modules/finance';
+import { createFinanceApi } from '../../../../../modules/finance';
 
 export const load: PageServerLoad = async (event) => {
 	const { project } = await event.parent();

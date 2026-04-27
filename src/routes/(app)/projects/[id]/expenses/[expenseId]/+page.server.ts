@@ -1,9 +1,9 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { writeAuditLog } from '$lib/server/audit';
+import { createCoreApi } from '$lib/server/modules/core';
 import { createModuleContext } from '$lib/server/modules';
-import { createFinanceApi } from '$lib/server/modules/finance';
+import { createFinanceApi } from '../../../../../../modules/finance';
 import { deleteUploadedFileHashForEntity } from '$lib/server/uploaded-file-hash';
 
 export const load: PageServerLoad = async (event) => {
@@ -46,7 +46,7 @@ export const actions: Actions = {
 			notes
 		});
 
-		await writeAuditLog(event.platform, event.locals.user, {
+		await createCoreApi(ctx).writeAuditLog({
 			action: 'expense.update',
 			entityType: 'expense',
 			entityId: event.params.expenseId,
@@ -67,7 +67,7 @@ export const actions: Actions = {
 			entityId: event.params.expenseId
 		});
 
-		await writeAuditLog(event.platform, event.locals.user, {
+		await createCoreApi(ctx).writeAuditLog({
 			action: 'expense.delete',
 			entityType: 'expense',
 			entityId: event.params.expenseId,

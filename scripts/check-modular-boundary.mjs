@@ -149,6 +149,26 @@ const LEGACY_DB_COMPATIBILITY_BRIDGE_FILES = new Set([
 	'src/lib/server/db/schema.ts'
 ]);
 
+const LEGACY_MODULE_BOOTSTRAP_SHIM_FILES = new Set(['src/lib/server/modules/register-all.ts']);
+
+const LEGACY_BUSINESS_COMPATIBILITY_DIRS = [
+	'src/lib/server/modules/finance/',
+	'src/lib/server/modules/project/',
+	'src/lib/server/modules/hr/',
+	'src/lib/server/modules/employee/',
+	'src/lib/server/modules/person/',
+	'src/lib/server/modules/document-intake/'
+];
+
+const DEPRECATED_SERVER_SHIM_FILES = new Set([
+	'src/lib/server/audit.ts',
+	'src/lib/server/project-expense-sums.ts',
+	'src/lib/server/singapore-resident-tax-estimate.ts',
+	'src/lib/server/project-staff-cost.ts',
+	'src/lib/server/settle-project-components.ts',
+	'src/lib/server/company-allocation-settle.ts'
+]);
+
 function isAnalyzedFinanceTargetFile(filePath) {
 	const normalized = normalize(filePath);
 	if (!normalized.startsWith('src/modules/finance/')) return false;
@@ -168,6 +188,28 @@ function isAnalyzedLegacyDbCompatibilityCallerFile(filePath) {
 	if (!normalized.startsWith('src/')) return false;
 	if (!normalized.endsWith('.ts') && !normalized.endsWith('.js')) return false;
 	return !LEGACY_DB_COMPATIBILITY_BRIDGE_FILES.has(normalized);
+}
+
+function isAnalyzedLegacyModuleBootstrapCallerFile(filePath) {
+	const normalized = normalize(filePath);
+	if (!normalized.startsWith('src/')) return false;
+	if (!normalized.endsWith('.ts') && !normalized.endsWith('.js')) return false;
+	return !LEGACY_MODULE_BOOTSTRAP_SHIM_FILES.has(normalized);
+}
+
+function isAnalyzedLegacyBusinessCompatibilityCallerFile(filePath) {
+	const normalized = normalize(filePath);
+	if (!normalized.startsWith('src/')) return false;
+	if (!normalized.endsWith('.ts') && !normalized.endsWith('.js')) return false;
+	if (DEPRECATED_SERVER_SHIM_FILES.has(normalized)) return false;
+	return !LEGACY_BUSINESS_COMPATIBILITY_DIRS.some((prefix) => normalized.startsWith(prefix));
+}
+
+function isAnalyzedDeprecatedServerShimCallerFile(filePath) {
+	const normalized = normalize(filePath);
+	if (!normalized.startsWith('src/')) return false;
+	if (!normalized.endsWith('.ts') && !normalized.endsWith('.js')) return false;
+	return !DEPRECATED_SERVER_SHIM_FILES.has(normalized);
 }
 
 function isAnalyzedPhase4TargetFile(filePath) {
@@ -221,6 +263,33 @@ function hasLegacyDbCompatibilityImport(source) {
 	);
 }
 
+function hasLegacyModuleBootstrapImport(source) {
+	const compact = source.replace(/\s+/g, ' ');
+	return (
+		/import\s+['"]\$lib\/server\/modules\/register-all['"]/.test(compact) ||
+		/import\s+['"]\.\/lib\/server\/modules\/register-all['"]/.test(compact)
+	);
+}
+
+function hasLegacyBusinessCompatibilityImport(source) {
+	const compact = source.replace(/\s+/g, ' ');
+	return (
+		/(?:import|export)\s+[^;]+from\s+['"]\$lib\/server\/modules\/(finance|project|hr|document-intake|employee|person)(?:\/(api|compat))?['"]/.test(
+			compact
+		) ||
+		/import\s+['"]\$lib\/server\/modules\/(finance|project|hr|document-intake|employee|person)(?:\/(api|compat))?['"]/.test(
+			compact
+		)
+	);
+}
+
+function hasDeprecatedServerShimImport(source) {
+	const compact = source.replace(/\s+/g, ' ');
+	return /(?:import|export)\s+[^;]+from\s+['"]\$lib\/server\/(audit|project-expense-sums|singapore-resident-tax-estimate|project-staff-cost|settle-project-components|company-allocation-settle)['"]/.test(
+		compact
+	);
+}
+
 function hasPhase4TargetLegacyImport(source) {
 	return /from\s+['"][^'"]*lib\/server\/modules\/(project|employee|person|document-intake)\//.test(source);
 }
@@ -245,6 +314,9 @@ async function collectReport(
 	financeTargetFiles,
 	legacyRuntimeCallerFiles,
 	legacyDbCompatibilityCallerFiles,
+	legacyModuleBootstrapCallerFiles,
+	legacyBusinessCompatibilityCallerFiles,
+	deprecatedServerShimCallerFiles,
 	phase4TargetFiles,
 	phase5TargetFiles
 ) {
@@ -261,6 +333,9 @@ async function collectReport(
 		phase5TargetLegacyHandlerImports: [],
 		legacyRuntimeEntrypointImports: [],
 		legacyDbCompatibilityImports: [],
+		legacyModuleBootstrapImports: [],
+		legacyBusinessCompatibilityImports: [],
+		deprecatedServerShimImports: [],
 		layoutDirectDbImports: [],
 		layoutLegacyDbBridgeImports: []
 	};
@@ -357,6 +432,33 @@ async function collectReport(
 		}
 	}
 
+	for (const file of legacyModuleBootstrapCallerFiles) {
+		const relative = rel(file);
+		const source = await readFile(file, 'utf8');
+
+		if (hasLegacyModuleBootstrapImport(source)) {
+			report.legacyModuleBootstrapImports.push(relative);
+		}
+	}
+
+	for (const file of legacyBusinessCompatibilityCallerFiles) {
+		const relative = rel(file);
+		const source = await readFile(file, 'utf8');
+
+		if (hasLegacyBusinessCompatibilityImport(source)) {
+			report.legacyBusinessCompatibilityImports.push(relative);
+		}
+	}
+
+	for (const file of deprecatedServerShimCallerFiles) {
+		const relative = rel(file);
+		const source = await readFile(file, 'utf8');
+
+		if (hasDeprecatedServerShimImport(source)) {
+			report.deprecatedServerShimImports.push(relative);
+		}
+	}
+
 	return report;
 }
 
@@ -367,6 +469,9 @@ async function runReport(
 	financeTargetFiles,
 	legacyRuntimeCallerFiles,
 	legacyDbCompatibilityCallerFiles,
+	legacyModuleBootstrapCallerFiles,
+	legacyBusinessCompatibilityCallerFiles,
+	deprecatedServerShimCallerFiles,
 	phase4TargetFiles,
 	phase5TargetFiles
 ) {
@@ -377,6 +482,9 @@ async function runReport(
 		financeTargetFiles,
 		legacyRuntimeCallerFiles,
 		legacyDbCompatibilityCallerFiles,
+		legacyModuleBootstrapCallerFiles,
+		legacyBusinessCompatibilityCallerFiles,
+		deprecatedServerShimCallerFiles,
 		phase4TargetFiles,
 		phase5TargetFiles
 	);
@@ -396,6 +504,12 @@ async function runReport(
 	printList('Phase 5 target legacy handler imports', report.phase5TargetLegacyHandlerImports);
 	printList('Legacy runtime entrypoint imports', report.legacyRuntimeEntrypointImports);
 	printList('Legacy DB compatibility imports', report.legacyDbCompatibilityImports);
+	printList('Legacy module bootstrap imports', report.legacyModuleBootstrapImports);
+	printList(
+		'Legacy business compatibility entrypoint imports',
+		report.legacyBusinessCompatibilityImports
+	);
+	printList('Deprecated server shim imports', report.deprecatedServerShimImports);
 	printList('Layout direct DB imports', report.layoutDirectDbImports);
 	printList('Layout legacy DB bridge imports', report.layoutLegacyDbBridgeImports);
 }
@@ -438,6 +552,15 @@ async function main() {
 	const legacyDbCompatibilityCallerFiles = await walkFiltered(SRC_DIR, (filePath) =>
 		isAnalyzedLegacyDbCompatibilityCallerFile(rel(filePath))
 	);
+	const legacyModuleBootstrapCallerFiles = await walkFiltered(SRC_DIR, (filePath) =>
+		isAnalyzedLegacyModuleBootstrapCallerFile(rel(filePath))
+	);
+	const legacyBusinessCompatibilityCallerFiles = await walkFiltered(SRC_DIR, (filePath) =>
+		isAnalyzedLegacyBusinessCompatibilityCallerFile(rel(filePath))
+	);
+	const deprecatedServerShimCallerFiles = await walkFiltered(SRC_DIR, (filePath) =>
+		isAnalyzedDeprecatedServerShimCallerFile(rel(filePath))
+	);
 	const phase4TargetFiles = await walkFiltered(SRC_DIR, (filePath) =>
 		isAnalyzedPhase4TargetFile(rel(filePath))
 	);
@@ -452,6 +575,9 @@ async function main() {
 			financeTargetFiles,
 			legacyRuntimeCallerFiles,
 			legacyDbCompatibilityCallerFiles,
+			legacyModuleBootstrapCallerFiles,
+			legacyBusinessCompatibilityCallerFiles,
+			deprecatedServerShimCallerFiles,
 			phase4TargetFiles,
 			phase5TargetFiles
 		);

@@ -14,8 +14,9 @@ Current legacy implementation slices:
 Phase 4 bridge status:
 - Public API assembly now lives under `src/modules/project`.
 - Event handler registration now lives under `src/modules/project/handlers.ts`.
-- `src/lib/server/modules/project` remains as the compatibility entrypoint for
-  existing callers.
+- The former compatibility entrypoints under
+  `src/lib/server/modules/project/{api,index,handlers}.ts` have been retired
+  after their caller count reached zero.
 - Business logic and repository ownership still remain in the legacy slice for
   now; Phase 4 only moves the public assembly boundary.
 - Legacy coupling inside this target module is intentionally isolated to

@@ -15,8 +15,9 @@ Current legacy implementation slices:
 Phase 4 bridge status:
 - Target-layer public entrypoints now live under `src/modules/hr`.
 - Employee/person handler registration now lives under `src/modules/hr/handlers.ts`.
-- `src/lib/server/modules/employee` and `src/lib/server/modules/person`
-  remain as compatibility entrypoints for existing callers.
+- The former compatibility entrypoints under
+  `src/lib/server/modules/{employee,person}/{api,index,handlers}.ts` have been
+  retired after their caller count reached zero.
 - Internal ownership still remains in the legacy slices; Phase 4 only moves the
   public assembly boundary and defines the HR umbrella.
 - Legacy coupling inside this target module is intentionally isolated to
