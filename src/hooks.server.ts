@@ -12,6 +12,8 @@ import { getEnabledModuleIds, isPathEnabled } from './platform/config';
 
 // Register all modules at app startup (side-effect import)
 import './platform/registry/register-all';
+// Register AI capabilities into the platform capability registry (side-effect import)
+import './platform/ai/register-all';
 
 function isPublicAppPath(pathname: string) {
 	return (

@@ -229,5 +229,9 @@ Current status:
   third-layer directories, manifest assembly, service assembly, action
   catalog, and handler registration now live under target-layer subdirectories
   while business implementation still remains in the legacy slice.
+- Project target-owned read/runtime ownership has now started for low-risk
+  paths: `getById`, `getWithCustomer`, `list`, `getListCounts`,
+  `getProjectListPage`, `getProjectShell`, `getMembers`, and
+  `getProjectFinancials`.
 - The next module-internal alignment target after Project should move to
   `src/modules/hr`, then `src/modules/document-intake`.

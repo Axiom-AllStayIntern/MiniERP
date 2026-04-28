@@ -36,8 +36,23 @@ Current bridge status:
 - The former compatibility entrypoints under
   `src/lib/server/modules/project/{api,index,handlers}.ts` have been retired
   after their caller count reached zero.
-- Business logic and repository ownership still remain in the legacy slice for
-  now; this phase moves the internal directory topology and public assembly
-  boundary, not the underlying project business implementation.
+- Target-owned read/runtime ownership has now started for:
+  `getById`,
+  `getWithCustomer`,
+  `list`,
+  `getListCounts`,
+  `getProjectListPage`,
+  `getProjectShell`, and
+  `getMembers`, and
+  `getProjectFinancials`.
+- Write paths and cross-module project financial orchestration still remain in
+  the legacy slice for now:
+  `create`,
+  `update`,
+  `archive`,
+  `softDelete`,
+  `addMember`,
+  `removeMember`, and
+  `getProjectFinancials`.
 - Legacy coupling inside this target module is intentionally isolated to
   `contracts/source.ts` and `adapters/legacy.ts`.

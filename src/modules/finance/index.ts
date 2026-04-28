@@ -1,3 +1,4 @@
+import * as financeAgent from './agent';
 import { financeAppSurface } from './app';
 import { financeCapabilities, financeCapabilityIds } from './capabilities';
 import { financeManifestV2 } from './config';
@@ -29,6 +30,37 @@ export { financeCapabilities, financeCapabilityIds };
 export { createFinanceTaskService, type FinanceTaskService } from './services/finance-task-service';
 export { financeManifestV2 };
 export {
+	financeAgentManifest,
+	classifyFinanceIntent,
+	financeWorkflowBinding,
+	resolveWorkflowForIntent,
+	financeAgentAllowedCapabilities,
+	financeAgentForbiddenActions,
+	financeAgentRefusalCopy,
+	findCapabilityPolicy,
+	isForbiddenAction
+} from './agent';
+export type {
+	FinanceAgentManifest,
+	ClassifyFinanceIntentInput,
+	FinanceCapabilityPolicyEntry,
+	FinanceIntent,
+	FinanceIntentResult,
+	FinanceAgentRequest,
+	FinanceAgentResponse,
+	FinanceAgentAction,
+	FinanceAgentActionType,
+	FinanceAgentState,
+	FinanceAgentStatus,
+	FinanceEvidence,
+	FinanceEvidenceType,
+	FinanceForbiddenAction,
+	FinanceOwnedDomain,
+	FinanceRiskLevel,
+	FinanceUserDecisionRequest,
+	FinanceValidationIssue
+} from './agent';
+export {
 	financeContracts,
 	financeServices,
 	financeRules,
@@ -39,6 +71,7 @@ export {
 
 export const financePublicSurface = {
 	manifest: financeManifestV2,
+	agent: financeAgent,
 	contracts: financeContracts,
 	capabilities: financeCapabilities,
 	workflows: financeWorkflows,

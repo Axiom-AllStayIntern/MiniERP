@@ -1,1 +1,1 @@
-export const projectRepositories = [] as const;
+export * from './project-repository';

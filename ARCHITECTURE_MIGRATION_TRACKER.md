@@ -324,5 +324,9 @@ Current follow-up status:
   `adapters`, `events`, and `config` are now landed under
   `src/modules/project`, while legacy business implementation remains behind
   `contracts/source.ts` and `adapters/legacy.ts`.
+- Project target-owned runtime ownership has now started for low-risk read
+  paths: `getById`, `getWithCustomer`, `list`, `getListCounts`,
+  `getProjectListPage`, `getProjectShell`, `getMembers`, and
+  `getProjectFinancials`.
 - The next internal-topology alignment target after Project should move to HR,
   then Document Intake.

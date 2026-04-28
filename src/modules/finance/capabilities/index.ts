@@ -1,7 +1,8 @@
-import { classifyDocumentCapability } from './classify-document';
-import { explainDecisionCapability } from './explain-decision';
-import { extractFieldsCapability } from './extract-fields';
-import { suggestNextTaskCapability } from './suggest-next-task';
+import { detectDuplicateCapability } from './detect-duplicate';
+import { extractInvoiceFieldsCapability } from './extract-invoice-fields';
+import { matchPurchaseOrderCapability } from './match-purchase-order';
+import { matchSupplierCapability } from './match-supplier';
+import { validateExpenseDraftCapability } from './validate-expense-draft';
 
 export {
 	financeAgentActionSets,
@@ -9,11 +10,48 @@ export {
 	type FinanceAgentActionSets
 } from './agent-actions';
 
+export type {
+	FinanceCapability,
+	FinanceCapabilityContext,
+	FinanceCapabilityDescriptor
+} from './types';
+
+export {
+	extractInvoiceFieldsCapability,
+	type ExtractInvoiceFieldsInput,
+	type ExtractInvoiceFieldsOutput,
+	type ExtractedInvoiceFields
+} from './extract-invoice-fields';
+export {
+	matchSupplierCapability,
+	type MatchSupplierInput,
+	type MatchSupplierOutput,
+	type SupplierCandidate
+} from './match-supplier';
+export {
+	matchPurchaseOrderCapability,
+	type MatchPurchaseOrderInput,
+	type MatchPurchaseOrderOutput,
+	type PurchaseOrderCandidate
+} from './match-purchase-order';
+export {
+	detectDuplicateCapability,
+	type DetectDuplicateInput,
+	type DetectDuplicateOutput,
+	type DuplicateCandidatePayload
+} from './detect-duplicate';
+export {
+	validateExpenseDraftCapability,
+	type ValidateExpenseDraftInput,
+	type ValidateExpenseDraftOutput
+} from './validate-expense-draft';
+
 export const financeCapabilities = [
-	classifyDocumentCapability,
-	extractFieldsCapability,
-	explainDecisionCapability,
-	suggestNextTaskCapability
+	extractInvoiceFieldsCapability,
+	matchSupplierCapability,
+	matchPurchaseOrderCapability,
+	detectDuplicateCapability,
+	validateExpenseDraftCapability
 ] as const;
 
 export const financeCapabilityIds = financeCapabilities.map((capability) => capability.id);
