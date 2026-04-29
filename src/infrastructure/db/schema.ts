@@ -70,3 +70,6 @@ export {
 
 // Tax module
 export { gstReturns, personIncome, timeLogs } from '../../lib/server/modules/tax/schema';
+
+// Document Intake module (target-layer artifact storage)
+export { documentArtifacts } from '../../modules/document-intake/repositories/document-artifact.schema';

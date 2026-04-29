@@ -13,7 +13,7 @@ export const mockBriefItems: BriefItem[] = [
 		id: 'brief-1',
 		title: '3 supplier invoices waiting on you',
 		detail: 'From Axiom Tech, Cloudfactor SG, Neon Robotics — OCR draft ready.',
-		workflowId: 'document-intake',
+		workflowId: 'vendor-invoice-intake',
 		workflowHint: { docType: 'invoice_in' },
 		urgency: 'due-soon',
 		count: 3
@@ -43,7 +43,7 @@ export const mockQuickActions: QuickAction[] = [
 		id: 'qa-invoice',
 		label: 'Record invoice',
 		icon: 'receipt',
-		workflowId: 'document-intake',
+		workflowId: 'vendor-invoice-intake',
 		workflowHint: { docType: 'invoice_in' }
 	},
 	{

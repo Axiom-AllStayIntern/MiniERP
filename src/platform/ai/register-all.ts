@@ -12,9 +12,11 @@ import {
 	extractInvoiceFieldsCapability,
 	matchPurchaseOrderCapability,
 	matchSupplierCapability,
+	suggestNextFinanceTaskCapability,
 	validateExpenseDraftCapability,
 	type FinanceCapability
 } from '../../modules/finance/capabilities';
+import { classifyDocumentCapability } from '../../modules/document-intake/capabilities/classify-document';
 import { registerCapability } from './capability-registry';
 
 const FINANCE_AGENT_ID = 'finance-agent';
@@ -24,7 +26,8 @@ const FINANCE_CAPABILITIES: ReadonlyArray<FinanceCapability<unknown, unknown>> =
 	matchSupplierCapability as FinanceCapability<unknown, unknown>,
 	matchPurchaseOrderCapability as FinanceCapability<unknown, unknown>,
 	detectDuplicateCapability as FinanceCapability<unknown, unknown>,
-	validateExpenseDraftCapability as FinanceCapability<unknown, unknown>
+	validateExpenseDraftCapability as FinanceCapability<unknown, unknown>,
+	suggestNextFinanceTaskCapability as FinanceCapability<unknown, unknown>
 ];
 
 for (const capability of FINANCE_CAPABILITIES) {
@@ -49,3 +52,22 @@ for (const capability of FINANCE_CAPABILITIES) {
 		capability
 	);
 }
+
+// Document Intake capabilities. Phase 2 only ships classify-document; the
+// document-intake service calls it directly today, but pre-registering it
+// against the platform registry means the future Document Agent (Phase 6)
+// can dispatch it through the same tool-policy gate Finance Agent uses.
+registerCapability(
+	{
+		id: classifyDocumentCapability.id,
+		ownerModule: 'document-intake',
+		description: classifyDocumentCapability.description,
+		riskLevel: classifyDocumentCapability.riskLevel,
+		allowedAgents: ['document-agent'],
+		requiredUserPermissions: ['finance:view'],
+		requiresConfirmation: false,
+		auditRequired: true,
+		enabled: true
+	},
+	classifyDocumentCapability as FinanceCapability<unknown, unknown>
+);

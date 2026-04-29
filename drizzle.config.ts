@@ -3,7 +3,8 @@ import { defineConfig } from 'drizzle-kit';
 export default defineConfig({
 	schema: [
 		'./src/lib/server/modules/*/schema.ts',
-		'./src/lib/server/modules/schema-helpers.ts'
+		'./src/lib/server/modules/schema-helpers.ts',
+		'./src/modules/*/repositories/*.schema.ts'
 	],
 	out: './drizzle/migrations',
 	dialect: 'sqlite',

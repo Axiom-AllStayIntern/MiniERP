@@ -11,6 +11,7 @@ import {
 	type ExtractedInvoiceFields,
 	type VendorInvoiceIntakeStepId
 } from '../../../../../../modules/finance/workflows/vendor-invoice-intake';
+import { createDocumentIntakeService } from '../../../../../../modules/document-intake';
 import { appendAgentAuditEntry } from '../../../../../../platform/audit/audit-log';
 import { checkToolPolicy } from '../../../../../../platform/ai/tool-policy';
 import {
@@ -152,7 +153,15 @@ export const POST: RequestHandler = async (event) => {
 		);
 	}
 
-	const ctx = { tenantId: state.tenantId, userId: state.userId, useMock: true };
+	const ctx = {
+		tenantId: state.tenantId,
+		userId: state.userId,
+		useMock: true,
+		// `env` is read by capabilities that may invoke the platform AI runtime
+		// (e.g. extract-invoice-fields LLM fallback). Capabilities that don't
+		// need it ignore the field — keeping the runtime ctx shape minimal.
+		env
+	};
 
 	switch (body.targetStep) {
 		case 'document_intake': {
@@ -173,9 +182,40 @@ export const POST: RequestHandler = async (event) => {
 		case 'invoice_field_extraction': {
 			const document = state.data.document as DocumentIntakeOutput | undefined;
 			if (!document) return fail('Workflow has no document context', 400);
-			const result = await runFieldExtractionStep(document, ctx);
+
+			// Phase 2: when the documentId points at a real DocumentArtifact,
+			// load its OCR text so the capability can run heuristic + LLM
+			// extraction over real content. Phase 1 mock ids (`mock-…`) skip
+			// this and fall through to the capability's fixture mock.
+			let artifactText: string | undefined;
+			let artifactConfidence: number | undefined;
+			if (!document.documentId.startsWith('mock-')) {
+				try {
+					const docService = createDocumentIntakeService({ db, env, user });
+					const artifact = await docService.getDocumentArtifact({
+						tenantId: state.tenantId,
+						documentId: document.documentId
+					});
+					if (artifact?.textExtraction?.status === 'success') {
+						artifactText = artifact.textExtraction.text;
+						artifactConfidence = artifact.textExtraction.confidence;
+					}
+				} catch {
+					// Treat as missing text; the capability will fall back.
+				}
+			}
+
+			const result = await runFieldExtractionStep(
+				{
+					...document,
+					text: artifactText,
+					artifactConfidence
+				},
+				ctx
+			);
 			await auditCapabilitySuccess(db, state, user, 'finance.extract-invoice-fields', {
-				confidence: result.confidence
+				confidence: result.confidence,
+				usedRealText: Boolean(artifactText)
 			});
 			const next = await patchState(env.KV, state.id, {
 				step: body.targetStep,

@@ -40,3 +40,32 @@ registerWorkflow({
 		{ id: 'review', label: 'Review & save', hint: 'Check, fix, commit' }
 	]
 });
+
+/**
+ * Vendor invoice intake — the Phase 1 reference flow for the Finance Agent.
+ * Steps map onto the server-side workflow definition in
+ * `src/modules/finance/workflows/vendor-invoice-intake/definition.ts`:
+ *   client 0 → server document_intake
+ *   client 1 → server invoice_field_extraction
+ *   client 2 → display extraction (no server call)
+ *   client 3 → server matching
+ *   client 4 → server user_confirmation
+ *   client 5 → server record_creation + completion (Stage 5)
+ */
+registerWorkflow({
+	id: 'vendor-invoice-intake',
+	title: 'Record supplier invoice',
+	shortTitle: 'Invoice',
+	description:
+		'Drop a supplier invoice — I extract the fields, match the PO, and prep a record for your confirmation.',
+	entryLabel: 'Record invoice',
+	icon: 'receipt',
+	steps: [
+		{ id: 'drop', label: 'Drop file', hint: 'PDF or photo' },
+		{ id: 'extract', label: 'Extract', hint: 'Mock fields' },
+		{ id: 'review-fields', label: 'Review fields', hint: 'Confidence + edit' },
+		{ id: 'match', label: 'Match PO', hint: 'Supplier + PO + duplicate' },
+		{ id: 'confirm', label: 'Confirm', hint: 'Final summary' },
+		{ id: 'done', label: 'Done', hint: 'Recorded' }
+	]
+});

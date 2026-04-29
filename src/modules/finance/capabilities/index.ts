@@ -2,6 +2,7 @@ import { detectDuplicateCapability } from './detect-duplicate';
 import { extractInvoiceFieldsCapability } from './extract-invoice-fields';
 import { matchPurchaseOrderCapability } from './match-purchase-order';
 import { matchSupplierCapability } from './match-supplier';
+import { suggestNextFinanceTaskCapability } from './suggest-next-task';
 import { validateExpenseDraftCapability } from './validate-expense-draft';
 
 export {
@@ -45,13 +46,20 @@ export {
 	type ValidateExpenseDraftInput,
 	type ValidateExpenseDraftOutput
 } from './validate-expense-draft';
+export {
+	suggestNextFinanceTaskCapability,
+	type SuggestNextTaskInput,
+	type SuggestNextTaskOutput,
+	type SuggestedNextTask
+} from './suggest-next-task';
 
 export const financeCapabilities = [
 	extractInvoiceFieldsCapability,
 	matchSupplierCapability,
 	matchPurchaseOrderCapability,
 	detectDuplicateCapability,
-	validateExpenseDraftCapability
+	validateExpenseDraftCapability,
+	suggestNextFinanceTaskCapability
 ] as const;
 
 export const financeCapabilityIds = financeCapabilities.map((capability) => capability.id);

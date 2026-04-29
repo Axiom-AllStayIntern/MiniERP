@@ -7,18 +7,33 @@
 	import KindStep from './intake/KindStep.svelte';
 	import ProjectStep from './intake/ProjectStep.svelte';
 	import ReviewStep from './intake/ReviewStep.svelte';
+	import UploadStep from './finance-invoice/UploadStep.svelte';
+	import ExtractingStage from './finance-invoice/ExtractingStage.svelte';
+	import FieldsReviewStep from './finance-invoice/FieldsReviewStep.svelte';
+	import MatchesStep from './finance-invoice/MatchesStep.svelte';
+	import ConfirmStep from './finance-invoice/ConfirmStep.svelte';
+	import DoneStep from './finance-invoice/DoneStep.svelte';
 
 	const workflow = $derived(
 		panel.activeWorkflow ? getWorkflow(panel.activeWorkflow.workflowId) : undefined
 	);
+	const workflowId = $derived(panel.activeWorkflow?.workflowId);
 	const stepIndex = $derived(panel.activeWorkflow?.stepIndex ?? 0);
+
+	// document-intake's review step takes the whole column at stepIndex 5;
+	// other steps still get an intro. Vendor-invoice-intake keeps the intro on
+	// every step except `done` so the title isn't repeated alongside success.
+	const showIntro = $derived.by(() => {
+		if (!workflow) return false;
+		if (workflowId === 'document-intake') return stepIndex < 5;
+		if (workflowId === 'vendor-invoice-intake') return stepIndex < 5;
+		return true;
+	});
 </script>
 
 <section class="flow">
 	{#if workflow}
-		<!-- Title intro only while the review step has room; otherwise
-		     review-cockpit takes over the whole column. -->
-		{#if stepIndex < 5}
+		{#if showIntro}
 			<div class="flow-intro">
 				<div class="flow-eyebrow">
 					<span class="flow-eyebrow-dot"></span>
@@ -29,18 +44,34 @@
 			</div>
 		{/if}
 
-		{#if stepIndex === 0}
-			<DropZone />
-		{:else if stepIndex === 1}
-			<ClassifyingStage />
-		{:else if stepIndex === 2}
-			<BucketStep />
-		{:else if stepIndex === 3}
-			<KindStep />
-		{:else if stepIndex === 4}
-			<ProjectStep />
-		{:else if stepIndex === 5}
-			<ReviewStep />
+		{#if workflowId === 'document-intake'}
+			{#if stepIndex === 0}
+				<DropZone />
+			{:else if stepIndex === 1}
+				<ClassifyingStage />
+			{:else if stepIndex === 2}
+				<BucketStep />
+			{:else if stepIndex === 3}
+				<KindStep />
+			{:else if stepIndex === 4}
+				<ProjectStep />
+			{:else if stepIndex === 5}
+				<ReviewStep />
+			{/if}
+		{:else if workflowId === 'vendor-invoice-intake'}
+			{#if stepIndex === 0}
+				<UploadStep />
+			{:else if stepIndex === 1}
+				<ExtractingStage />
+			{:else if stepIndex === 2}
+				<FieldsReviewStep />
+			{:else if stepIndex === 3}
+				<MatchesStep />
+			{:else if stepIndex === 4}
+				<ConfirmStep />
+			{:else if stepIndex === 5}
+				<DoneStep />
+			{/if}
 		{/if}
 	{/if}
 </section>

@@ -3,6 +3,15 @@ import type { FinanceEvidence } from '../../agent/types';
 export interface ExtractInvoiceFieldsInput {
 	documentId: string;
 	fileName?: string;
+	/**
+	 * Real OCR text from a Document Artifact. When present the capability runs
+	 * heuristic-then-LLM extraction; when absent it falls back to the Phase 1
+	 * filename-keyword fixture so the local demo without an AI binding still
+	 * works.
+	 */
+	text?: string;
+	/** Confidence reported by upstream OCR/text-extraction. */
+	artifactConfidence?: number;
 }
 
 export interface ExtractedInvoiceFields {
@@ -15,11 +24,13 @@ export interface ExtractedInvoiceFields {
 	dueDate: string;
 }
 
+export type ExtractionProvider = 'mock-v1' | 'heuristic' | 'workers_ai' | 'external_api';
+
 export interface ExtractInvoiceFieldsOutput {
 	fields: ExtractedInvoiceFields;
 	confidence: number;
 	evidence: FinanceEvidence[];
-	provider: 'mock-v1';
+	provider: ExtractionProvider;
 }
 
 interface Fixture {
