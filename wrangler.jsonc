@@ -29,19 +29,18 @@
 			"id": "fd0eca3363a3444daff52d1a35af69eb"
 		}
 	],
+	// OCR_QUEUE producer 仍被 src/modules/legacy/server-modules/document-intake/service.ts 调用
+	// （via /api/upload/confirm /api/documents/upload /api/doc-hub/upload 三条路由）。
+	// 当前没有 consumer 绑定，消息会在队列里堆积到默认 4 天 retention 后丢弃。
+	// 等 Wave 1.9 删除 legacy/document-intake 后，整个 queues 段一并移除。
+	// 详见 ref_files/v4/SmartFin_Migration_Plan.md Wave 0.2 / Wave 1.9 / Wave 3.7。
 	"queues": {
 		"producers": [
 			{
-			"binding": "OCR_QUEUE",
-			"queue": "smartfin-ocr-queue"  
+				"binding": "OCR_QUEUE",
+				"queue": "smartfin-ocr-queue"
 			}
 		]
-//		"consumers": [
-//			{
-//			"queue": "smartfin-ocr-queue",
-//			"dead_letter_queue": "smartfin-ocr-queue-dlq"
-//			}
-//		]
 	},
 	"vars": {
 		// 线上 Worker 默认站点；本地 localhost 时应用会按请求 origin 覆盖 auth 基地址。

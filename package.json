@@ -16,14 +16,12 @@
 		"check": "npm run check:modular-boundary && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"gen": "wrangler types",
-		"gen:ocr": "wrangler types --config workers/wrangler.ocr-consumer.jsonc",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate:local": "wrangler d1 migrations apply smartfin-db --local",
 		"db:migrate:remote": "wrangler d1 migrations apply smartfin-db --remote",
 		"db:seed:local": "wrangler d1 execute smartfin-db --local --file drizzle/seeds/local-customers.sql",
 		"db:seed:mock:local": "wrangler d1 execute smartfin-db --local --file drizzle/seeds/local-mock-full.sql",
-		"db:test:mock:local": "npm run db:migrate:local && npm run db:seed:mock:local",
-		"deploy:ocr-consumer": "wrangler deploy --config workers/wrangler.ocr-consumer.jsonc"
+		"db:test:mock:local": "npm run db:migrate:local && npm run db:seed:mock:local"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-cloudflare": "^7.2.6",
