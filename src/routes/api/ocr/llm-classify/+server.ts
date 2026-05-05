@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
-import { classifyDocType, normalizeDocTypeHint } from '$lib/server/ocr/classify';
-import { fail, ok } from '$lib/server/http';
+import { classifyDocType, normalizeDocTypeHint } from '$platform/ai/ocr/classify';
+import { fail, ok } from '$platform/http';
 
 type ClassifyPayload = {
 	text?: string;
@@ -26,3 +26,4 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 	return ok({ provider: outcome.provider, result: outcome.result });
 };
+

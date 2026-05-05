@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { authClient } from '$lib/auth-client';
+	import { authClient } from '$platform/auth/client';
 
 	let email = $state('');
 	let loading = $state(false);
@@ -51,9 +51,11 @@
 				disabled={loading}
 				class="w-full rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2f5e2c] disabled:opacity-60"
 			>
-				{loading ? 'Sending…' : 'Send reset link'}
+				{loading ? 'Sending...' : 'Send reset link'}
 			</button>
 		</form>
 		<a class="mt-4 inline-block text-sm text-[var(--sf-green)] underline" href="/login">Back to sign in</a>
 	</div>
 </main>
+
+

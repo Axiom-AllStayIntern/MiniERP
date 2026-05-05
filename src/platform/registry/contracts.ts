@@ -1,4 +1,4 @@
-import type { ModuleManifest as LegacyModuleManifest } from '../../lib/server/modules/types';
+import type { ModuleManifest as LegacyModuleManifest } from '../modules/types';
 
 export type ModuleLayerV2 = LegacyModuleManifest['layer'];
 

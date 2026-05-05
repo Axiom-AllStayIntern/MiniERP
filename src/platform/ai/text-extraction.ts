@@ -3,14 +3,14 @@
  *
  * Hides three concrete OCR / parse paths behind a single function so
  * Document Intake's `processDocument` doesn't care whether the file was a
- * PDF with a text layer, a scanned image, or â€” when running offline /
- * without an AI binding â€” a mock fixture.
+ * PDF with a text layer, a scanned image, or â€?when running offline /
+ * without an AI binding â€?a mock fixture.
  *
  * Output shape conforms to `TextExtractionResult` in
  * `src/modules/document-intake/schemas/document-artifact.schema.ts`
  * (doc 04 Â§11). Callers persist this directly into the artifact.
  */
-import { runWorkersVisionOcr } from '../../lib/server/ocr/workers-vision-ocr';
+import { runWorkersVisionOcr } from './ocr/workers-vision-ocr';
 import type { TextExtractionResult } from '../../modules/document-intake/schemas/document-artifact.schema';
 import type { FileServiceContract } from '../files/file.types';
 import { pickMockFixtureText } from './text-extraction-fixtures';
@@ -80,8 +80,8 @@ function buildFailure(code: string, message: string, method: TextExtractionResul
 
 /**
  * Run text extraction. Phase 2 supports three paths:
- *  - PDF with a text layer (heuristic byte decode â€” same approach as the
- *    existing `$lib/server/ocr/pipeline.ts:extractPdfText`).
+ *  - PDF with a text layer (heuristic byte decode â€?same approach as the
+ *    existing `$platform/ai/ocr/pipeline.ts:extractPdfText`).
  *  - Image (Workers AI vision via `runWorkersVisionOcr`).
  *  - Mock fixture (filename keyword lookup) when caller opts in or when the
  *    AI binding is missing.
@@ -129,7 +129,7 @@ export async function extractTextFromBlob(
 
 	if (isImageMime(fileRef.mimeType, fileRef.fileName)) {
 		if (!env.AI) {
-			// No AI binding â€” fall back to mock fixture so local dev still works.
+			// No AI binding â€?fall back to mock fixture so local dev still works.
 			return buildMockResult(input);
 		}
 		const bytes = await fileService.getBytes(fileRef.key);
@@ -157,3 +157,4 @@ export async function extractTextFromBlob(
 		'manual'
 	);
 }
+

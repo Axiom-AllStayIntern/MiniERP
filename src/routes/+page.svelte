@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { authClient } from '$lib/auth-client';
-	import coverArt from '$lib/assets/smartfin_cover_art.svg';
-	import bgLight from '$lib/assets/smartfin_bg_light.svg';
+	import { authClient } from '$platform/auth/client';
+	import coverArt from '$app-layer/assets/smartfin_cover_art.svg';
+	import bgLight from '$app-layer/assets/smartfin_bg_light.svg';
 
 	let email = $state('');
 	let password = $state('');
@@ -76,7 +76,7 @@
 						disabled={loading}
 						class="w-full rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2f5e2c] disabled:opacity-60"
 					>
-						{loading ? 'Signing in…' : 'Sign in'}
+						{loading ? 'Signing in...' : 'Sign in'}
 					</button>
 				</form>
 				<div class="mt-4 flex items-center justify-between text-sm">
@@ -87,3 +87,5 @@
 		</section>
 	</div>
 </main>
+
+

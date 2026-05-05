@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageShell from '$lib/components/PageShell.svelte';
+	import PageShell from '$app-layer/components/PageShell.svelte';
 
 	let { data } = $props();
 </script>
@@ -85,14 +85,14 @@
 							<td class="px-4 py-3 font-medium text-slate-900">
 								<a class="hover:text-[var(--sf-green)] hover:underline" href={`/suppliers/${s.id}`}>{s.name}</a>
 							</td>
-							<td class="px-4 py-3 text-slate-600">{s.contact ?? '—'}</td>
-							<td class="px-4 py-3 text-slate-600">{s.itemDescription ?? '—'}</td>
-							<td class="px-4 py-3 text-slate-600">{s.dateCreate ?? '—'}</td>
-							<td class="px-4 py-3 text-slate-600">{s.projectRelated ?? '—'}</td>
-							<td class="max-w-md truncate px-4 py-3 text-slate-600" title={s.address ?? ''}>{s.address ?? '—'}</td>
+							<td class="px-4 py-3 text-slate-600">{s.contact ?? '-'}</td>
+							<td class="px-4 py-3 text-slate-600">{s.itemDescription ?? '-'}</td>
+							<td class="px-4 py-3 text-slate-600">{s.dateCreate ?? '-'}</td>
+							<td class="px-4 py-3 text-slate-600">{s.projectRelated ?? '-'}</td>
+							<td class="max-w-md truncate px-4 py-3 text-slate-600" title={s.address ?? ''}>{s.address ?? '-'}</td>
 							<td class="px-4 py-3 text-slate-600">
 								{#if s.contacts.length === 0}
-									—
+									�?
 								{:else}
 									{#each s.contacts as c, i}
 										<div class="text-xs">
@@ -114,3 +114,5 @@
 		</table>
 	</div>
 </PageShell>
+
+

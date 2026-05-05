@@ -1,8 +1,8 @@
 import type { RequestHandler } from './$types';
 
-import { createModuleContext } from '$lib/server/modules';
-import { createBusinessPartnerApi } from '$lib/server/modules/business-partner/api';
-import { fail, ok } from '$lib/server/http';
+import { createModuleContext } from '$platform/modules';
+import { createBusinessPartnerApi } from '$modules/legacy/server-modules/business-partner/api';
+import { fail, ok } from '$platform/http';
 
 export const GET: RequestHandler = async (event) => {
 	try {
@@ -45,3 +45,4 @@ export const POST: RequestHandler = async (event) => {
 		return fail((e as Error).message, 500);
 	}
 };
+

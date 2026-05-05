@@ -1,8 +1,8 @@
 import { and, asc, desc, eq, isNull, like, ne, or, sql, type SQL } from 'drizzle-orm';
-import { parseStoredInvoiceLineItems } from '$lib/invoice-line-items';
-import { objectExists } from '$lib/server/r2';
-import type { ModuleContext } from '../../../lib/server/modules/types';
-import { ConflictError, NotFoundError } from '../../../lib/server/modules/errors';
+import { parseStoredInvoiceLineItems } from '$modules/finance/schemas/invoice-line-items';
+import { objectExists } from '$infrastructure/storage/r2';
+import type { ModuleContext } from '$platform/modules/types';
+import { ConflictError, NotFoundError } from '$platform/modules/errors';
 import { createEvent } from '../../../platform/events';
 import { customers, invoicesOut, projects } from '../../../infrastructure/db/schema';
 import { BillingRepository } from '../repositories';

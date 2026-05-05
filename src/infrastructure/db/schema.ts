@@ -12,10 +12,10 @@ export {
 	companySettings,
 	uploadIdempotency,
 	uploadFileDedup
-} from '../../lib/server/modules/core/schema';
+} from '$modules/legacy/server-modules/core/schema';
 
 // better-auth tables (sessions, accounts, verifications)
-export { sessions, accounts, verifications } from '../../lib/server/auth/auth-tables';
+export { sessions, accounts, verifications } from '../../platform/auth/auth-tables';
 
 // Person module (includes legacy employees table)
 export {
@@ -25,7 +25,7 @@ export {
 	shareholderProfiles,
 	freelancerProfiles,
 	employees
-} from '../../lib/server/modules/person/schema';
+} from '$modules/legacy/server-modules/person/schema';
 
 // Business Partner module (includes legacy customers table)
 export {
@@ -34,10 +34,10 @@ export {
 	partnerCustomerProfiles,
 	partnerContacts,
 	customers
-} from '../../lib/server/modules/business-partner/schema';
+} from '$modules/legacy/server-modules/business-partner/schema';
 
 // Project module
-export { projects, projectEmployees } from '../../lib/server/modules/project/schema';
+export { projects, projectEmployees } from '$modules/legacy/server-modules/project/schema';
 
 // AR module
 export {
@@ -48,7 +48,7 @@ export {
 	invoicesIn,
 	payments,
 	arDocumentLinks
-} from '../../lib/server/modules/ar/schema';
+} from '$modules/legacy/server-modules/ar/schema';
 
 // Employee module
 export {
@@ -57,7 +57,7 @@ export {
 	employeeProjectAllocations,
 	compensationComponents,
 	payoutRecords
-} from '../../lib/server/modules/employee/schema';
+} from '$modules/legacy/server-modules/employee/schema';
 
 // Expense module
 export {
@@ -66,10 +66,10 @@ export {
 	expenses,
 	revenue,
 	expenseCategories
-} from '../../lib/server/modules/expense/schema';
+} from '$modules/legacy/server-modules/expense/schema';
 
 // Tax module
-export { gstReturns, personIncome, timeLogs } from '../../lib/server/modules/tax/schema';
+export { gstReturns, personIncome, timeLogs } from '$modules/legacy/server-modules/tax/schema';
 
 // Document Intake module (target-layer artifact storage)
 export { documentArtifacts } from '../../modules/document-intake/repositories/document-artifact.schema';

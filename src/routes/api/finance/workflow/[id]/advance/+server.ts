@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
+import { fail, ok } from '$platform/http';
 import { getDb, type DBClient } from '../../../../../../infrastructure/db';
 import { financeAgentManifest } from '../../../../../../modules/finance/agent';
 import {
@@ -220,7 +220,7 @@ export const POST: RequestHandler = async (event) => {
 		useMock: true,
 		// `env` is read by capabilities that may invoke the platform AI runtime
 		// (e.g. extract-invoice-fields LLM fallback). Capabilities that don't
-		// need it ignore the field â€” keeping the runtime ctx shape minimal.
+		// need it ignore the field â€?keeping the runtime ctx shape minimal.
 		env
 	};
 
@@ -415,3 +415,4 @@ export const POST: RequestHandler = async (event) => {
 			return fail(`Unsupported target step: ${body.targetStep}`, 400);
 	}
 };
+

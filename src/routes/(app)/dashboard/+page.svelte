@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageShell from '$lib/components/PageShell.svelte';
+	import PageShell from '$app-layer/components/PageShell.svelte';
 	import { onMount } from 'svelte';
 	let { data } = $props();
 
@@ -752,3 +752,5 @@ const pieDetail = $derived.by(() => {
 		to { transform: scaleX(1); }
 	}
 </style>
+
+

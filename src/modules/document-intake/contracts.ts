@@ -1,4 +1,4 @@
-import { DocumentIntakeService } from '../../lib/server/modules/document-intake/service';
+import { DocumentIntakeService } from '$modules/legacy/server-modules/document-intake/service';
 
 type LegacyDocumentIntakeService = InstanceType<typeof DocumentIntakeService>;
 

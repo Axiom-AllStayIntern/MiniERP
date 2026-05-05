@@ -74,7 +74,7 @@
 			return { class: 'bg-amber-50 text-amber-900', text: 'Draft' };
 		if (rowStatus === 'pending')
 			return { class: 'bg-stone-100 text-stone-600', text: 'Pending' };
-		return { class: 'bg-slate-100 text-slate-400', text: '—' };
+		return { class: 'bg-slate-100 text-slate-400', text: '-' };
 	}
 
 	function payoutStatusBadge(status: string) {
@@ -105,7 +105,7 @@
 		<div>
 			<h1 class="text-lg font-medium text-slate-900">Team &amp; cost</h1>
 			<p class="mt-0.5 text-sm text-slate-500">
-				{data.project.name} — staff cost breakdown &amp; settlement
+				{data.project.name} �?staff cost breakdown &amp; settlement
 			</p>
 		</div>
 		<button
@@ -146,7 +146,7 @@
 	<!-- Toolbar -->
 	<div class="flex flex-wrap items-center gap-2">
 		<div class="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1 py-0.5">
-			<a class="rounded px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" href={monthHref(data.prevMonthYm)}>←</a>
+			<a class="rounded px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" href={monthHref(data.prevMonthYm)}>-</a>
 			<input
 				type="month"
 				class="rounded border-0 bg-transparent px-2 py-1 text-sm text-slate-800 focus:ring-0"
@@ -156,7 +156,7 @@
 					if (v) void goto(monthHref(v), { replaceState: true });
 				}}
 			/>
-			<a class="rounded px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" href={monthHref(data.nextMonthYm)}>→</a>
+			<a class="rounded px-2 py-1 text-xs text-slate-600 hover:bg-slate-50" href={monthHref(data.nextMonthYm)}>-</a>
 		</div>
 		<form method="POST" action="?/settleAllForMonth" class="inline-flex items-center gap-2">
 			<input type="hidden" name="monthYm" value={data.selectedMonthYm} />
@@ -283,7 +283,7 @@
 									class="rounded-lg border border-[var(--sf-green)] bg-[var(--sf-green-soft)] px-3 py-1.5 text-xs font-medium text-[var(--sf-green)] hover:bg-white"
 									href="{base}/employees/{m.peId}?month={encodeURIComponent(data.selectedMonthYm)}"
 								>
-									Open {m.name.split(' ')[0] ?? 'member'} → settlement
+									Open {m.name.split(' ')[0] ?? 'member'} �?settlement
 								</a>
 								<a
 									class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
@@ -384,7 +384,7 @@
 					<label class="space-y-1 text-sm md:col-span-2">
 						<span class="text-slate-700">Employee</span>
 						<select name="employeeId" required class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-							<option value="" disabled selected>Select…</option>
+							<option value="" disabled selected>Select</option>
 							{#each data.assignableEmployees as e}
 								<option value={e.id}>{e.name} ({e.type})</option>
 							{/each}
@@ -422,3 +422,5 @@
 		{/if}
 	</section>
 </div>
+
+

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 	import { tick } from 'svelte';
-	import PageShell from '$lib/components/PageShell.svelte';
-	import companyLogo from '$lib/assets/favicon.png';
-	import { agentPrefill, consumePrefill } from '$lib/agent/prefill';
+	import PageShell from '$app-layer/components/PageShell.svelte';
+	import companyLogo from '$app-layer/assets/favicon.png';
+	import { agentPrefill, consumePrefill } from '$app-layer/ai-panel/state/prefill';
 
 	type ProjectRow = {
 		id: string;
@@ -247,7 +247,7 @@
 	}
 
 	function fmtPreviewDate(raw: string): string {
-		if (!raw) return '—';
+		if (!raw) return '-';
 		const [y, m, day] = raw.split('-').map((x) => Number.parseInt(x, 10));
 		if (!y || !m || !day) return raw;
 		const mn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -693,7 +693,7 @@
 	description="Two-column editor with live preview, aligned to the standalone invoice generator layout. Saves a draft customer invoice on your selected project."
 >
 	<p class="sf-no-print -mt-2 text-sm">
-		<a class="font-medium text-[var(--sf-green)] hover:underline" href="/finance/doc-hub/customer-invoices">← Back to customer invoices</a>
+		<a class="font-medium text-[var(--sf-green)] hover:underline" href="/finance/doc-hub/customer-invoices">�?Back to customer invoices</a>
 	</p>
 
 	<div class="grid gap-5 lg:grid-cols-2 lg:items-start">
@@ -708,7 +708,7 @@
 						bind:value={selectedProjectId}
 					>
 						{#if data.projects.length === 0}
-							<option value="">No projects — create one first</option>
+							<option value="">No projects �?create one first</option>
 						{:else}
 							{#each data.projects as p}
 								<option value={p.id}>{p.name} · {p.customerName ?? p.customerId}</option>
@@ -954,8 +954,7 @@
 					disabled={saveBusy}
 					onclick={() => void generateAndSend()}
 				>
-					Generate &amp; send →
-				</button>
+					Generate &amp; send �?				</button>
 			</div>
 			{#if saveMessage}
 				<p class="border-t border-slate-100 px-4 py-2 text-xs text-slate-700">{saveMessage}</p>
@@ -1023,7 +1022,7 @@
 					</div>
 					<div class="text-left">
 						<p class="text-xs font-semibold text-slate-700">
-							Invoice Number: <span class="font-medium text-slate-900">{invoiceNo || '—'}</span>
+							Invoice Number: <span class="font-medium text-slate-900">{invoiceNo || '-'}</span>
 						</p>
 						<p class="mt-1 text-xs font-semibold text-slate-700">
 							Invoice Date: <span class="font-medium text-slate-900">{fmtPreviewDate(issueDate)}</span>
@@ -1057,8 +1056,8 @@
 					<tbody>
 						{#each totals.rows as r}
 							<tr class="border-b border-slate-100">
-								<td class="py-2 pr-2 align-top whitespace-pre-wrap break-words font-medium text-slate-800">{r.itemName || '—'}</td>
-								<td class="py-2 pr-2 align-top whitespace-pre-wrap break-words text-slate-700">{r.description || '—'}</td>
+								<td class="py-2 pr-2 align-top whitespace-pre-wrap break-words font-medium text-slate-800">{r.itemName || '-'}</td>
+								<td class="py-2 pr-2 align-top whitespace-pre-wrap break-words text-slate-700">{r.description || '-'}</td>
 								<td class="py-2 text-right align-top whitespace-pre-wrap break-words">{r.qty}</td>
 								<td class="py-2 text-center align-top whitespace-pre-wrap break-words">{r.uom || ''}</td>
 								{#each customCols as col (col.id)}
@@ -1118,3 +1117,5 @@
 		</div>
 	</div>
 </PageShell>
+
+

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import StorageTextPreview from '$lib/components/StorageTextPreview.svelte';
-	import { documentPreviewMode } from '$lib/document-preview-mode';
+	import StorageTextPreview from '$app-layer/components/StorageTextPreview.svelte';
+	import { documentPreviewMode } from '$platform/files/document-preview-mode';
 
 	let { data, form } = $props();
 
@@ -21,14 +21,14 @@
 	);
 
 	const fmtBytes = (n: number | undefined) => {
-		if (n == null || !Number.isFinite(n)) return '—';
+		if (n == null || !Number.isFinite(n)) return '-';
 		if (n < 1024) return `${n} B`;
 		if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
 		return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 	};
 
 	const fmtWhen = (iso: string | undefined) => {
-		if (!iso) return '—';
+		if (!iso) return '-';
 		const d = new Date(iso);
 		return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-SG');
 	};
@@ -41,13 +41,13 @@
 			class="text-xs font-medium text-[var(--sf-green)] hover:underline"
 			onclick={() => goto(`${base}/documents`)}
 		>
-			← Back to documents
+			�?Back to documents
 		</button>
 		<a
 			class="text-xs font-medium text-[var(--sf-green)] hover:underline"
 			href={`/finance/doc-hub/upload/project?projectId=${encodeURIComponent(data.project.id)}&docType=contract`}
 		>
-			Upload another contract…
+			Upload another contract�?
 		</a>
 	</div>
 
@@ -71,15 +71,15 @@
 			</div>
 			<div class="bg-white px-5 py-3">
 				<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Contract date</p>
-				<p class="mt-1 text-sm text-slate-900">{data.contract.effectiveDate ?? '—'}</p>
+				<p class="mt-1 text-sm text-slate-900">{data.contract.effectiveDate ?? '-'}</p>
 			</div>
 			<div class="bg-white px-5 py-3">
 				<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Source</p>
-				<p class="mt-1 text-sm text-slate-900">{data.docMeta.sourceType ?? '—'}</p>
+				<p class="mt-1 text-sm text-slate-900">{data.docMeta.sourceType ?? '-'}</p>
 			</div>
 			<div class="bg-white px-5 py-3">
 				<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Parse status</p>
-				<p class="mt-1 text-sm text-slate-900">{data.docMeta.parseStatus ?? '—'}</p>
+				<p class="mt-1 text-sm text-slate-900">{data.docMeta.parseStatus ?? '-'}</p>
 			</div>
 			<div class="bg-white px-5 py-3">
 				<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Storage key</p>
@@ -233,3 +233,5 @@
 		</div>
 	</details>
 </div>
+
+

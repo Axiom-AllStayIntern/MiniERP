@@ -1,4 +1,4 @@
-import type { DomainEvent, EventBus, EventHandler, ModuleContext } from '../../lib/server/modules/types';
+import type { DomainEvent, EventBus, EventHandler, ModuleContext } from '$platform/modules/types';
 
 export function createEventBus(): EventBus {
 	const handlers = new Map<string, Set<EventHandler<any>>>();

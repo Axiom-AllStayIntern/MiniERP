@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
-import { fail, ok } from '$lib/server/http';
-import { runImageDocumentOcr } from '$lib/server/ocr/image-document-ocr';
+import { fail, ok } from '$platform/http';
+import { runImageDocumentOcr } from '$platform/ai/ocr/image-document-ocr';
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
@@ -64,3 +64,4 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 		fileName: file.name
 	});
 };
+

@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 
-import { fail } from '$lib/server/http';
+import { fail } from '$platform/http';
 
 function guessContentTypeFromKey(key: string): string {
 	const ext = key.split('.').pop()?.toLowerCase() ?? '';
@@ -27,7 +27,7 @@ function fileNameFromKey(key: string): string {
 	return seg.replace(uuidPrefix, '') || 'file';
 }
 
-/** R2 ReadableStream â†’ Response() can 500 under SvelteKit/Miniflare; buffer modest files instead. */
+/** R2 ReadableStream â†?Response() can 500 under SvelteKit/Miniflare; buffer modest files instead. */
 const MAX_BUFFER_BYTES = 32 * 1024 * 1024;
 
 function asciiFileName(name: string): string {
@@ -111,3 +111,4 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 		return fail('Failed to read file from storage', 500, message);
 	}
 };
+

@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
+import { fail, ok } from '$platform/http';
 import { runReclassifyPipeline } from '$modules/document-intake/workflows/intake-pipeline/pipeline';
 import type { Bucket } from '$modules/document-intake/schemas/intake-field-specs';
 
@@ -33,3 +33,4 @@ export const POST: RequestHandler = async (event) => {
 	});
 	return ok(result);
 };
+

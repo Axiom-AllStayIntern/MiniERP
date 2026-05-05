@@ -8,8 +8,8 @@ Owns:
 - Target-layer schema barrel assembly
 
 Compatibility boundary:
-- `src/lib/server/db/index.ts` re-exports this layer for legacy callers
-- `src/lib/server/db/schema.ts` re-exports the schema barrel for legacy callers
+- `src/infrastructure/db/index.ts` re-exports this layer for legacy callers
+- `src/infrastructure/db/schema.ts` re-exports the schema barrel for legacy callers
 
 Does not own:
 - Business repository logic

@@ -1,12 +1,12 @@
 import type { RequestHandler } from './$types';
 
-import { createModuleContext } from '$lib/server/modules';
+import { createModuleContext } from '$platform/modules';
 import {
 	createDocumentIntakeApi,
 	createDocumentIntakeService
 } from '../../../../../modules/document-intake';
 import { getDb } from '../../../../../infrastructure/db';
-import { fail, ok } from '$lib/server/http';
+import { fail, ok } from '$platform/http';
 
 /**
  * GET /api/documents/[id]/status
@@ -49,3 +49,4 @@ export const GET: RequestHandler = async (event) => {
 
 	return fail('Document not found', 404);
 };
+

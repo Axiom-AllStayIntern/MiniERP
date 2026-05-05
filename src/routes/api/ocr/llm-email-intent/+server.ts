@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
-import { callExternalLlmJson } from '$lib/server/ocr/external-llm-json';
-import { fail, ok } from '$lib/server/http';
+import { callExternalLlmJson } from '$platform/ai/ocr/external-llm-json';
+import { fail, ok } from '$platform/http';
 
 type EmailType = 'invoice' | 'purchase_order' | 'quotation' | 'contract' | 'other';
 
@@ -18,7 +18,7 @@ export type EmailIntentResult = {
 	email_type: EmailType;
 	target_attachment_keywords: string[];
 	priority_attachment: string | null;
-	/** 0â€“1 */
+	/** 0â€? */
 	confidence: number;
 };
 
@@ -186,3 +186,4 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const fallback = heuristicIntent({ subject, sender, bodyPreview, attachmentNames });
 	return ok({ provider: 'heuristic', result: fallback });
 };
+

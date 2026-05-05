@@ -9,14 +9,14 @@ Target ownership:
 - Project staffing-facing HR entrypoints
 
 Current legacy implementation slices:
-- `src/lib/server/modules/employee`
-- `src/lib/server/modules/person`
+- `src/modules/legacy/server-modules/employee`
+- `src/modules/legacy/server-modules/person`
 
 Phase 4 bridge status:
 - Target-layer public entrypoints now live under `src/modules/hr`.
 - Employee/person handler registration now lives under `src/modules/hr/handlers.ts`.
 - The former compatibility entrypoints under
-  `src/lib/server/modules/{employee,person}/{api,index,handlers}.ts` have been
+  `src/modules/legacy/server-modules/{employee,person}/{api,index,handlers}.ts` have been
   retired after their caller count reached zero.
 - Internal ownership still remains in the legacy slices; Phase 4 only moves the
   public assembly boundary and defines the HR umbrella.

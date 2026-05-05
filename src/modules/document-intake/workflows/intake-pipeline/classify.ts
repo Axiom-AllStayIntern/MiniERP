@@ -1,18 +1,18 @@
 /**
- * Classify layer â€” decides the (bucket, docType, category) triple that
+ * Classify layer â€?decides the (bucket, docType, category) triple that
  * drives which extractor runs next.
  *
  * Two sequential LLM passes:
- *   1. classifyDocType         â†’ 7-way docType
- *   2. classifyExpenseCategory â†’ (expense only) refines to 11-way category
+ *   1. classifyDocType         â†?7-way docType
+ *   2. classifyExpenseCategory â†?(expense only) refines to 11-way category
  *
  * The classifier is imperfect (see user feedback on sales_cost.invoice
- * being mis-classified as opex.logistics) â€” the ReviewStep's Re-check
+ * being mis-classified as opex.logistics) â€?the ReviewStep's Re-check
  * button and the user-pill overrides exist precisely to recover from that.
  */
 
-import { classifyDocType, type DocType } from '$lib/server/ocr/classify';
-import { classifyExpenseCategory } from '$lib/server/ocr/classify-expense-category';
+import { classifyDocType, type DocType } from '$platform/ai/ocr/classify';
+import { classifyExpenseCategory } from '$platform/ai/ocr/classify-expense-category';
 import type { Bucket, CategoryDocType, ExpenseTypeT } from './types';
 
 export { classifyDocType };
@@ -34,7 +34,7 @@ export interface ClassifyIntakeResult {
 }
 
 /**
- * Combined classify â€” runs docType classifier, then (for expense bucket)
+ * Combined classify â€?runs docType classifier, then (for expense bucket)
  * the category classifier. Returns everything downstream layers need to
  * route to the right extractor.
  */

@@ -11,10 +11,10 @@
 	const money = (value: number | null, currency = 'SGD') =>
 		value != null
 			? new Intl.NumberFormat('en-SG', { style: 'currency', currency }).format(value)
-			: '—';
+			: '-';
 
 	const formatDate = (date: string | null) => {
-		if (!date) return '—';
+		if (!date) return '-';
 		return new Date(date).toLocaleDateString('en-SG', {
 			year: 'numeric',
 			month: 'short',
@@ -385,7 +385,7 @@
 				<h3 class="text-sm font-semibold text-slate-900">Other reference files</h3>
 				<p class="mt-0.5 text-xs text-slate-500">
 					Reference files <strong>not</strong> tied to a row in Contracts, Quotations, or Purchase Orders above (e.g. archive-only). Doc Hub quotations with a project appear under
-					<strong>Quotations</strong> only — they are no longer duplicated here.
+					<strong>Quotations</strong> only �?they are no longer duplicated here.
 				</p>
 				<p class="mt-1 text-xs text-slate-500">Click a row to open the file in a new tab.</p>
 			</div>
@@ -419,7 +419,7 @@
 								</span>
 								<span class="ml-1 text-[11px] text-slate-400">({docTypeLabel(doc.docType)})</span>
 							</td>
-							<td class="px-4 py-3 text-slate-500">—</td>
+							<td class="px-4 py-3 text-slate-500">-</td>
 						</tr>
 					{/each}
 				</tbody>
@@ -436,3 +436,5 @@
 		</div>
 	{/if}
 </div>
+
+

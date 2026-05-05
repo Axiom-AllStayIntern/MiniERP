@@ -5,12 +5,12 @@
  * Import this file once at app startup to make all modules available to
  * createModuleContext().
  */
-import { coreModule } from '../../lib/server/modules/core';
-import { businessPartnerModule } from '../../lib/server/modules/business-partner';
-import { arModule } from '../../lib/server/modules/ar';
-import { expenseModule } from '../../lib/server/modules/expense';
-import { taxModule } from '../../lib/server/modules/tax';
-import { reportingModule } from '../../lib/server/modules/reporting';
+import { coreModule } from '$modules/legacy/server-modules/core';
+import { businessPartnerModule } from '$modules/legacy/server-modules/business-partner';
+import { arModule } from '$modules/legacy/server-modules/ar';
+import { expenseModule } from '$modules/legacy/server-modules/expense';
+import { taxModule } from '$modules/legacy/server-modules/tax';
+import { reportingModule } from '$modules/legacy/server-modules/reporting';
 import { documentIntakeModule } from '../../modules/document-intake';
 import { employeeModule, personModule } from '../../modules/hr';
 import { projectModule } from '../../modules/project';

@@ -1,16 +1,16 @@
 /**
  * Receipt-shape extractor. Variants share field set but vary prompt
  * context to bias the LLM toward each scenario's likely fields.
- *   â€¢ transport      â€” Grab / taxi / MRT receipt
- *   â€¢ meal           â€” restaurant / cafe receipt
- *   â€¢ accommodation  â€” hotel / lodging receipt
- *   â€¢ gift           â€” gift shop / florist receipt
- *   â€¢ logistics      â€” courier / shipping receipt (trackingNumber key)
- *   â€¢ sales_cost     â€” formal payment receipt from a supplier
- *   â€¢ others         â€” generic business expense receipt
+ *   â€?transport      â€?Grab / taxi / MRT receipt
+ *   â€?meal           â€?restaurant / cafe receipt
+ *   â€?accommodation  â€?hotel / lodging receipt
+ *   â€?gift           â€?gift shop / florist receipt
+ *   â€?logistics      â€?courier / shipping receipt (trackingNumber key)
+ *   â€?sales_cost     â€?formal payment receipt from a supplier
+ *   â€?others         â€?generic business expense receipt
  */
 
-import { callAiJsonWithSource } from '$lib/server/services/ai-agent';
+import { callAiJsonWithSource } from '$platform/ai/json-provider';
 import type { ExtractedFields } from '../types';
 
 export type ReceiptVariant =
@@ -38,7 +38,7 @@ const BASE_RULES = `Rules:
 - supplierName = merchant / vendor / service provider name.
 - Currency: normalise S$â†’SGD, Â¥/RMBâ†’CNY, US$â†’USD, RMâ†’MYR, â‚¬â†’EUR.
 - staffName: only populate if a specific employee name appears on the receipt.
-- Be conservative â€” prefer null over guessing.`;
+- Be conservative â€?prefer null over guessing.`;
 
 function buildPrompt(variant: ReceiptVariant): string {
 	const common = `You extract fields from an OCR'd receipt. Return ONLY a JSON object with these exact keys. Use null for anything not clearly present.
@@ -50,7 +50,7 @@ ${BASE_RULES}`;
 	if (variant === 'transport') {
 		return `${common}
 
-Context: Transport expense receipt (Grab / Gojek / Uber / taxi / MRT / Comfort Delgro / ride-hail). supplierName = the ride-hail app or transport provider. trackingNumber is NOT relevant here â€” leave null.`;
+Context: Transport expense receipt (Grab / Gojek / Uber / taxi / MRT / Comfort Delgro / ride-hail). supplierName = the ride-hail app or transport provider. trackingNumber is NOT relevant here â€?leave null.`;
 	}
 	if (variant === 'meal') {
 		return `${common}
@@ -70,7 +70,7 @@ Context: Gift purchase receipt (gift shop / florist / FTD). supplierName = the s
 	if (variant === 'logistics') {
 		return `${common}
 
-Context: Courier / shipping / logistics receipt (DHL / FedEx / SingPost / UPS / SF Express / Ninja Van). supplierName = the courier. **trackingNumber is a KEY field** â€” look for "Tracking No.", "AWB", "Waybill", "Consignment No."`;
+Context: Courier / shipping / logistics receipt (DHL / FedEx / SingPost / UPS / SF Express / Ninja Van). supplierName = the courier. **trackingNumber is a KEY field** â€?look for "Tracking No.", "AWB", "Waybill", "Consignment No."`;
 	}
 	if (variant === 'sales_cost') {
 		return `${common}
@@ -109,7 +109,7 @@ function normCurrency(v: unknown): string | null {
 		'Â¥': 'CNY',
 		RMB: 'CNY',
 		RM: 'MYR',
-		'â‚¬': 'EUR'
+		EUR: 'EUR'
 	};
 	return aliases[up] ?? (up.length === 3 ? up : null);
 }

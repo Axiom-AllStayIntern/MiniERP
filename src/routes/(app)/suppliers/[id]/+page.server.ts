@@ -1,8 +1,8 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { createBusinessPartnerApi } from '$lib/server/modules/business-partner/api';
-import { createModuleContext } from '$lib/server/modules';
+import { createBusinessPartnerApi } from '$modules/legacy/server-modules/business-partner/api';
+import { createModuleContext } from '$platform/modules';
 
 export const load: PageServerLoad = async (event) => {
 	if (!event.platform) throw error(500, 'Cloudflare platform bindings are required');
@@ -55,4 +55,5 @@ export const actions: Actions = {
 		throw redirect(303, `/suppliers/${event.params.id}`);
 	}
 };
+
 

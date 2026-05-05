@@ -1,8 +1,8 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
-import { runOcrPipeline } from '$lib/server/ocr/pipeline';
-import { extractDocHubFields, type DocHubDocType } from '$lib/server/ocr/doc-hub-extract';
+import { fail, ok } from '$platform/http';
+import { runOcrPipeline } from '$platform/ai/ocr/pipeline';
+import { extractDocHubFields, type DocHubDocType } from '$platform/ai/ocr/doc-hub-extract';
 
 export const POST: RequestHandler = async ({ request, platform }) => {
 	if (!platform) return fail('Cloudflare platform bindings are required', 500);
@@ -69,7 +69,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		confidence: Math.round((pipeline.confidence || 0) * 100),
 		confidenceBand: pipeline.confidenceBand,
 		isImageFile: false,
-		message: pipeline.validationWarnings.length > 0 ? pipeline.validationWarnings.join('；') : null,
+		message: pipeline.validationWarnings.length > 0 ? pipeline.validationWarnings.join('; ') : null,
 		baseExtract: {
 			documentDate: pipeline.documentDate,
 			totalAmount: pipeline.totalAmount,
@@ -81,3 +81,5 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		extracted
 	});
 };
+
+

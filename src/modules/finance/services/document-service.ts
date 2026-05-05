@@ -1,8 +1,8 @@
 import { and, desc, eq, isNull, like, or, sql, type SQL } from 'drizzle-orm';
-import { buildDocumentMetadata, parseDocumentMetadata } from '$lib/server/document-metadata';
-import { resolveSgdEquivalentForWrite } from '$lib/server/fx/resolve-sgd-equivalent';
-import { objectExists } from '$lib/server/r2';
-import { r2FileUrls } from '$lib/server/r2-file-urls';
+import { buildDocumentMetadata, parseDocumentMetadata } from '$modules/finance/schemas/document-metadata';
+import { resolveSgdEquivalentForWrite } from '$modules/finance/services/fx/resolve-sgd-equivalent';
+import { objectExists } from '$infrastructure/storage/r2';
+import { r2FileUrls } from '$platform/files/r2-file-urls';
 import {
 	beginIdempotentRequest,
 	claimFileHash,
@@ -12,8 +12,8 @@ import {
 	normalizeProjectScope,
 	releaseFileHashClaim,
 	UploadGuardSchemaError
-} from '$lib/server/upload-guards';
-import type { ModuleContext } from '../../../lib/server/modules/types';
+} from '$platform/files/upload-guards';
+import type { ModuleContext } from '$platform/modules/types';
 import {
 	auditLogs,
 	contracts,

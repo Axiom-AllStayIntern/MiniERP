@@ -33,9 +33,9 @@
 			class="text-xs font-medium text-[var(--sf-green)] hover:underline"
 			onclick={() => goto(`${base}/employees`)}
 		>
-			← Back to roster
+			�?Back to roster
 		</button>
-		<a class="text-xs font-medium text-[var(--sf-green)] hover:underline" href={empHref}>Open employee master →</a>
+		<a class="text-xs font-medium text-[var(--sf-green)] hover:underline" href={empHref}>Open employee master -</a>
 	</div>
 
 	<section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -85,13 +85,13 @@
 		<div class="border-b border-slate-200/80 px-5 py-4">
 			<div class="flex flex-wrap items-center justify-between gap-3">
 				<div>
-					<h2 class="text-[13px] font-medium text-slate-900">Staff cost — {data.selectedMonthYm}</h2>
+					<h2 class="text-[13px] font-medium text-slate-900">Staff cost �?{data.selectedMonthYm}</h2>
 					<p class="mt-0.5 text-xs text-slate-500">Compare preview vs confirmed payouts for this assignment.</p>
 				</div>
 				<div class="flex items-center gap-2 text-xs">
-					<a class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-600 hover:bg-slate-50" href={monthHref(data.prevMonthYm)}>← Prev</a>
+					<a class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-600 hover:bg-slate-50" href={monthHref(data.prevMonthYm)}>�?Prev</a>
 					<span class="font-mono text-slate-700">{data.selectedMonthYm}</span>
-					<a class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-600 hover:bg-slate-50" href={monthHref(data.nextMonthYm)}>Next →</a>
+					<a class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-600 hover:bg-slate-50" href={monthHref(data.nextMonthYm)}>Next -</a>
 				</div>
 			</div>
 		</div>
@@ -159,7 +159,7 @@
 
 	<section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
 		<div class="border-b border-slate-200 px-5 py-4">
-			<h2 class="text-[13px] font-medium text-slate-900">Company pay — allocated slice (read-only)</h2>
+			<h2 class="text-[13px] font-medium text-slate-900">Company pay �?allocated slice (read-only)</h2>
 			<p class="mt-0.5 text-xs text-slate-500">
 				{#if data.allocationRow}
 					Weight on this project: <strong>{data.allocationRow.weightPct}%</strong> ({data.allocationRow.allocationMode}). Edit weights on the
@@ -196,7 +196,7 @@
 									{#if row.allocatedMonthly != null}
 										{money(row.allocatedMonthly)}
 									{:else}
-										<span class="text-slate-400">—</span>
+										<span class="text-slate-400">-</span>
 									{/if}
 								</td>
 							</tr>
@@ -208,7 +208,7 @@
 		<div class="border-t border-slate-100 px-5 py-4">
 			<p class="text-xs text-slate-500">
 				Editing is on the employee master. Use <strong>Settle month</strong> above to post amounts into payout history (read-only mirror rows
-				<code class="rounded bg-slate-100 px-1">[Company] …</code> are created automatically).
+				<code class="rounded bg-slate-100 px-1">[Company] -</code> are created automatically).
 			</p>
 		</div>
 	</section>
@@ -341,7 +341,7 @@
 								<td class="px-4 py-3 text-slate-600">{p.incomeType}</td>
 								<td class="px-4 py-3 text-slate-600">{p.source}</td>
 								<td class="px-4 py-3 text-slate-600">{p.status}</td>
-								<td class="px-4 py-3 text-slate-600">{p.note ?? '—'}</td>
+								<td class="px-4 py-3 text-slate-600">{p.note ?? '-'}</td>
 								<td class="px-4 py-3 text-right text-slate-800">{money(p.computedAmount)}</td>
 							</tr>
 						{/each}
@@ -351,3 +351,5 @@
 		{/if}
 	</section>
 </div>
+
+

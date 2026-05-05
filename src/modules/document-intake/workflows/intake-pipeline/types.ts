@@ -9,7 +9,7 @@
  */
 
 import type { Bucket } from '$modules/document-intake/schemas/intake-field-specs';
-import type { DocType } from '$lib/server/ocr/classify';
+import type { DocType } from '$platform/ai/ocr/classify';
 
 export type { Bucket, DocType };
 

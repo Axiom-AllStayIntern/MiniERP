@@ -1,5 +1,5 @@
 import type { DBClient } from '../../infrastructure/db';
-import { CompanySettingsRepository } from '../../lib/server/modules/core/repository';
+import { CompanySettingsRepository } from '$modules/legacy/server-modules/core/repository';
 import { registry } from '../registry';
 
 const PREFIX_TO_MODULE: Array<{ prefix: string; moduleId: string }> = [

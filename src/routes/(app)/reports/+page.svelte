@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageShell from '$lib/components/PageShell.svelte';
+	import PageShell from '$app-layer/components/PageShell.svelte';
 	let { data } = $props();
 
 	const money = (value: number) =>
@@ -196,3 +196,5 @@
 		</table>
 	</div>
 </PageShell>
+
+

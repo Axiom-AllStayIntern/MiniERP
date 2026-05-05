@@ -3,10 +3,10 @@ import { building } from '$app/environment';
 import { redirect } from '@sveltejs/kit';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 
-import { getAuth } from '$lib/server/auth/better-auth';
-import { resolveWorkerAuthEnv } from '$lib/server/auth/resolve-worker-env';
-import type { AuthRole } from '$lib/server/auth/config';
-import { isRouteAllowed } from '$lib/server/auth/permissions';
+import { getAuth } from '$platform/auth/better-auth';
+import { resolveWorkerAuthEnv } from '$platform/auth/resolve-worker-env';
+import type { AuthRole } from '$platform/auth/config';
+import { isRouteAllowed } from '$platform/auth/permissions';
 import { getDb } from './infrastructure/db';
 import { getEnabledModuleIds, isPathEnabled } from './platform/config';
 

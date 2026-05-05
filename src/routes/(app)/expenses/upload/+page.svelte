@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageShell from '$lib/components/PageShell.svelte';
+	import PageShell from '$app-layer/components/PageShell.svelte';
 	import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 	import {
 		isLegacyDocMimeOrName,
@@ -8,7 +8,7 @@
 		looksLikeZip,
 		shouldParseAsDocx,
 		tryExtractDocxPlainText
-	} from '$lib/docx/extract-plain-text';
+	} from '$platform/files/docx/extract-plain-text';
 	import {
 		EXPENSE_CATEGORY_OPTIONS,
 		CATEGORY_DOC_TYPE_MAP,
@@ -22,7 +22,7 @@
 		normalizeExpenseCurrency,
 		type ExpenseType,
 		type ExpenseCategory
-	} from '$lib/constants/expense-upload';
+	} from '$modules/finance/schemas/expense-upload';
 
 	let { data } = $props();
 
@@ -30,7 +30,7 @@
 	type ProjectInfo = { id: string; name: string; customerName: string | null; status: string; startDate: string | null; endDate: string | null };
 	let selectedProject = $state<ProjectInfo | null>(null);
 
-	/** Server resolves ?projectId=… (e.g. from project Expenses) and links the project automatically */
+	/** Server resolves ?projectId=�?(e.g. from project Expenses) and links the project automatically */
 	$effect(() => {
 		const incoming = data.preselectedProject;
 		if (incoming) selectedProject = incoming;
@@ -44,7 +44,7 @@
 	let projectSearching = $state(false);
 
 	const pageTitle = $derived(
-		selectedProject ? `Upload Expense — Project: ${selectedProject.name}` : 'Upload Expense'
+		selectedProject ? `Upload Expense �?Project: ${selectedProject.name}` : 'Upload Expense'
 	);
 
 	async function searchProjects() {
@@ -164,7 +164,7 @@
 			if (looksLikeLegacyWordDoc(buf) && !looksLikeZip(buf)) {
 				wordPreviewStatus = 'error';
 				wordPreviewError =
-					'Legacy Word (.doc) cannot be previewed or detected here. In Word use Save As → .docx, then upload.';
+					'Legacy Word (.doc) cannot be previewed or detected here. In Word use Save As �?.docx, then upload.';
 				wordPreviewText = '';
 				return;
 			}
@@ -182,7 +182,7 @@
 				return;
 			}
 			wordPreviewText =
-				t.length > 80_000 ? `${t.slice(0, 80_000)}\n\n… (preview truncated; detection still uses full text)` : t;
+				t.length > 80_000 ? `${t.slice(0, 80_000)}\n\n�?(preview truncated; detection still uses full text)` : t;
 			wordPreviewStatus = 'ready';
 		});
 		return () => {
@@ -359,7 +359,7 @@
 					if (text.trim().length >= 48) {
 						fd.set('rawText', text);
 					} else {
-						// Scanned PDF: render first page → Workers AI vision
+						// Scanned PDF: render first page �?Workers AI vision
 						const jpeg = await renderPdfFirstPageToJpeg(selectedFile);
 						if (jpeg) {
 							const baseName = fname.replace(/\.pdf$/i, '') || 'document';
@@ -609,7 +609,7 @@
 					{#if selectedProject.customerName}
 						<span class="text-emerald-600">({selectedProject.customerName})</span>
 					{/if}
-					<button type="button" class="ml-1 text-emerald-500 hover:text-emerald-800" onclick={clearProject} title="Unlink project">✕</button>
+					<button type="button" class="ml-1 text-emerald-500 hover:text-emerald-800" onclick={clearProject} title="Unlink project">-</button>
 				</span>
 			{/if}
 			<button
@@ -671,7 +671,7 @@
 				<!-- Allowance-specific fields -->
 				{#if isAllowance}
 					<div class="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
-						<p class="text-xs font-semibold text-amber-800">Trip daily allowance (no file — manual entry)</p>
+						<p class="text-xs font-semibold text-amber-800">Trip daily allowance (no file �?manual entry)</p>
 						<label class="block">
 							<span class="mb-1 block text-xs font-medium text-slate-700">Staff Name</span>
 							<select class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" bind:value={staffName}>
@@ -772,7 +772,7 @@
 			{#if metadataFieldDefs.length > 0 && !isAllowance}
 				<div class="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
 					<p class="text-xs font-semibold text-blue-800">
-						{CATEGORY_LABELS[category] ?? category} — extra fields
+						{CATEGORY_LABELS[category] ?? category} �?extra fields
 						<span class="ml-1 font-normal text-blue-600">(LLM may fill these; you can edit manually)</span>
 					</p>
 					<div class="grid gap-3 md:grid-cols-2">
@@ -854,7 +854,7 @@
 						disabled={uploading}
 						onclick={() => void upload()}
 					>
-						{uploading ? 'Saving…' : isAllowance ? 'Create Allowance' : 'Upload Document'}
+						{uploading ? 'Saving...' : isAllowance ? 'Create Allowance' : 'Upload Document'}
 					</button>
 					<a href="/expenses" class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Back</a>
 				</div>
@@ -888,7 +888,7 @@
 						onclick={() => setPreviewZoom(previewZoomPct - 10)}
 						title="Zoom out"
 					>
-						−
+						�?
 					</button>
 					<button
 						type="button"
@@ -949,7 +949,7 @@
 						disabled={detecting}
 						onclick={() => void runOcrDetect()}
 					>
-						{detecting ? 'Detecting…' : 'OCR + AI detect & fill'}
+						{detecting ? 'Detecting...' : 'OCR + AI detect & fill'}
 					</button>
 					<p class="text-[11px] text-slate-500 self-center">Optional; skip for fully manual entry. Detection does not save a record.</p>
 				</div>
@@ -958,7 +958,7 @@
 					Word (.docx) shows extracted body text here; detection uses that text (no vision OCR).
 				</p>
 				{#if wordPreviewStatus === 'loading'}
-					<p class="mt-4 text-sm text-slate-600">Reading Word text…</p>
+					<p class="mt-4 text-sm text-slate-600">Reading Word text-</p>
 				{:else if wordPreviewStatus === 'error'}
 					<p class="mt-4 text-sm text-rose-700">{wordPreviewError}</p>
 				{:else if wordPreviewStatus === 'ready' && wordPreviewText}
@@ -969,7 +969,7 @@
 							class="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
 							onclick={() => setPreviewZoom(previewZoomPct - 10)}
 						>
-							−
+							�?
 						</button>
 						<span class="text-xs tabular-nums text-slate-600">{previewZoomPct}%</span>
 						<button
@@ -996,7 +996,7 @@
 						disabled={detecting || wordPreviewStatus === 'loading' || wordPreviewStatus === 'error'}
 						onclick={() => void runOcrDetect()}
 					>
-						{detecting ? 'Detecting…' : 'Detect & fill'}
+						{detecting ? 'Detecting...' : 'Detect & fill'}
 					</button>
 					<p class="text-[11px] text-slate-500 self-center">Full .docx text is sent to the model for field parsing.</p>
 				</div>
@@ -1011,7 +1011,7 @@
 						disabled={detecting}
 						onclick={() => void runOcrDetect()}
 					>
-						{detecting ? 'Detecting…' : 'OCR + AI detect & fill'}
+						{detecting ? 'Detecting...' : 'OCR + AI detect & fill'}
 					</button>
 				</div>
 			{:else if needsFile}
@@ -1020,8 +1020,8 @@
 
 			<h2 class="mt-6 text-sm font-semibold text-slate-900">Save result</h2>
 			<div class="mt-2 space-y-1 text-xs text-slate-600">
-				<p><span class="font-medium text-slate-800">Document ID:</span> {uploadedDocumentId ?? '—'}</p>
-				<p><span class="font-medium text-slate-800">Expense ID:</span> {expenseId ?? '—'}</p>
+				<p><span class="font-medium text-slate-800">Document ID:</span> {uploadedDocumentId ?? '-'}</p>
+				<p><span class="font-medium text-slate-800">Expense ID:</span> {expenseId ?? '-'}</p>
 				{#if expenseId}
 					<p><a class="text-[var(--sf-green)] hover:underline" href="/expenses">View in expense list</a></p>
 				{/if}
@@ -1030,7 +1030,7 @@
 			{#if detectRawText || (detectSnapshot !== null)}
 				<details class="mt-4 rounded-lg border border-slate-200 bg-slate-50" open={!!detectRawText}>
 					<summary class="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100/80">
-						OCR text ({detectRawText.length} chars) — click to expand/collapse
+						OCR text ({detectRawText.length} chars) �?click to expand/collapse
 					</summary>
 					{#if detectRawText}
 						<pre class="max-h-64 overflow-auto whitespace-pre-wrap break-words border-t border-slate-200 px-3 py-2 text-[11px] leading-relaxed text-slate-700">{detectRawText}</pre>
@@ -1058,7 +1058,7 @@
 			<!-- Header -->
 			<div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
 				<h2 class="text-sm font-semibold text-slate-900">Select Project</h2>
-				<button type="button" class="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onclick={() => { showProjectPicker = false; }}>✕</button>
+				<button type="button" class="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onclick={() => { showProjectPicker = false; }}>-</button>
 			</div>
 
 			<!-- Filters -->
@@ -1092,7 +1092,7 @@
 						class="h-10 self-end rounded border border-[var(--sf-green)] bg-[var(--sf-green)] px-4 text-sm font-medium text-white hover:bg-[#2f5e2c]"
 						onclick={() => void searchProjects()}
 					>
-						{projectSearching ? 'Searching…' : 'Apply'}
+						{projectSearching ? 'Searching...' : 'Apply'}
 					</button>
 				</div>
 			</div>
@@ -1101,7 +1101,7 @@
 			<div class="max-h-[50vh] overflow-auto px-5 py-3">
 				{#if projectSearchResults.length === 0}
 					<p class="py-6 text-center text-sm text-slate-400">
-						{projectSearching ? 'Searching…' : 'No projects found. Try a different search.'}
+						{projectSearching ? 'Searching...' : 'No projects found. Try a different search.'}
 					</p>
 				{:else}
 					<p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Matched projects</p>
@@ -1123,11 +1123,11 @@
 											<p class="font-medium text-slate-800">{p.name}</p>
 											<p class="text-[11px] text-slate-400">{p.id}</p>
 										</td>
-										<td class="px-3 py-2">{p.customerName ?? '—'}</td>
+										<td class="px-3 py-2">{p.customerName ?? '-'}</td>
 										<td class="px-3 py-2">
 											<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">{p.status}</span>
 										</td>
-										<td class="px-3 py-2">{p.startDate ?? '—'} / {p.endDate ?? '—'}</td>
+										<td class="px-3 py-2">{p.startDate ?? '-'} / {p.endDate ?? '-'}</td>
 										<td class="px-3 py-2">
 											<button
 												type="button"
@@ -1162,3 +1162,5 @@
 		</div>
 	</div>
 {/if}
+
+

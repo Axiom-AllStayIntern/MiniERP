@@ -1,4 +1,4 @@
-import { ProjectService } from '../../../lib/server/modules/project/service';
+import { ProjectService } from '$modules/legacy/server-modules/project/service';
 
 type LegacyProjectService = InstanceType<typeof ProjectService>;
 

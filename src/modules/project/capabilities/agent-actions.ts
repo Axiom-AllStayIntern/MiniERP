@@ -1,4 +1,4 @@
-import type { AgentAction } from '../../../lib/server/agent/types';
+import type { AgentAction } from '$platform/ai/legacy-agent/types';
 
 export const projectActions: AgentAction[] = [
 	{

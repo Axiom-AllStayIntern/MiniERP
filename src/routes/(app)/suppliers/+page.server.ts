@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 
-import { createBusinessPartnerApi } from '$lib/server/modules/business-partner/api';
-import { createModuleContext } from '$lib/server/modules';
+import { createBusinessPartnerApi } from '$modules/legacy/server-modules/business-partner/api';
+import { createModuleContext } from '$platform/modules';
 
 export const load: PageServerLoad = async (event) => {
 	const q = (event.url.searchParams.get('q') ?? '').trim().toLowerCase();
@@ -88,3 +88,4 @@ export const load: PageServerLoad = async (event) => {
 		suppliers: filtered
 	};
 };
+

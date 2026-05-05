@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
-	import PageShell from '$lib/components/PageShell.svelte';
+	import PageShell from '$app-layer/components/PageShell.svelte';
 	import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 	let { data } = $props();
@@ -21,7 +21,7 @@
 
 	let selectedProject = $state<ProjectInfo | null>(null);
 
-	/** Server resolves ?projectId=… and links the project when the page loads */
+	/** Server resolves ?projectId=�?and links the project when the page loads */
 	$effect(() => {
 		const incoming = data.preselectedProject;
 		if (incoming) selectedProject = incoming;
@@ -70,7 +70,7 @@
 	let poLineItems = $state('');
 
 	const pageTitle = $derived(
-		selectedProject ? `Upload Document — Project: ${selectedProject.name}` : 'Upload Document'
+		selectedProject ? `Upload Document �?Project: ${selectedProject.name}` : 'Upload Document'
 	);
 
 	$effect(() => {
@@ -315,7 +315,7 @@
 					if (text.trim().length >= 48) {
 						fd.set('rawText', text);
 					} else {
-						// Scanned PDF: render first page → Workers AI vision
+						// Scanned PDF: render first page �?Workers AI vision
 						const jpeg = await renderPdfFirstPageToJpeg(selectedFile);
 						if (jpeg) {
 							const baseName = fname.replace(/\.pdf$/i, '') || 'document';
@@ -346,8 +346,8 @@
 				applyExtracted(data);
 				const warn = data.message ? `\nNote: ${data.message}` : '';
 				const filled = data.extracted
-					? 'Fields were prefilled automatically — review before saving.'
-					: 'Text was extracted but the LLM returned no structured fields — fill the form manually.';
+					? 'Fields were prefilled automatically �?review before saving.'
+					: 'Text was extracted but the LLM returned no structured fields �?fill the form manually.';
 				message = filled + warn;
 			}
 		} catch (e) {
@@ -432,7 +432,7 @@
 				<span class="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800">
 					{selectedProject.name}
 					{#if selectedProject.customerName}<span class="text-emerald-600">({selectedProject.customerName})</span>{/if}
-					<button type="button" class="ml-1 text-emerald-500 hover:text-emerald-800" onclick={clearProject} title="Unlink project">✕</button>
+					<button type="button" class="ml-1 text-emerald-500 hover:text-emerald-800" onclick={clearProject} title="Unlink project">-</button>
 				</span>
 			{/if}
 			<button type="button" class="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50" onclick={() => { showProjectPicker = true; void searchProjects(); }}>
@@ -495,8 +495,8 @@
 				<label class="block"><span class="mb-1 block text-xs font-medium text-slate-700">Notes</span><input class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" bind:value={notes} /></label>
 				<div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><p class="text-xs font-semibold text-slate-700">Payload Preview</p><pre class="mt-2 overflow-x-auto text-[11px] leading-relaxed text-slate-700">{JSON.stringify(buildExtractedPayload(), null, 2)}</pre></div>
 				<div class="flex items-center gap-2">
-					<button type="button" class="rounded-md border border-[var(--sf-green)] bg-[var(--sf-green-soft)] px-3 py-2 text-xs font-medium text-[var(--sf-green)] hover:bg-[#dcefd8] disabled:opacity-50" disabled={extracting || !selectedFile} onclick={() => void runDetect()}>{extracting ? 'Extracting…' : 'Extract text'}</button>
-					<button type="button" class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c] disabled:opacity-50" disabled={uploading || !selectedFile} onclick={() => void upload()}>{uploading ? 'Saving…' : 'Upload Files'}</button>
+					<button type="button" class="rounded-md border border-[var(--sf-green)] bg-[var(--sf-green-soft)] px-3 py-2 text-xs font-medium text-[var(--sf-green)] hover:bg-[#dcefd8] disabled:opacity-50" disabled={extracting || !selectedFile} onclick={() => void runDetect()}>{extracting ? 'Extracting...' : 'Extract text'}</button>
+					<button type="button" class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c] disabled:opacity-50" disabled={uploading || !selectedFile} onclick={() => void upload()}>{uploading ? 'Saving...' : 'Upload Files'}</button>
 				</div>
 				{#if message}<p class="text-sm text-emerald-700">{message}</p>{/if}
 				{#if error}<p class="text-sm text-rose-700">{error}</p>{/if}
@@ -508,7 +508,7 @@
 			{#if selectedFile && previewUrl}
 				<div class="mt-3 flex flex-wrap items-center gap-2">
 					<span class="text-[11px] font-medium text-slate-500">Zoom</span>
-					<button type="button" class="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={previewZoomPct <= 50} onclick={() => setPreviewZoom(previewZoomPct - 10)}>−</button>
+					<button type="button" class="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={previewZoomPct <= 50} onclick={() => setPreviewZoom(previewZoomPct - 10)}>-</button>
 					<button type="button" class="rounded border border-slate-300 bg-white px-2 py-1 text-xs tabular-nums text-slate-700 hover:bg-slate-50" onclick={() => { previewZoomPct = 100; }}>{previewZoomPct}%</button>
 					<button type="button" class="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40" disabled={previewZoomPct >= 200} onclick={() => setPreviewZoom(previewZoomPct + 10)}>+</button>
 					<a href={previewUrl} target="_blank" rel="noreferrer" class="ml-auto text-xs font-medium text-[var(--sf-green)] hover:underline">Open in new tab</a>
@@ -529,8 +529,8 @@
 			{/if}
 			<h2 class="mt-6 text-sm font-semibold text-slate-900">Save result</h2>
 			<div class="mt-2 space-y-1 text-xs text-slate-600">
-				<p><span class="font-medium text-slate-800">Document ID:</span> {documentId ?? '—'}</p>
-				<p><span class="font-medium text-slate-800">Entity ID:</span> {entityId ?? '—'}</p>
+				<p><span class="font-medium text-slate-800">Document ID:</span> {documentId ?? '-'}</p>
+				<p><span class="font-medium text-slate-800">Entity ID:</span> {entityId ?? '-'}</p>
 			</div>
 			<h2 class="mt-4 text-sm font-semibold text-slate-900">Extracted text</h2>
 			<pre class="mt-2 max-h-48 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-700">{rawText || 'Not extracted yet'}</pre>
@@ -541,25 +541,25 @@
 {#if showProjectPicker}
 	<div class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[8vh]" role="dialog" aria-modal="true">
 		<div class="w-full max-w-3xl rounded-xl border border-slate-200 bg-white shadow-xl">
-			<div class="flex items-center justify-between border-b border-slate-200 px-5 py-3"><h2 class="text-sm font-semibold text-slate-900">Select Project</h2><button type="button" class="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onclick={() => { showProjectPicker = false; }}>✕</button></div>
+			<div class="flex items-center justify-between border-b border-slate-200 px-5 py-3"><h2 class="text-sm font-semibold text-slate-900">Select Project</h2><button type="button" class="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onclick={() => { showProjectPicker = false; }}>-</button></div>
 			<div class="border-b border-slate-100 px-5 py-3">
 				<div class="grid gap-3 lg:grid-cols-[2fr_1fr_1.3fr_auto]">
 					<label class="space-y-1"><span class="text-xs font-medium text-slate-600">Project search</span><input class="w-full rounded border border-slate-300 px-3 py-2 text-sm" placeholder="Project name / Project ID / Customer name" bind:value={projectSearchQ} onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void searchProjects(); } }} /></label>
 					<label class="space-y-1"><span class="text-xs font-medium text-slate-600">Status</span><select class="w-full rounded border border-slate-300 px-3 py-2 text-sm" bind:value={projectSearchStatus}><option value="">All status</option><option value="active">active</option><option value="on_hold">on_hold</option><option value="completed">completed</option><option value="archived">archived</option></select></label>
 					<label class="space-y-1"><span class="text-xs font-medium text-slate-600">Started on or after</span><input class="w-full rounded border border-slate-300 px-3 py-2 text-sm" type="date" bind:value={projectSearchStartedAfter} /></label>
-					<button type="button" class="h-10 self-end rounded border border-[var(--sf-green)] bg-[var(--sf-green)] px-4 text-sm font-medium text-white hover:bg-[#2f5e2c]" onclick={() => void searchProjects()}>{projectSearching ? 'Searching…' : 'Apply'}</button>
+					<button type="button" class="h-10 self-end rounded border border-[var(--sf-green)] bg-[var(--sf-green)] px-4 text-sm font-medium text-white hover:bg-[#2f5e2c]" onclick={() => void searchProjects()}>{projectSearching ? 'Searching...' : 'Apply'}</button>
 				</div>
 			</div>
 			<div class="max-h-[50vh] overflow-auto px-5 py-3">
 				{#if projectSearchResults.length === 0}
-					<p class="py-6 text-center text-sm text-slate-400">{projectSearching ? 'Searching…' : 'No projects found. Try a different search.'}</p>
+					<p class="py-6 text-center text-sm text-slate-400">{projectSearching ? 'Searching...' : 'No projects found. Try a different search.'}</p>
 				{:else}
 					<div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
 						<table class="min-w-full divide-y divide-slate-200 text-xs">
 							<thead class="bg-slate-50 text-left text-slate-600"><tr><th class="px-3 py-2">Project</th><th class="px-3 py-2">Customer</th><th class="px-3 py-2">Status</th><th class="px-3 py-2">Start / End</th><th class="px-3 py-2">Action</th></tr></thead>
 							<tbody class="divide-y divide-slate-100">
 								{#each projectSearchResults as p (p.id)}
-									<tr class="hover:bg-slate-50/80"><td class="px-3 py-2"><p class="font-medium text-slate-800">{p.name}</p><p class="text-[11px] text-slate-400">{p.id}</p></td><td class="px-3 py-2">{p.customerName ?? '—'}</td><td class="px-3 py-2">{p.status}</td><td class="px-3 py-2">{p.startDate ?? '—'} / {p.endDate ?? '—'}</td><td class="px-3 py-2"><button type="button" class="rounded border border-[var(--sf-green)] bg-[var(--sf-green-soft)] px-2 py-1 text-[var(--sf-green)] hover:bg-[#dcefd8]" onclick={() => pickProject(p)}>Select</button></td></tr>
+									<tr class="hover:bg-slate-50/80"><td class="px-3 py-2"><p class="font-medium text-slate-800">{p.name}</p><p class="text-[11px] text-slate-400">{p.id}</p></td><td class="px-3 py-2">{p.customerName ?? '-'}</td><td class="px-3 py-2">{p.status}</td><td class="px-3 py-2">{p.startDate ?? '-'} / {p.endDate ?? '-'}</td><td class="px-3 py-2"><button type="button" class="rounded border border-[var(--sf-green)] bg-[var(--sf-green-soft)] px-2 py-1 text-[var(--sf-green)] hover:bg-[#dcefd8]" onclick={() => pickProject(p)}>Select</button></td></tr>
 								{/each}
 							</tbody>
 						</table>
@@ -569,3 +569,5 @@
 		</div>
 	</div>
 {/if}
+
+

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import PageShell from '$lib/components/PageShell.svelte';
-	import StorageTextPreview from '$lib/components/StorageTextPreview.svelte';
-	import { CATEGORY_LABELS, EXPENSE_CATEGORY_OPTIONS } from '$lib/constants/expense-upload';
+	import PageShell from '$app-layer/components/PageShell.svelte';
+	import StorageTextPreview from '$app-layer/components/StorageTextPreview.svelte';
+	import { CATEGORY_LABELS, EXPENSE_CATEGORY_OPTIONS } from '$modules/finance/schemas/expense-upload';
 
 	let { data, form } = $props();
 
@@ -10,7 +10,7 @@
 		new Intl.NumberFormat('en-SG', { style: 'currency', currency: data.expense.currency ?? 'SGD' }).format(value ?? 0);
 
 	const fmtWhen = (iso: string | undefined) => {
-		if (!iso) return '—';
+		if (!iso) return '-';
 		const d = new Date(iso);
 		return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-SG');
 	};
@@ -26,7 +26,7 @@
 				class="text-xs font-medium text-[var(--sf-green)] hover:underline"
 				onclick={() => goto('/expenses')}
 			>
-				← Back to company expenses
+				�?Back to company expenses
 			</button>
 		</div>
 
@@ -64,15 +64,15 @@
 				</div>
 				<div class="bg-white px-5 py-3">
 					<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Vendor / Supplier</p>
-					<p class="mt-1 text-sm text-slate-900">{data.expense.vendorOrSupplier ?? '—'}</p>
+					<p class="mt-1 text-sm text-slate-900">{data.expense.vendorOrSupplier ?? '-'}</p>
 				</div>
 				<div class="bg-white px-5 py-3">
 					<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Staff</p>
-					<p class="mt-1 text-sm text-slate-900">{data.expense.staffName ?? '—'}</p>
+					<p class="mt-1 text-sm text-slate-900">{data.expense.staffName ?? '-'}</p>
 				</div>
 				<div class="bg-white px-5 py-3">
 					<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Project</p>
-					<p class="mt-1 text-sm text-slate-500">—</p>
+					<p class="mt-1 text-sm text-slate-500">-</p>
 				</div>
 				<div class="bg-white px-5 py-3 sm:col-span-2">
 					<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Document Ref</p>
@@ -264,3 +264,5 @@
 		</details>
 	</div>
 </PageShell>
+
+

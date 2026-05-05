@@ -20,8 +20,8 @@
 
 import type { RequestEvent } from '@sveltejs/kit';
 
-import { createModuleContext } from '$lib/server/modules';
-import { normalizeDocTypeHint } from '$lib/server/ocr/classify';
+import { createModuleContext } from '$platform/modules';
+import { normalizeDocTypeHint } from '$platform/ai/ocr/classify';
 import { resolveKindSelection } from '$modules/document-intake/schemas/intake-field-specs';
 import { createProjectApi } from '$modules/project';
 

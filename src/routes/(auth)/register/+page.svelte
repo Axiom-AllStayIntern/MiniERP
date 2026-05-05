@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { authClient } from '$lib/auth-client';
+	import { authClient } from '$platform/auth/client';
 
 	let name = $state('');
 	let email = $state('');
@@ -84,7 +84,7 @@
 					disabled={loading}
 					class="w-full rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2f5e2c] disabled:opacity-60"
 				>
-					{loading ? 'Creating…' : 'Register'}
+					{loading ? 'Creating...' : 'Register'}
 				</button>
 			</form>
 			<p class="mt-4 text-center text-sm text-slate-600">
@@ -94,3 +94,5 @@
 		{/if}
 	</div>
 </main>
+
+

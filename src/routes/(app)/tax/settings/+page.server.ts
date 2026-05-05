@@ -1,8 +1,8 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { createCoreApi } from '$lib/server/modules/core';
-import { createModuleContext } from '$lib/server/modules';
+import { createCoreApi } from '$modules/legacy/server-modules/core';
+import { createModuleContext } from '$platform/modules';
 import { createFinanceApi } from '../../../../modules/finance';
 
 const MANUAL_BOX_KEYS = ['gst_box9_manual', 'gst_box10_manual', 'gst_box11_manual', 'gst_box12_manual'] as const;
@@ -90,4 +90,5 @@ export const actions: Actions = {
 		return { ok: true, year, quarter };
 	}
 };
+
 

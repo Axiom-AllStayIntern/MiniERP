@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 
-import { createModuleContext, NotFoundError } from '$lib/server/modules';
+import { createModuleContext, NotFoundError } from '$platform/modules';
 import { createProjectApi } from '../../../../modules/project';
 
 export const load: LayoutServerLoad = async (event) => {
@@ -22,3 +22,4 @@ export const load: LayoutServerLoad = async (event) => {
 		throw e;
 	}
 };
+

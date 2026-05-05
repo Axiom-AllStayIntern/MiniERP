@@ -1,8 +1,8 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
+import { fail, ok } from '$platform/http';
 import { hashConfirmationPayload } from '$platform/workflow/payload-hash';
-import { createModuleContext } from '$lib/server/modules';
+import { createModuleContext } from '$platform/modules';
 import { getDb } from '../../../../../../infrastructure/db';
 import { financeAgentManifest } from '../../../../../../modules/finance/agent';
 import { suggestNextFinanceTaskCapability } from '../../../../../../modules/finance/capabilities/suggest-next-task';
@@ -415,3 +415,4 @@ export const POST: RequestHandler = async (event) => {
 		nextTask: suggestion.task
 	});
 };
+

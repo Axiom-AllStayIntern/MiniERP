@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
-import { extractDocxPlainText, tryExtractDocxPlainText } from '$lib/docx/extract-plain-text';
+import { fail, ok } from '$platform/http';
+import { extractDocxPlainText, tryExtractDocxPlainText } from '$platform/files/docx/extract-plain-text';
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const MAX_CHARS = 120_000;
@@ -79,3 +79,4 @@ export const GET: RequestHandler = async ({ platform, url }) => {
 	const out = truncated ? trimmed.slice(0, MAX_CHARS) : trimmed;
 	return ok({ text: out, truncated, empty: false as const });
 };
+

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import StorageTextPreview from '$lib/components/StorageTextPreview.svelte';
+	import StorageTextPreview from '$app-layer/components/StorageTextPreview.svelte';
 
 	let { data } = $props();
 	const base = $derived(`/projects/${data.revenue.projectId}`);
@@ -11,7 +11,7 @@
 		);
 
 	const fmtWhen = (iso: string | undefined) => {
-		if (!iso) return '—';
+		if (!iso) return '-';
 		const d = new Date(iso);
 		return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-SG');
 	};
@@ -30,7 +30,7 @@
 			class="text-xs font-medium text-[var(--sf-green)] hover:underline"
 			onclick={() => goto(`${base}/documents`)}
 		>
-			← Back to documents
+			�?Back to documents
 		</button>
 		<a
 			class="text-xs font-medium text-slate-500 hover:text-[var(--sf-green)] hover:underline"
@@ -56,7 +56,7 @@
 			</div>
 			<div class="bg-white px-5 py-3">
 				<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Customer</p>
-				<p class="mt-1 text-sm text-slate-900">{data.revenue.clientName ?? '—'}</p>
+				<p class="mt-1 text-sm text-slate-900">{data.revenue.clientName ?? '-'}</p>
 			</div>
 			<div class="bg-white px-5 py-3">
 				<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Amount</p>
@@ -146,3 +146,5 @@
 		</div>
 	</section>
 </div>
+
+

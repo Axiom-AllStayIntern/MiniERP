@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
+import { fail, ok } from '$platform/http';
 import { financeAgentManifest } from '../../../../modules/finance/agent';
 import { vendorInvoiceIntakeWorkflow } from '../../../../modules/finance/workflows/vendor-invoice-intake';
 import { financialDocumentIntakeWorkflow } from '../../../../modules/finance/workflows/financial-document-intake';
@@ -82,3 +82,4 @@ export const POST: RequestHandler = async (event) => {
 		201
 	);
 };
+

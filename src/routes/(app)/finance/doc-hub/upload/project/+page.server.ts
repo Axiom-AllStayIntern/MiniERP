@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 
-import { createModuleContext } from '$lib/server/modules';
+import { createModuleContext } from '$platform/modules';
 import { createProjectApi } from '../../../../../../modules/project';
 
 export const load: PageServerLoad = async (event) => {
@@ -41,3 +41,4 @@ export const load: PageServerLoad = async (event) => {
 		preselectedProject
 	};
 };
+

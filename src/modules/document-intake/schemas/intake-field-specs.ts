@@ -358,7 +358,7 @@ export function getFieldSpecs(ctx: Ctx): FieldSpec[] {
 
 	// --- Document Only ---------------------------------------------------
 	// Field ids use camelCase to match the kitchen-sink extractor (see
-	// $lib/server/ocr/extract-intake.ts). The save endpoint translates to
+	// $platform/ai/ocr/extract-intake.ts). The save endpoint translates to
 	// DB snake_case columns at write time.
 	if (docType === 'contract') {
 		return [

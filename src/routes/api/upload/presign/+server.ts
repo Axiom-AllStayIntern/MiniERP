@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
-import { createUploadTarget } from '$lib/server/r2';
-import { fail, ok } from '$lib/server/http';
+import { createUploadTarget } from '$infrastructure/storage/r2';
+import { fail, ok } from '$platform/http';
 
 export const POST: RequestHandler = async ({ request, platform }) => {
 	if (!platform) {
@@ -30,3 +30,4 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 	return ok(target, 201);
 };
+

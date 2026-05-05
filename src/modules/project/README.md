@@ -9,7 +9,7 @@ Target ownership:
 - Project agent metadata and route-facing entrypoints
 
 Current legacy implementation slices:
-- `src/lib/server/modules/project`
+- `src/modules/legacy/server-modules/project`
 
 Current target-layer structure:
 - `app/`: workspace and navigation metadata
@@ -34,7 +34,7 @@ Current bridge status:
 - Root files such as `api.ts`, `contracts.ts`, `adapters.ts`, and `handlers.ts`
   are now thin compatibility shells over the deeper target-layer structure.
 - The former compatibility entrypoints under
-  `src/lib/server/modules/project/{api,index,handlers}.ts` have been retired
+  `src/modules/legacy/server-modules/project/{api,index,handlers}.ts` have been retired
   after their caller count reached zero.
 - Target-owned read/runtime ownership has now started for:
   `getById`,

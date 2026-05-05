@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import PageShell from '$lib/components/PageShell.svelte';
-	import { EXPENSE_CATEGORY_OPTIONS, CATEGORY_LABELS, type ExpenseType } from '$lib/constants/expense-upload';
+	import PageShell from '$app-layer/components/PageShell.svelte';
+	import { EXPENSE_CATEGORY_OPTIONS, CATEGORY_LABELS, type ExpenseType } from '$modules/finance/schemas/expense-upload';
 
 	let { data } = $props();
 
@@ -9,7 +9,7 @@
 		new Intl.NumberFormat('en-SG', { style: 'currency', currency }).format(value ?? 0);
 
 	const formatDate = (date: string | null) => {
-		if (!date) return '—';
+		if (!date) return '-';
 		return new Date(date).toLocaleDateString('en-SG', {
 			year: 'numeric',
 			month: 'short',
@@ -34,7 +34,7 @@
 	};
 
 	const gstCell = (gst: number | null | undefined, currency: string) => {
-		if (gst == null || gst === 0) return '—';
+		if (gst == null || gst === 0) return '-';
 		return money(gst, currency);
 	};
 
@@ -68,7 +68,7 @@
 <PageShell
 	eyebrow="Finance"
 	title="Company Expenses"
-	description="Manage all expenses — operating costs and sales costs."
+	description="Manage all expenses �?operating costs and sales costs."
 >
 	<!-- Summary cards -->
 	<div class="grid grid-cols-2 gap-4 md:grid-cols-3">
@@ -176,7 +176,7 @@
 								{/if}
 							</td>
 							<td class="max-w-[180px] truncate px-4 py-3 text-slate-600" title={expense.projectName ?? ''}>
-								{expense.projectName ?? '—'}
+								{expense.projectName ?? '-'}
 							</td>
 							<td class="px-4 py-3 text-right text-slate-600">
 								{gstCell(expense.gstAmount, expense.currency)}
@@ -187,7 +187,7 @@
 								</span>
 							</td>
 							<td class="max-w-[200px] truncate px-4 py-3 text-xs text-slate-500" title={expense.notes ?? ''}>
-								{expense.notes || '—'}
+								{expense.notes || '-'}
 							</td>
 							<td class="px-4 py-3 text-right">
 								{#if expense.hasAttachment}
@@ -199,7 +199,7 @@
 										View
 									</a>
 								{:else}
-									<span class="text-slate-400">—</span>
+									<span class="text-slate-400">-</span>
 								{/if}
 							</td>
 						</tr>
@@ -368,3 +368,5 @@
 		</div>
 	</div>
 {/if}
+
+

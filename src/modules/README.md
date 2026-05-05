@@ -22,7 +22,7 @@ Each module should eventually own:
 - Events
 - Module config and manifest
 
-Phase 1 does not move existing runtime code out of `src/lib/server/modules`.
+Phase 1 does not move existing runtime code out of `src/modules/legacy/server-modules`.
 This directory records the target boundaries and compatibility path.
 
 Phase 4 starts moving active public entrypoint assembly for `project`, `hr`,

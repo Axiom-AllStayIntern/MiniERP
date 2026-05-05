@@ -5,7 +5,7 @@ import {
 	allocationPeriodDay,
 	periodCalendarMonth,
 	shadowCompensationComponentId
-} from '../../lib/server/modules/employee/service';
+} from '$modules/legacy/server-modules/employee/service';
 
 export {
 	staffCostPayoutStatuses,
@@ -13,7 +13,7 @@ export {
 	staffCostPayoutJoinConditions,
 	staffCostSumExpr,
 	staffCostPeriodBetween
-} from '../../lib/server/modules/employee/repository';
+} from '$modules/legacy/server-modules/employee/repository';
 
 export { allocationPeriodDay, periodCalendarMonth, shadowCompensationComponentId };
 
@@ -233,7 +233,7 @@ export async function settleCompanyAllocationMonth(params: {
 			)
 			.limit(1);
 
-		const note = `${ecc.label} è„³ ${weightPct}% (company éˆ«?project)`;
+		const note = `${ecc.label} è„�?${weightPct}% (company éˆ«?project)`;
 
 		if (existingPayout) {
 			await db

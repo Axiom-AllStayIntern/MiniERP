@@ -1,8 +1,8 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
-import { callAiJsonWithSource, type AiProviderUsed } from '$lib/server/services/ai-agent';
-import { applyExtractAliases, llmExtractionHasUsableSignal } from '$lib/server/ocr/llm-json-normalize';
+import { fail, ok } from '$platform/http';
+import { callAiJsonWithSource, type AiProviderUsed } from '$platform/ai/json-provider';
+import { applyExtractAliases, llmExtractionHasUsableSignal } from '$platform/ai/ocr/llm-json-normalize';
 
 type DocType =
 	| 'contract'
@@ -76,7 +76,7 @@ type LlmExtractionResult = {
 	expenseReceiptNumber?: string | null;
 	/** Payment method hint from receipt (e.g. GrabPay, VISA **1234, cash) */
 	expensePaymentMethodHint?: string | null;
-	/** Per extracted field: 0â€“100 (model or heuristic). Keys match JSON field names (e.g. supplierName). */
+	/** Per extracted field: 0â€?00 (model or heuristic). Keys match JSON field names (e.g. supplierName). */
 	fieldConfidence?: Record<string, number>;
 	/** Optional overall band (legacy / summary). */
 	confidence?: 'low' | 'medium' | 'high';
@@ -291,7 +291,7 @@ Document type: ${docType}
 ${invoiceRole ? `\n${invoiceRole}\n` : ''}
 For contract return keys:
 contractNo, contractDate, contractAmount, contractCurrency, contractPartyA, contractPartyB, contractStartDate, contractEndDate, contractPaymentTerms, fieldConfidence, confidence (optional)
-- For Chinese-labeled contracts: first party / Party A â†’ contractPartyA; second party / Party B â†’ contractPartyB; stated contract total â†’ contractAmount
+- For Chinese-labeled contracts: first party / Party A â†?contractPartyA; second party / Party B â†?contractPartyB; stated contract total â†?contractAmount
 
 For purchase_order return keys:
 poNumber, poDate, poCurrency, supplierName, contractAmount, fieldConfidence, confidence (optional)
@@ -302,7 +302,7 @@ quotationRef, quotationDate, quotationAmount, quotationCurrency, sourceType, cus
 For invoice_in / invoice_out return keys:
 invoiceNo, invoiceDate, invoiceAmount, invoiceCurrency, invoiceDueDate, invoiceGstAmount, invoiceGstRegNo, invoiceSubtotal, poNumber, supplierName, customerName, fieldConfidence, confidence (optional)
 - invoiceGstRegNo: GST registration number if present (indicates valid tax invoice for input tax claim)
-- For Chinese-labeled invoices: VAT or tax amount line â†’ invoiceGstAmount; taxpayer / GST registration number â†’ invoiceGstRegNo
+- For Chinese-labeled invoices: VAT or tax amount line â†?invoiceGstAmount; taxpayer / GST registration number â†?invoiceGstRegNo
 - Extract line_items if available as invoiceLineItems: [{description, quantity, unitPrice, amount}]
 
 For expense return keys:
@@ -317,7 +317,7 @@ expenseCategory, expenseSubcategory, expenseAmount, expenseCurrency, expenseDate
 Rules:
 - date format must be YYYY-MM-DD or null
 - amount must be number or null
-- currency: look for $ signs, currency codes (SGD, USD, CNY), or infer from language (Chinese doc â†’ likely CNY)
+- currency: look for $ signs, currency codes (SGD, USD, CNY), or infer from language (Chinese doc â†?likely CNY)
 - fieldConfidence: REQUIRED object. For every field you output with a non-null value, include a key with the SAME name as that field mapping to an integer 0-100 = your confidence that value is correct (based on label clarity, OCR ambiguity, cross-checks in the text). Omit keys for null fields. Example: {"contractNo": 88, "contractDate": 91, "contractAmount": 72}
 - confidence (optional): one of low, medium, high for the whole extraction summary
 - unknown values must be null`;
@@ -439,3 +439,4 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const fallback = heuristicExtract(docType, text);
 	return ok({ provider: 'heuristic', result: fallback });
 };
+

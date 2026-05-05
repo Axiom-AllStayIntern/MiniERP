@@ -5,11 +5,11 @@ import {
 	EXPENSE_DOC_TYPES,
 	type ExpenseCategory,
 	type ExpenseType
-} from '$lib/constants/expense-upload';
-import { buildDocumentMetadata, parseDocumentMetadata } from '$lib/server/document-metadata';
-import { resolveExpenseFilePreview } from '$lib/server/expense-file-preview';
-import { resolveSgdEquivalentForWrite } from '$lib/server/fx/resolve-sgd-equivalent';
-import { objectExists } from '$lib/server/r2';
+} from '$modules/finance/schemas/expense-upload';
+import { buildDocumentMetadata, parseDocumentMetadata } from '$modules/finance/schemas/document-metadata';
+import { resolveExpenseFilePreview } from '$modules/finance/services/expense-file-preview';
+import { resolveSgdEquivalentForWrite } from '$modules/finance/services/fx/resolve-sgd-equivalent';
+import { objectExists } from '$infrastructure/storage/r2';
 import {
 	beginIdempotentRequest,
 	claimFileHash,
@@ -19,8 +19,8 @@ import {
 	normalizeProjectScope,
 	releaseFileHashClaim,
 	UploadGuardSchemaError
-} from '$lib/server/upload-guards';
-import type { ModuleContext } from '../../../lib/server/modules/types';
+} from '$platform/files/upload-guards';
+import type { ModuleContext } from '$platform/modules/types';
 import { createEvent } from '../../../platform/events';
 import { businessTrips, documents, expenses } from '../../../infrastructure/db/schema';
 import {

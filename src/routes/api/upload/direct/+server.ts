@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
+import { fail, ok } from '$platform/http';
 
 export const PUT: RequestHandler = async ({ request, platform, url }) => {
 	if (!platform) {
@@ -57,3 +57,4 @@ export const POST: RequestHandler = async ({ request, url, platform }) => {
 		201
 	);
 };
+

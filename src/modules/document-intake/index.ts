@@ -1,4 +1,4 @@
-import type { ModuleDefinition } from '../../lib/server/modules/types';
+import type { ModuleDefinition } from '$platform/modules/types';
 import { registerDocumentIntakeHandlers } from './handlers';
 
 export const documentIntakeModule: ModuleDefinition = {

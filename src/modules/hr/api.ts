@@ -1,4 +1,4 @@
-import type { ModuleContext } from '../../lib/server/modules/types';
+import type { ModuleContext } from '$platform/modules/types';
 import { createHrLegacySources } from './adapters';
 import { createHrDirectoryApi } from './employee-api';
 import { createHrPeopleApi } from './person-api';

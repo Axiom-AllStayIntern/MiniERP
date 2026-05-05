@@ -6,7 +6,7 @@
 		CATEGORY_LABELS,
 		ALLOWANCE_RATES,
 		type ExpenseType
-	} from '$lib/constants/expense-upload';
+	} from '$modules/finance/schemas/expense-upload';
 
 	let { data } = $props();
 
@@ -14,7 +14,7 @@
 		new Intl.NumberFormat('en-SG', { style: 'currency', currency }).format(value ?? 0);
 
 	const formatDate = (date: string | null) => {
-		if (!date) return '—';
+		if (!date) return '-';
 		return new Date(date).toLocaleDateString('en-SG', {
 			year: 'numeric',
 			month: 'short',
@@ -23,7 +23,7 @@
 	};
 
 	const gstCell = (gst: number | null | undefined, currency: string) => {
-		if (gst == null || gst === 0) return '—';
+		if (gst == null || gst === 0) return '-';
 		return money(gst, currency);
 	};
 
@@ -168,7 +168,7 @@
 							<td class="px-4 py-3 text-slate-600">{formatDate(expense.date)}</td>
 							<td class="px-4 py-3 text-slate-600">{categoryLabel(expense.category)}</td>
 							<td class="px-4 py-3 font-medium text-slate-800">
-								{expense.vendorOrSupplier || expense.staffName || '—'}
+								{expense.vendorOrSupplier || expense.staffName || '-'}
 							</td>
 							<td class="px-4 py-3 text-right font-medium text-slate-800">
 								{money(expense.amount, expense.currency)}
@@ -190,7 +190,7 @@
 								</div>
 							</td>
 							<td class="px-4 py-3 max-w-[220px] truncate text-slate-500 text-xs" title={expense.notes ?? ''}>
-								{expense.notes || '—'}
+								{expense.notes || '-'}
 							</td>
 							<td class="px-4 py-3 text-right">
 								{#if expense.hasAttachment}
@@ -201,7 +201,7 @@
 										View
 									</a>
 								{:else}
-									<span class="text-slate-400">—</span>
+									<span class="text-slate-400">-</span>
 								{/if}
 							</td>
 						</tr>
@@ -350,3 +350,5 @@
 		</div>
 	</div>
 {/if}
+
+

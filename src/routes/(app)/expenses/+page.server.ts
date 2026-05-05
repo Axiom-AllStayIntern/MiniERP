@@ -1,9 +1,9 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 
-import { createModuleContext } from '$lib/server/modules';
+import { createModuleContext } from '$platform/modules';
 import { createFinanceApi } from '../../../modules/finance';
-import type { ExpenseType } from '$lib/constants/expense-upload';
+import type { ExpenseType } from '$modules/finance/schemas/expense-upload';
 
 export const load: PageServerLoad = async (event) => {
 	if (!event.platform) {
@@ -56,4 +56,5 @@ export const actions: Actions = {
 		return { success: true };
 	}
 };
+
 

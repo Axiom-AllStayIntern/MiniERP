@@ -1,4 +1,4 @@
-import type { ModuleContext } from '../../../lib/server/modules/types';
+import type { ModuleContext } from '$platform/modules/types';
 import type { FinanceInboundContract } from '../contracts/inbound';
 import { createFinanceBillingApi } from './billing-service';
 import { createFinanceDocumentApi } from './document-service';

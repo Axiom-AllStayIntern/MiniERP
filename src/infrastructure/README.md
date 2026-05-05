@@ -19,8 +19,9 @@ Does not own:
 - Workflow semantics
 
 Phase 3 starts moving concrete runtime implementations here behind compatibility
-re-exports from legacy `src/lib/server` entrypoints.
+direct imports through `src/infrastructure/*` aliases.
 
 Current Phase 3 scope includes the active DB client assembly and the schema
-barrel under `src/infrastructure/db`, while legacy `src/lib/server/db`
+barrel under `src/infrastructure/db`, while legacy `src/infrastructure/db`
 entrypoints remain compatibility shells.
+

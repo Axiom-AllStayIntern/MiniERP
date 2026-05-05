@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageShell from '$lib/components/PageShell.svelte';
+	import PageShell from '$app-layer/components/PageShell.svelte';
 
 	let { data } = $props();
 
@@ -81,7 +81,7 @@
 					></tr
 				>
 				<tr class="border-t border-slate-200 bg-slate-50/80"
-					><td class="px-4 py-3 font-medium">Taxable income (Revenue âˆ’ above costs)</td><td class="px-4 py-3 font-semibold"
+					><td class="px-4 py-3 font-medium">Taxable income (Revenue âˆ?above costs)</td><td class="px-4 py-3 font-semibold"
 						>{money(data.corporate.taxableIncome)}</td
 					></tr
 				>
@@ -101,3 +101,5 @@
 		</a>
 	</section>
 </PageShell>
+
+

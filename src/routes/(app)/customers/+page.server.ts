@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 
-import { createModuleContext } from '$lib/server/modules';
-import { createBusinessPartnerApi } from '$lib/server/modules/business-partner/api';
+import { createModuleContext } from '$platform/modules';
+import { createBusinessPartnerApi } from '$modules/legacy/server-modules/business-partner/api';
 
 export const load: PageServerLoad = async (event) => {
 	if (!event.platform) {
@@ -12,3 +12,4 @@ export const load: PageServerLoad = async (event) => {
 	const businessPartner = createBusinessPartnerApi(ctx);
 	return { customers: await businessPartner.listCustomerDirectory() };
 };
+

@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 
-import { createModuleContext } from '$lib/server/modules';
+import { createModuleContext } from '$platform/modules';
 import { createFinanceApi } from '../../../../../modules/finance';
 
 const emptySummary = {
@@ -26,3 +26,4 @@ export const load: PageServerLoad = async (event) => {
 
 	return { ...summary, project };
 };
+

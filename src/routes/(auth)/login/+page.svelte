@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { authClient } from '$lib/auth-client';
+	import { authClient } from '$platform/auth/client';
 
 	let email = $state('');
 	let password = $state('');
@@ -37,7 +37,7 @@
 		if (err) {
 			if (err.status === 403) {
 				error =
-					'Please verify your email first. Use “Resend verification” below if you did not receive the message.';
+					'Please verify your email first. Use “Resend verification�?below if you did not receive the message.';
 			} else {
 				error = err.message || 'Sign-in failed.';
 			}
@@ -104,7 +104,7 @@
 				disabled={loading}
 				class="w-full rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2f5e2c] disabled:opacity-60"
 			>
-				{loading ? 'Signing in…' : 'Sign in'}
+				{loading ? 'Signing in...' : 'Sign in'}
 			</button>
 		</form>
 		<div class="mt-4 flex flex-col gap-2 text-sm">
@@ -120,3 +120,5 @@
 		</div>
 	</div>
 </main>
+
+

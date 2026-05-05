@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
-import { createModuleContext } from '$lib/server/modules';
+import { fail, ok } from '$platform/http';
+import { createModuleContext } from '$platform/modules';
 import { createDocumentIntakeApi } from '../../../../modules/document-intake';
 
 type Bucket = 'revenue' | 'expense' | 'document_only';
@@ -45,3 +45,4 @@ export const POST: RequestHandler = async (event) => {
 		201
 	);
 };
+

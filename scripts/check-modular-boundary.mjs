@@ -43,7 +43,13 @@ async function walk(dir) {
 }
 
 async function walkFiltered(dir, shouldInclude) {
-	const entries = await readdir(dir, { withFileTypes: true });
+	let entries;
+	try {
+		entries = await readdir(dir, { withFileTypes: true });
+	} catch (err) {
+		if (err?.code === 'ENOENT') return [];
+		throw err;
+	}
 	const files = [];
 	for (const entry of entries) {
 		const fullPath = path.join(dir, entry.name);

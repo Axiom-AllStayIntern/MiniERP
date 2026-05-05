@@ -1,8 +1,8 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 
-import { createModuleContext } from '$lib/server/modules';
-import { createBusinessPartnerApi } from '$lib/server/modules/business-partner/api';
+import { createModuleContext } from '$platform/modules';
+import { createBusinessPartnerApi } from '$modules/legacy/server-modules/business-partner/api';
 
 export const actions: Actions = {
 	default: async (event) => {
@@ -33,3 +33,4 @@ export const actions: Actions = {
 		throw redirect(303, '/customers');
 	}
 };
+

@@ -1,8 +1,8 @@
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { timeFields } from '../../../lib/server/modules/schema-helpers';
+import { timeFields } from '$platform/modules/schema-helpers';
 
 /**
- * Document artifacts â€” the standardized representation of any file received
+ * Document artifacts â€?the standardized representation of any file received
  * by SmartFin (manual upload now, email/drive/etc. later). Owned by the
  * Document Intake module per ref_files/v4/phase0-6/04 Â§6.
  *
@@ -75,7 +75,7 @@ export const documentArtifacts = sqliteTable('document_artifacts', {
 	/** {@link DocumentSecurityFlag}[] JSON */
 	securityFlags: text('security_flags'),
 
-	/** Soft retention bytes for analytics â€” duplicated from originalFile.sizeBytes for fast filters. */
+	/** Soft retention bytes for analytics â€?duplicated from originalFile.sizeBytes for fast filters. */
 	sizeBytes: integer('size_bytes'),
 
 	...timeFields

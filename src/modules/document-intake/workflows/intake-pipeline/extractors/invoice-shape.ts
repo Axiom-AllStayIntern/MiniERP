@@ -1,12 +1,12 @@
 /**
  * Invoice-shape extractor. Three variants share the same field set but
  * different prompt framing for accuracy:
- *   • revenue        — OUR customer invoice (we are the seller)
- *   • sales_cost     — supplier invoice billing us for project work
- *   • ai_subscription — SaaS subscription invoice
+ *   �?revenue        �?OUR customer invoice (we are the seller)
+ *   �?sales_cost     �?supplier invoice billing us for project work
+ *   �?ai_subscription �?SaaS subscription invoice
  */
 
-import { callAiJsonWithSource } from '$lib/server/services/ai-agent';
+import { callAiJsonWithSource } from '$platform/ai/json-provider';
 import type { ExtractedFields } from '../types';
 
 export type InvoiceVariant = 'revenue' | 'sales_cost' | 'ai_subscription';
@@ -28,7 +28,7 @@ const BASE_RULES = `Rules:
 - clientName = who is billed (the buyer/payer).
 - Currency: normalise S$→SGD, ¥/RMB→CNY, US$→USD, RM→MYR, €→EUR.
 - invoiceType: "tax_invoice" if GST % line is shown; "zero_rate" for zero-rated exports; else "standard".
-- Be conservative — leave null rather than guess. Accuracy over recall.`;
+- Be conservative �?leave null rather than guess. Accuracy over recall.`;
 
 function buildPrompt(variant: InvoiceVariant): string {
 	const common = `You extract fields from an OCR'd invoice. Return ONLY a JSON object with these exact keys. Use null for anything not clearly present.
@@ -40,7 +40,7 @@ ${BASE_RULES}`;
 	if (variant === 'revenue') {
 		return `${common}
 
-Context: This is OUR customer invoice — our company (the tenant) is the SELLER. The clientName field = the external customer we billed. supplierName may be null or our own name; don't get confused by that.`;
+Context: This is OUR customer invoice �?our company (the tenant) is the SELLER. The clientName field = the external customer we billed. supplierName may be null or our own name; don't get confused by that.`;
 	}
 	if (variant === 'sales_cost') {
 		return `${common}
@@ -79,7 +79,7 @@ function normCurrency(v: unknown): string | null {
 		'¥': 'CNY',
 		RMB: 'CNY',
 		RM: 'MYR',
-		'€': 'EUR'
+		EUR: 'EUR'
 	};
 	return aliases[up] ?? (up.length === 3 ? up : null);
 }
@@ -96,7 +96,7 @@ function normInvoiceType(v: unknown): 'standard' | 'zero_rate' | 'tax_invoice' |
 	return 'standard';
 }
 
-/** Regex fallback — covers the "AI is down" / "very short text" cases. */
+/** Regex fallback �?covers the "AI is down" / "very short text" cases. */
 function heuristic(rawText: string): Partial<ExtractedFields> {
 	const r: Partial<ExtractedFields> = {};
 	const invoiceMatch = rawText.match(/invoice\s*(?:no\.?|number|#)?[:\s]+([A-Z0-9-]+)/i);

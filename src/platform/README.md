@@ -23,4 +23,4 @@ Does not own:
 - Document Intake classification semantics
 
 Phase 3 starts moving active runtime implementations here behind compatibility
-re-exports from `src/lib/server/modules`.
+re-exports from `src/modules/legacy/server-modules`.

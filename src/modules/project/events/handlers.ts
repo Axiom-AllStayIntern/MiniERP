@@ -1,4 +1,4 @@
-import type { EventBus, ModuleContext } from '../../../lib/server/modules/types';
+import type { EventBus, ModuleContext } from '$platform/modules/types';
 
 /**
  * Project listens to finance-side activity for cache invalidation and shell refresh hooks.

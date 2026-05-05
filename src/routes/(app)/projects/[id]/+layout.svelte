@@ -19,7 +19,7 @@
 	const dateRangeLabel = $derived.by(() => {
 		const a = data.project.startDate;
 		const b = data.project.endDate;
-		if (a && b) return `${formatShortDate(a)} – ${formatShortDate(b)}`;
+		if (a && b) return `${formatShortDate(a)} �?${formatShortDate(b)}`;
 		if (a) return `From ${formatShortDate(a)}`;
 		if (b) return `Until ${formatShortDate(b)}`;
 		return '';
@@ -45,11 +45,11 @@
 	};
 
 	const navItems = $derived<NavItem[]>([
-		{ href: base, label: 'Dashboard', icon: '◫', active: isDashboard },
+		{ href: base, label: 'Dashboard', icon: '-', active: isDashboard },
 		{
 			href: `${base}/documents`,
 			label: 'Documents',
-			icon: '▤',
+			icon: '-',
 			active: isDocuments,
 			count:
 				data.submoduleCounts.contracts +
@@ -57,9 +57,9 @@
 				data.submoduleCounts.purchaseOrders +
 				data.submoduleCounts.expenses
 		},
-		{ href: `${base}/expenses`, label: 'Expenses', icon: '⊟', active: isExpenses, count: data.submoduleCounts.expenses },
+		{ href: `${base}/expenses`, label: 'Expenses', icon: '-', active: isExpenses, count: data.submoduleCounts.expenses },
 		{ href: `${base}/revenue`, label: 'Revenue', icon: '¥', active: isRevenue },
-		{ href: `${base}/employees`, label: 'Team & Cost', icon: '◎', active: isMembers }
+		{ href: `${base}/employees`, label: 'Team & Cost', icon: '-', active: isMembers }
 	]);
 
 	const projectAction = (action: string) => `${base}?/${action}`;
@@ -88,7 +88,7 @@
 					href="/projects" 
 					class="flex items-center gap-2 text-sm text-slate-500 transition hover:text-[var(--sf-green)]"
 				>
-					<span>←</span>
+					<span>-</span>
 					<span>All Projects</span>
 				</a>
 			</div>
@@ -145,7 +145,7 @@
 					class="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
 					onclick={() => { settingsOpen = true; }}
 				>
-					<span class="opacity-60">⚙</span>
+					<span class="opacity-60">-</span>
 					Project Settings
 				</button>
 			</div>
@@ -157,7 +157,7 @@
 		<!-- Mobile project nav -->
 		<div class="border-b border-slate-200 bg-slate-50/80 px-4 py-3 lg:hidden">
 			<div class="mb-2 flex items-center justify-between">
-				<a href="/projects" class="text-xs text-slate-500 hover:text-[var(--sf-green)]">← All Projects</a>
+				<a href="/projects" class="text-xs text-slate-500 hover:text-[var(--sf-green)]">�?All Projects</a>
 				<button
 					type="button"
 					class="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
@@ -411,3 +411,5 @@
 		</div>
 	</div>
 {/if}
+
+

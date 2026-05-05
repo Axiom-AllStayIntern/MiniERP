@@ -1,9 +1,9 @@
 import type { RequestHandler } from './$types';
 
-import { createModuleContext } from '$lib/server/modules';
+import { createModuleContext } from '$platform/modules';
 import { createFinanceApi } from '../../../../../modules/finance';
-import { ConflictError, NotFoundError } from '$lib/server/modules/errors';
-import { fail, ok } from '$lib/server/http';
+import { ConflictError, NotFoundError } from '$platform/modules/errors';
+import { fail, ok } from '$platform/http';
 
 type InvoicePayload = {
 	projectId?: string;
@@ -34,4 +34,5 @@ export const PUT: RequestHandler = async (event) => {
 		return fail((e as Error).message, 500);
 	}
 };
+
 

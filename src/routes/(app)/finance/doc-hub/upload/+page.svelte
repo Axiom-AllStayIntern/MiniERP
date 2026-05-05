@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageShell from '$lib/components/PageShell.svelte';
+	import PageShell from '$app-layer/components/PageShell.svelte';
 </script>
 
 <PageShell
@@ -31,3 +31,5 @@
 		</a>
 	</section>
 </PageShell>
+
+

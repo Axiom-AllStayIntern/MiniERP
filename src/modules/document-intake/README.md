@@ -9,14 +9,14 @@ Target ownership:
 - Doc Hub save / confirm workflows
 
 Current legacy implementation slices:
-- `src/lib/server/modules/document-intake`
+- `src/modules/legacy/server-modules/document-intake`
 - `src/modules/document-intake/workflows/intake-pipeline`
 
 Phase 4 bridge status:
 - Public API assembly now lives under `src/modules/document-intake`.
 - Event handler registration now lives under `src/modules/document-intake/handlers.ts`.
 - The former compatibility entrypoints under
-  `src/lib/server/modules/document-intake/{api,index,handlers}.ts` have been
+  `src/modules/legacy/server-modules/document-intake/{api,index,handlers}.ts` have been
   retired after their caller count reached zero.
 - OCR provider helpers remain in their legacy locations until a
   later internal-ownership phase.

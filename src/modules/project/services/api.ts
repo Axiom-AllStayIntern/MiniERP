@@ -1,5 +1,5 @@
-import type { ModuleContext } from '../../../lib/server/modules/types';
-import { NotFoundError } from '../../../lib/server/modules/errors';
+import type { ModuleContext } from '$platform/modules/types';
+import { NotFoundError } from '$platform/modules/errors';
 import { and, desc, eq, gte, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 import {
 	auditLogs,
@@ -15,7 +15,7 @@ import {
 	activityVariantForAction,
 	parseAuditMetadata,
 	summarizeAuditForProject
-} from '$lib/server/audit-display';
+} from '$modules/project/services/audit-display';
 import { createProjectLegacySource } from '../adapters/legacy';
 import type { ProjectSource } from '../contracts/source';
 import { ProjectRepository } from '../repositories';

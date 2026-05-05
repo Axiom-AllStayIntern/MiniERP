@@ -37,3 +37,4 @@ export const load: PageServerLoad = async ({ fetch, params }) => {
 		detailNote: json.data.note ?? null
 	};
 };
+

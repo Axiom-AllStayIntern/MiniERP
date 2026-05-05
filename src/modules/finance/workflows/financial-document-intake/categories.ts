@@ -6,7 +6,7 @@
  * quotation / purchase_order).
  *
  * This file lifts the scattered constants in
- * `src/lib/constants/expense-upload.ts` and the chip catalogues in
+ * `src/modules/finance/schemas/expense-upload.ts` and the chip catalogues in
  * `src/modules/document-intake/schemas/intake-field-specs.ts` into a
  * single workflow-oriented table that the Finance Agent + capability layer +
  * UI all consume.
@@ -25,11 +25,11 @@ import type {
 	ExpenseCategory,
 	ExpenseDocType,
 	ExpenseType
-} from '../../../../lib/constants/expense-upload';
+} from '$modules/finance/schemas/expense-upload';
 
 export type Bucket = 'expense' | 'revenue' | 'document_only';
 
-/** Document type label used by extraction (broader than ExpenseDocType â€?adds invoice_out + archive types). */
+/** Document type label used by extraction (broader than ExpenseDocType ï¿½?adds invoice_out + archive types). */
 export type CategoryDocType =
 	| 'invoice'
 	| 'receipt'
@@ -71,7 +71,7 @@ export interface CategoryDefinition {
 	requiresProject: boolean;
 	/** Whether the workflow expects a file. False for allowance. */
 	hasDocument: boolean;
-	/** Persistence routing â€?which DB table this category lands in. */
+	/** Persistence routing ï¿½?which DB table this category lands in. */
 	persistTarget: 'expenses' | 'revenue' | 'contracts' | 'quotations' | 'purchase_orders';
 }
 
@@ -92,7 +92,7 @@ const INVOICE_LLM = [
 const PO_LLM = ['po_number', 'supplier_name', 'date', 'amount', 'currency', 'description'];
 
 // ---------------------------------------------------------------------------
-// Category catalog â€?11 expense + 1 revenue + 3 archive
+// Category catalog ï¿½?11 expense + 1 revenue + 3 archive
 // ---------------------------------------------------------------------------
 
 const EXPENSE_CATEGORIES: CategoryDefinition[] = [
@@ -132,7 +132,7 @@ const EXPENSE_CATEGORIES: CategoryDefinition[] = [
 		persistTarget: 'expenses'
 	},
 
-	// ----- OPEX â€?Staff cost -----
+	// ----- OPEX ï¿½?Staff cost -----
 	{
 		id: 'expense.opex.transport',
 		bucket: 'expense',
@@ -227,7 +227,7 @@ const EXPENSE_CATEGORIES: CategoryDefinition[] = [
 		persistTarget: 'expenses'
 	},
 
-	// ----- OPEX â€?Company cost -----
+	// ----- OPEX ï¿½?Company cost -----
 	{
 		id: 'expense.opex.ai_subscription',
 		bucket: 'expense',
@@ -441,3 +441,5 @@ export const DEFAULT_SUPPLIER_INVOICE_CATEGORY_ID = 'expense.sales_cost.invoice'
 
 /** Default category when the classifier produces no useful guess. */
 export const FALLBACK_CATEGORY_ID = 'expense.opex.others';
+
+

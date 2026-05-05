@@ -1,8 +1,8 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { createModuleContext, registry } from '$lib/server/modules';
-import { createCoreApi } from '$lib/server/modules/core/api';
+import { createModuleContext, registry } from '$platform/modules';
+import { createCoreApi } from '$modules/legacy/server-modules/core/api';
 
 export const load: PageServerLoad = async (event) => {
 	const ctx = await createModuleContext(event);
@@ -63,3 +63,4 @@ export const actions: Actions = {
 		};
 	}
 };
+

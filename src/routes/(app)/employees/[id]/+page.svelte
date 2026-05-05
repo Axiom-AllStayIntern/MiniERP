@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageShell from '$lib/components/PageShell.svelte';
+	import PageShell from '$app-layer/components/PageShell.svelte';
 
 	let { data, form } = $props();
 
@@ -21,7 +21,7 @@
 
 	function dash(s: string | null | undefined) {
 		const t = s?.trim();
-		return t ? t : '—';
+		return t ? t : '-';
 	}
 </script>
 
@@ -340,8 +340,8 @@
 			<div>
 				<h2 class="text-lg font-semibold text-slate-900">Individual income tax (IR8A-style summary)</h2>
 				<p class="mt-1 text-xs text-slate-500">
-					Rolls up <strong>project-linked payouts</strong> (status confirmed or paid) by calendar year — same basis as
-					<code class="rounded bg-slate-100 px-1 text-[11px]">GET /api/tax/individual/…</code>. Not a filing-ready IR8A export.
+					Rolls up <strong>project-linked payouts</strong> (status confirmed or paid) by calendar year �?same basis as
+					<code class="rounded bg-slate-100 px-1 text-[11px]">GET /api/tax/individual/-</code>. Not a filing-ready IR8A export.
 				</p>
 			</div>
 			<form method="GET" class="flex items-end gap-2">
@@ -440,3 +440,5 @@
 		</button>
 	</form>
 </PageShell>
+
+

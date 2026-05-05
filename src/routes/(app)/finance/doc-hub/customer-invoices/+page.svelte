@@ -1,6 +1,6 @@
 <script lang="ts">
-	import PageShell from '$lib/components/PageShell.svelte';
-	import { parseStoredInvoiceLineItems } from '$lib/invoice-line-items';
+	import PageShell from '$app-layer/components/PageShell.svelte';
+	import { parseStoredInvoiceLineItems } from '$modules/finance/schemas/invoice-line-items';
 
 	let { data } = $props();
 
@@ -268,3 +268,5 @@
 		</div>
 	{/if}
 </PageShell>
+
+

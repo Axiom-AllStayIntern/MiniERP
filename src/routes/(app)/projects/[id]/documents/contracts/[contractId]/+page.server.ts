@@ -1,8 +1,8 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { createCoreApi } from '$lib/server/modules/core';
-import { createModuleContext } from '$lib/server/modules';
+import { createCoreApi } from '$modules/legacy/server-modules/core';
+import { createModuleContext } from '$platform/modules';
 import { createFinanceApi } from '../../../../../../../modules/finance';
 
 export const load: PageServerLoad = async (event) => {
@@ -64,3 +64,4 @@ export const actions: Actions = {
 		throw redirect(303, `/projects/${params.id}/documents`);
 	}
 };
+

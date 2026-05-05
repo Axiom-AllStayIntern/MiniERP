@@ -1,5 +1,5 @@
 import { and, between, eq, inArray, isNull, sql } from 'drizzle-orm';
-import type { ModuleContext } from '../../../lib/server/modules/types';
+import type { ModuleContext } from '$platform/modules/types';
 import {
 	companySettings,
 	compensationComponents,

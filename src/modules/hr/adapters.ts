@@ -1,13 +1,13 @@
-import type { ModuleContext } from '../../lib/server/modules/types';
-import { EmployeeMasterService } from '../../lib/server/modules/employee/master-service';
-import { AllocationRepository, PayoutRepository } from '../../lib/server/modules/employee/repository';
+import type { ModuleContext } from '$platform/modules/types';
+import { EmployeeMasterService } from '$modules/legacy/server-modules/employee/master-service';
+import { AllocationRepository, PayoutRepository } from '$modules/legacy/server-modules/employee/repository';
 import {
 	AllocationService,
 	CompensationService,
 	ProjectStaffingService,
 	SettlementService
-} from '../../lib/server/modules/employee/service';
-import { PersonService } from '../../lib/server/modules/person/service';
+} from '$modules/legacy/server-modules/employee/service';
+import { PersonService } from '$modules/legacy/server-modules/person/service';
 import type {
 	HrDirectorySource,
 	HrLegacySources,

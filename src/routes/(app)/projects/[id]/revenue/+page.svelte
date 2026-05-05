@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { REVENUE_INVOICE_TYPES } from '$lib/constants/expense-upload';
+	import { REVENUE_INVOICE_TYPES } from '$modules/finance/schemas/expense-upload';
 
 	let { data } = $props();
 
@@ -246,3 +246,5 @@
 		</div>
 	</div>
 {/if}
+
+

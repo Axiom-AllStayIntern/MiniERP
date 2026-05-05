@@ -1,7 +1,7 @@
 import { and, between, desc, eq, inArray, isNull, not, or, sql } from 'drizzle-orm';
-import { effectiveAmountSgd } from '$lib/server/fx/effective-amount-sgd';
-import { parseDocumentMetadata } from '$lib/server/document-metadata';
-import type { ModuleContext } from '../../../lib/server/modules/types';
+import { effectiveAmountSgd } from '$modules/finance/services/fx/effective-amount-sgd';
+import { parseDocumentMetadata } from '$modules/finance/schemas/document-metadata';
+import type { ModuleContext } from '$platform/modules/types';
 import {
 	compensationComponents,
 	contracts,

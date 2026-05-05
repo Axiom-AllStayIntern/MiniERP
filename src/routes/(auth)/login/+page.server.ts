@@ -6,3 +6,4 @@ export const load: PageServerLoad = async ({ url }) => {
 	const qs = url.searchParams.toString();
 	throw redirect(307, qs ? `/?${qs}` : '/');
 };
+

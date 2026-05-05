@@ -1,8 +1,8 @@
 import type { RequestHandler } from './$types';
 
-import { createModuleContext } from '$lib/server/modules';
+import { createModuleContext } from '$platform/modules';
 import { createFinanceApi } from '../../../../../modules/finance';
-import { fail } from '$lib/server/http';
+import { fail } from '$platform/http';
 
 export const GET: RequestHandler = async (event) => {
 	try {
@@ -25,4 +25,5 @@ export const GET: RequestHandler = async (event) => {
 		return fail((e as Error).message, 500);
 	}
 };
+
 

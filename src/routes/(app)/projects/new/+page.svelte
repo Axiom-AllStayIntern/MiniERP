@@ -1,6 +1,6 @@
 <script lang="ts">
-	import PageShell from '$lib/components/PageShell.svelte';
-	import { agentPrefill, consumePrefill, parseDateToPrefill } from '$lib/agent/prefill';
+	import PageShell from '$app-layer/components/PageShell.svelte';
+	import { agentPrefill, consumePrefill, parseDateToPrefill } from '$app-layer/ai-panel/state/prefill';
 
 	let { data, form } = $props();
 
@@ -151,3 +151,5 @@
 		</div>
 	</form>
 </PageShell>
+
+

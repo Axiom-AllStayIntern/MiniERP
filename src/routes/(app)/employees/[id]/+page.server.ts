@@ -1,7 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { createModuleContext } from '$lib/server/modules';
+import { createModuleContext } from '$platform/modules';
 import { createEmployeeApi } from '../../../../modules/hr';
 
 export const load: PageServerLoad = async (event) => {
@@ -119,3 +119,4 @@ export const actions: Actions = {
 		throw redirect(303, '/employees');
 	}
 };
+

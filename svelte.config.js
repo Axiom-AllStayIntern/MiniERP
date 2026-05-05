@@ -17,6 +17,7 @@ const config = {
 		adapter: adapter(),
 		alias: {
 			'$app-layer': 'src/app',
+			$infrastructure: 'src/infrastructure',
 			$modules: 'src/modules',
 			$platform: 'src/platform'
 		}

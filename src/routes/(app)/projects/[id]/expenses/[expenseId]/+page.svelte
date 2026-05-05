@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import StorageTextPreview from '$lib/components/StorageTextPreview.svelte';
-	import { CATEGORY_LABELS, EXPENSE_CATEGORY_OPTIONS } from '$lib/constants/expense-upload';
+	import StorageTextPreview from '$app-layer/components/StorageTextPreview.svelte';
+	import { CATEGORY_LABELS, EXPENSE_CATEGORY_OPTIONS } from '$modules/finance/schemas/expense-upload';
 
 	let { data, form } = $props();
 
@@ -11,14 +11,14 @@
 		new Intl.NumberFormat('en-SG', { style: 'currency', currency: data.expense.currency ?? 'SGD' }).format(value ?? 0);
 
 	const fmtBytes = (n: number | undefined) => {
-		if (n == null || !Number.isFinite(n)) return '—';
+		if (n == null || !Number.isFinite(n)) return '-';
 		if (n < 1024) return `${n} B`;
 		if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
 		return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 	};
 
 	const fmtWhen = (iso: string | undefined) => {
-		if (!iso) return '—';
+		if (!iso) return '-';
 		const d = new Date(iso);
 		return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-SG');
 	};
@@ -33,7 +33,7 @@
 			class="text-xs font-medium text-[var(--sf-green)] hover:underline"
 			onclick={() => goto(base)}
 		>
-			← Back to project overview
+			�?Back to project overview
 		</button>
 	</div>
 
@@ -69,11 +69,11 @@
 			</div>
 			<div class="bg-white px-5 py-3">
 				<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Vendor / Supplier</p>
-				<p class="mt-1 text-sm text-slate-900">{data.expense.vendorOrSupplier ?? '—'}</p>
+				<p class="mt-1 text-sm text-slate-900">{data.expense.vendorOrSupplier ?? '-'}</p>
 			</div>
 			<div class="bg-white px-5 py-3">
 				<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Staff</p>
-				<p class="mt-1 text-sm text-slate-900">{data.expense.staffName ?? '—'}</p>
+				<p class="mt-1 text-sm text-slate-900">{data.expense.staffName ?? '-'}</p>
 			</div>
 			<div class="bg-white px-5 py-3">
 				<p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Tags</p>
@@ -85,7 +85,7 @@
 						<span class="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">Business Trip</span>
 					{/if}
 					{#if !data.expense.reimbursement && !data.expense.businessTrip}
-						<span class="text-sm text-slate-500">—</span>
+						<span class="text-sm text-slate-500">-</span>
 					{/if}
 				</div>
 			</div>
@@ -280,3 +280,5 @@
 		</div>
 	</details>
 </div>
+
+

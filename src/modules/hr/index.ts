@@ -1,5 +1,5 @@
-import type { AgentAction } from '../../lib/server/agent/types';
-import type { ModuleDefinition } from '../../lib/server/modules/types';
+import type { AgentAction } from '$platform/ai/legacy-agent/types';
+import type { ModuleDefinition } from '$platform/modules/types';
 import { registerEmployeeHandlers, registerPersonHandlers } from './handlers';
 
 export const employeeModule: ModuleDefinition = {

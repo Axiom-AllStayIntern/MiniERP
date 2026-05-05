@@ -1,4 +1,4 @@
-import type { ModuleDefinition } from '../../lib/server/modules/types';
+import type { ModuleDefinition } from '$platform/modules/types';
 import { toLegacyModuleManifest } from '../../platform/registry/contracts';
 import { projectAppSurface } from './app';
 import { projectActions, projectCapabilities, projectCapabilityIds } from './capabilities';

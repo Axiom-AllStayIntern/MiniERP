@@ -129,7 +129,7 @@
 			</div>
 			<div class="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
 				<p>
-					Page {data.pagination.page} / {data.pagination.totalPages} â€” Total projects:
+					Page {data.pagination.page} / {data.pagination.totalPages} â€?Total projects:
 					{data.pagination.total}
 				</p>
 				<div class="flex items-center gap-2">
@@ -156,3 +156,5 @@
 		{/if}
 	</section>
 </div>
+
+

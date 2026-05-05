@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
-import { callExternalLlmJson } from '$lib/server/ocr/external-llm-json';
-import { fail, ok } from '$lib/server/http';
+import { callExternalLlmJson } from '$platform/ai/ocr/external-llm-json';
+import { fail, ok } from '$platform/http';
 
 type AttachmentRow = {
 	filename: string;
@@ -17,7 +17,7 @@ type RankPayload = {
 
 export type RankedAttachment = {
 	filename: string;
-	/** 0â€“1 */
+	/** 0â€? */
 	confidence: number;
 	reason?: string;
 };
@@ -28,7 +28,7 @@ function clamp01(n: number): number {
 }
 
 function buildRankSystemPrompt(emailTypeLabel: string): string {
-	return `You rank email attachments by how likely they are to be the primary business document. Use only filename, size, and MIME â€” do not invent file contents.
+	return `You rank email attachments by how likely they are to be the primary business document. Use only filename, size, and MIME â€?do not invent file contents.
 
 Email intent label: ${emailTypeLabel}
 
@@ -144,3 +144,4 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 	return ok({ provider: 'heuristic', result: { ranked: heuristicRank(rows) } });
 };
+

@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
+import { fail, ok } from '$platform/http';
 import { createDocumentIntakeService } from '../../../../modules/document-intake';
 import { getDb } from '../../../../infrastructure/db';
 
@@ -23,3 +23,4 @@ export const GET: RequestHandler = async (event) => {
 
 	return ok(service.toView(artifact));
 };
+

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { setAgentPageContext } from '$lib/agent/context';
+	import { setAgentPageContext } from '$app-layer/ai-panel/state/context';
 
 	let { data } = $props();
 	$effect(() => {
@@ -202,7 +202,7 @@
 				>
 					Net {money(data.profit)}
 				</p>
-				<p class="mt-0.5 text-xs text-[var(--sf-green)]">Net = Gross − OpEx expenses</p>
+				<p class="mt-0.5 text-xs text-[var(--sf-green)]">Net = Gross �?OpEx expenses</p>
 			</div>
 			<div class="px-5 py-3.5" style="background: var(--sf-green-soft);">
 				<p class="text-[11px] font-medium uppercase tracking-wide text-[var(--sf-green)] opacity-80">
@@ -266,7 +266,7 @@
 				class="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-[var(--sf-green)] hover:shadow-md"
 			>
 				<div class="flex items-center justify-between">
-					<span class="text-2xl opacity-60">▤</span>
+					<span class="text-2xl opacity-60">-</span>
 					<span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 group-hover:bg-[var(--sf-green-soft)] group-hover:text-[var(--sf-green)]">
 						{data.submoduleCounts.contracts + data.submoduleCounts.quotations + data.submoduleCounts.purchaseOrders}
 					</span>
@@ -280,7 +280,7 @@
 				class="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-[var(--sf-green)] hover:shadow-md"
 			>
 				<div class="flex items-center justify-between">
-					<span class="text-2xl opacity-60">⊟</span>
+					<span class="text-2xl opacity-60">-</span>
 					<span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 group-hover:bg-[var(--sf-green-soft)] group-hover:text-[var(--sf-green)]">
 						{data.submoduleCounts.expenses}
 					</span>
@@ -308,7 +308,7 @@
 				class="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-[var(--sf-green)] hover:shadow-md"
 			>
 				<div class="flex items-center justify-between">
-					<span class="text-2xl opacity-60">◎</span>
+					<span class="text-2xl opacity-60">-</span>
 					<span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 group-hover:bg-[var(--sf-green-soft)] group-hover:text-[var(--sf-green)]">
 						{data.metricDocCounts.staff}
 					</span>
@@ -390,3 +390,5 @@
 		</div>
 	</div>
 {/if}
+
+

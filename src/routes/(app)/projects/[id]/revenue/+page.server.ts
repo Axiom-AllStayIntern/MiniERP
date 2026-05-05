@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 
-import { createModuleContext } from '$lib/server/modules';
+import { createModuleContext } from '$platform/modules';
 import { createFinanceApi } from '../../../../../modules/finance';
 
 export const load: PageServerLoad = async (event) => {
@@ -61,3 +61,4 @@ export const actions: Actions = {
 		return { success: true };
 	}
 };
+

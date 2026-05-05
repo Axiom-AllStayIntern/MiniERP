@@ -1,8 +1,8 @@
 import type { RequestHandler } from './$types';
 
-import { createModuleContext } from '$lib/server/modules';
+import { createModuleContext } from '$platform/modules';
 import { createDocumentIntakeApi } from '../../../../modules/document-intake';
-import { fail, ok } from '$lib/server/http';
+import { fail, ok } from '$platform/http';
 
 /**
  * POST /api/documents/upload
@@ -61,3 +61,4 @@ export const POST: RequestHandler = async (event) => {
 		201
 	);
 };
+

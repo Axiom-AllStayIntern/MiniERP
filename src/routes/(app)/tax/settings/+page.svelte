@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageShell from '$lib/components/PageShell.svelte';
+	import PageShell from '$app-layer/components/PageShell.svelte';
 
 	let { data, form } = $props();
 
@@ -64,7 +64,7 @@
 		</div>
 
 		<section class="space-y-3 rounded-lg border border-slate-200 p-4">
-			<p class="text-sm font-semibold text-slate-800">Manual Source Fields (Box 9â€“12)</p>
+			<p class="text-sm font-semibold text-slate-800">Manual Source Fields (Box 9â€?2)</p>
 			<p class="text-xs text-slate-500">
 				Keep these in sync when reverse-charge values are needed as traceable source data.
 			</p>
@@ -95,3 +95,5 @@
 		</div>
 	</form>
 </PageShell>
+
+

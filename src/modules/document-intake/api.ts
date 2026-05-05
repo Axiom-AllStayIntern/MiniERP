@@ -1,4 +1,4 @@
-import type { ModuleContext } from '../../lib/server/modules/types';
+import type { ModuleContext } from '$platform/modules/types';
 import { createDocumentIntakeLegacySource } from './adapters';
 import type { DocumentIntakeSource } from './contracts';
 

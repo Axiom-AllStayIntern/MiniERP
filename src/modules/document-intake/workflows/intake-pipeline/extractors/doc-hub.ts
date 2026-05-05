@@ -1,10 +1,10 @@
 /**
- * Thin wrappers over the existing extractDocHubFields helper â€” reshapes
+ * Thin wrappers over the existing extractDocHubFields helper â€?reshapes
  * its snake_case output into the intake pipeline's camelCase ExtractedFields
  * partial. Existing prompts are already good; no reason to re-author them.
  */
 
-import { extractDocHubFields } from '$lib/server/ocr/doc-hub-extract';
+import { extractDocHubFields } from '$platform/ai/ocr/doc-hub-extract';
 import type { ExtractedFields } from '../types';
 
 export async function extractContract(

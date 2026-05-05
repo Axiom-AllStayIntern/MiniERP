@@ -1,15 +1,15 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
-import { runOcrPipeline } from '$lib/server/ocr/pipeline';
-import { detectExpenseFieldsFromOcr } from '$lib/server/ocr/expense-detection';
+import { fail, ok } from '$platform/http';
+import { runOcrPipeline } from '$platform/ai/ocr/pipeline';
+import { detectExpenseFieldsFromOcr } from '$platform/ai/ocr/expense-detection';
 import {
 	CATEGORY_DOC_TYPE_MAP,
 	EXPENSE_CATEGORY_OPTIONS,
 	isValidExpenseCategory,
 	type ExpenseCategory,
 	type ExpenseType
-} from '$lib/constants/expense-upload';
+} from '$modules/finance/schemas/expense-upload';
 
 /**
  * POST /api/expenses/detect
@@ -115,3 +115,4 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		rawTextLength: extracted.rawText?.length ?? 0
 	});
 };
+

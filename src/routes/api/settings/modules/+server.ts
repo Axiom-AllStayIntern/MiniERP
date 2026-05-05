@@ -1,8 +1,8 @@
 import type { RequestHandler } from './$types';
 
-import { createModuleContext, registry } from '$lib/server/modules';
-import { createCoreApi } from '$lib/server/modules/core/api';
-import { fail, ok } from '$lib/server/http';
+import { createModuleContext, registry } from '$platform/modules';
+import { createCoreApi } from '$modules/legacy/server-modules/core/api';
+import { fail, ok } from '$platform/http';
 
 function getValidModuleIds() {
 	return new Set(registry.getAll().map((m) => m.manifest.id));
@@ -56,3 +56,4 @@ export const PUT: RequestHandler = async (event) => {
 		return fail((e as Error).message, 500);
 	}
 };
+

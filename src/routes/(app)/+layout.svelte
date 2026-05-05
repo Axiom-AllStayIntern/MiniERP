@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { authClient } from '$lib/auth-client';
-	// AgentChat is retired in favour of WorkflowPanel; kept in the tree for
-	// reference until its router/intent logic is fully migrated in Phase 1B.
-	// import AgentChat from '$lib/components/AgentChat.svelte';
+	import { authClient } from '$platform/auth/client';
 	import WorkflowPanel from '$app-layer/ai-panel/components/workflow-panel/WorkflowPanel.svelte';
 	import PanelTrigger from '$app-layer/ai-panel/components/workflow-panel/PanelTrigger.svelte';
 
@@ -374,7 +371,8 @@
 			{/if}
 		</main>
 	</div>
-	<!-- <AgentChat /> -->
 	<PanelTrigger />
 	<WorkflowPanel />
 </div>
+
+

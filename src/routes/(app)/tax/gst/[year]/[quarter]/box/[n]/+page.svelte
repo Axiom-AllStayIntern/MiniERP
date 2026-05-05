@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageShell from '$lib/components/PageShell.svelte';
+	import PageShell from '$app-layer/components/PageShell.svelte';
 
 	let { data } = $props();
 
@@ -22,7 +22,7 @@
 
 	{#if data.breakdown}
 		<p class="mt-3 text-xs text-slate-500">
-			Box 8 here is output tax (standard-rated sales only) minus supplier invoice input tax. Reverse charge (Boxes 10â€“12) is manual; confirm net payable on the IRAS return.
+			Box 8 here is output tax (standard-rated sales only) minus supplier invoice input tax. Reverse charge (Boxes 10â€?2) is manual; confirm net payable on the IRAS return.
 		</p>
 		<div class="mt-2 grid gap-4 md:grid-cols-3">
 			<article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -86,3 +86,5 @@
 		</div>
 	{/if}
 </PageShell>
+
+

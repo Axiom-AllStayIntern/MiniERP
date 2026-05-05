@@ -1,4 +1,4 @@
-import type { AuthRole } from '../../lib/server/auth/config';
+import type { AuthRole } from '../auth/config';
 import type { FinanceRiskLevel } from '../../modules/finance/agent/types';
 import { lookupCapability } from './capability-registry';
 
@@ -53,7 +53,7 @@ const ACCEPTABLE_RISK: ReadonlySet<FinanceRiskLevel> = new Set<FinanceRiskLevel>
 ]);
 
 /**
- * Doc 03 §8 — 9-point tool policy check. Order matters: stop on first failure
+ * Doc 03 §8 �?9-point tool policy check. Order matters: stop on first failure
  * but accumulate human-readable reasons in `blockedBy` so the audit log can
  * see exactly which gate fired.
  */
@@ -115,3 +115,4 @@ export function checkToolPolicy(input: PolicyCheckInput): PolicyDecision {
 		blockedBy
 	};
 }
+

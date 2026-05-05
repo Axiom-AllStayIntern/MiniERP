@@ -1,5 +1,5 @@
 import type { LayoutServerLoad } from './$types';
-import { createModuleContext } from '$lib/server/modules';
+import { createModuleContext } from '$platform/modules';
 import { createProjectApi } from '../../modules/project';
 import { getEnabledModuleIds } from '../../platform/config';
 
@@ -27,3 +27,4 @@ export const load: LayoutServerLoad = async (event) => {
 		projectListCounts
 	};
 };
+

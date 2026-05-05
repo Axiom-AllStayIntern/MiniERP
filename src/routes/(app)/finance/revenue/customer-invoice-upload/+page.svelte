@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { invalidate } from '$app/navigation';
-	import PageShell from '$lib/components/PageShell.svelte';
+	import PageShell from '$app-layer/components/PageShell.svelte';
 	import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-	import { EXPENSE_UPLOAD_CURRENCIES } from '$lib/constants/expense-upload';
+	import { EXPENSE_UPLOAD_CURRENCIES } from '$modules/finance/schemas/expense-upload';
 
 	let { data } = $props();
 
@@ -30,7 +30,7 @@
 	let projectSearching = $state(false);
 
 	const pageTitle = $derived(
-		selectedProject ? `Upload customer invoice — ${selectedProject.name}` : 'Upload customer invoice'
+		selectedProject ? `Upload customer invoice �?${selectedProject.name}` : 'Upload customer invoice'
 	);
 
 	async function searchProjects() {
@@ -450,7 +450,7 @@
 						onclick={clearProject}
 						title="Unlink"
 					>
-						✕
+						�?
 					</button>
 				</span>
 			{/if}
@@ -554,7 +554,7 @@
 						disabled={detecting || !selectedFile}
 						onclick={() => void runDetect()}
 					>
-						{detecting ? 'Detecting…' : 'OCR + AI detect & fill'}
+						{detecting ? 'Detecting...' : 'OCR + AI detect & fill'}
 					</button>
 					<button
 						type="button"
@@ -562,7 +562,7 @@
 						disabled={uploading || !selectedFile}
 						onclick={() => void upload()}
 					>
-						{uploading ? 'Saving…' : 'Upload and save'}
+						{uploading ? 'Saving...' : 'Upload and save'}
 					</button>
 					{#if duplicateInvoicePending}
 						<button
@@ -615,7 +615,7 @@
 						disabled={previewZoomPct <= 50}
 						onclick={() => setPreviewZoom(previewZoomPct - 10)}
 					>
-						−
+						�?
 					</button>
 					<button
 						type="button"
@@ -671,8 +671,8 @@
 
 			<h2 class="mt-6 text-sm font-semibold text-slate-900">Save result</h2>
 			<div class="mt-2 space-y-1 text-xs text-slate-600">
-				<p><span class="font-medium text-slate-800">Invoice Number:</span> {savedInvoiceNo ?? '—'}</p>
-				<p><span class="font-medium text-slate-800">Record ID:</span> {savedEntityId ?? '—'}</p>
+				<p><span class="font-medium text-slate-800">Invoice Number:</span> {savedInvoiceNo ?? '-'}</p>
+				<p><span class="font-medium text-slate-800">Record ID:</span> {savedEntityId ?? '-'}</p>
 				{#if savedEntityId && selectedProject}
 					<p>
 						<a
@@ -714,7 +714,7 @@
 						showProjectPicker = false;
 					}}
 				>
-					✕
+					�?
 				</button>
 			</div>
 			<div class="border-b border-slate-100 px-5 py-3">
@@ -752,14 +752,14 @@
 						class="h-10 self-end rounded border border-[var(--sf-green)] bg-[var(--sf-green)] px-4 text-sm font-medium text-white hover:bg-[#2f5e2c]"
 						onclick={() => void searchProjects()}
 					>
-						{projectSearching ? 'Searching…' : 'Search'}
+						{projectSearching ? 'Searching...' : 'Search'}
 					</button>
 				</div>
 			</div>
 			<div class="max-h-[50vh] overflow-auto px-5 py-3">
 				{#if projectSearchResults.length === 0}
 					<p class="py-6 text-center text-sm text-slate-400">
-						{projectSearching ? 'Searching…' : 'No results. Try different filters.'}
+						{projectSearching ? 'Searching...' : 'No results. Try different filters.'}
 					</p>
 				{:else}
 					<div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -780,9 +780,9 @@
 											<p class="font-medium text-slate-800">{p.name}</p>
 											<p class="text-[11px] text-slate-400">{p.id}</p>
 										</td>
-										<td class="px-3 py-2">{p.customerName ?? '—'}</td>
+										<td class="px-3 py-2">{p.customerName ?? '-'}</td>
 										<td class="px-3 py-2">{p.status}</td>
-										<td class="px-3 py-2">{p.startDate ?? '—'} / {p.endDate ?? '—'}</td>
+										<td class="px-3 py-2">{p.startDate ?? '-'} / {p.endDate ?? '-'}</td>
 										<td class="px-3 py-2">
 											<button
 												type="button"
@@ -802,3 +802,5 @@
 		</div>
 	</div>
 {/if}
+
+

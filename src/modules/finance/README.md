@@ -13,10 +13,10 @@ Target ownership:
 - Finance workspace entry metadata
 
 Current legacy subdomains:
-- `src/lib/server/modules/ar`
-- `src/lib/server/modules/expense`
-- `src/lib/server/modules/tax`
-- `src/lib/server/modules/reporting`
+- `src/modules/legacy/server-modules/ar`
+- `src/modules/legacy/server-modules/expense`
+- `src/modules/legacy/server-modules/tax`
+- `src/modules/legacy/server-modules/reporting`
 
 Integration rule:
 - Project and HR context must be consumed through lookup adapters or public
@@ -30,7 +30,7 @@ boundary for incremental migration.
 Current bridge status:
 - Executable Finance facade assembly now lives under this target directory.
 - The former compatibility entrypoints under
-  `src/lib/server/modules/finance/{index,api,compat}.ts` were retired after
+  `src/modules/legacy/server-modules/finance/{index,api,compat}.ts` were retired after
   their caller count reached zero.
 - Internal convergence has now started inside this module by splitting the
   target layer into:

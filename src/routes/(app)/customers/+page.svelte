@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageShell from '$lib/components/PageShell.svelte';
+	import PageShell from '$app-layer/components/PageShell.svelte';
 
 	let { data } = $props();
 </script>
@@ -43,8 +43,8 @@
 					{#each data.customers as c}
 						<tr class="hover:bg-slate-50/80">
 							<td class="px-4 py-3 font-medium text-slate-900">{c.name}</td>
-							<td class="px-4 py-3 text-slate-600">{c.contact ?? '—'}</td>
-							<td class="max-w-md truncate px-4 py-3 text-slate-600" title={c.address ?? ''}>{c.address ?? '—'}</td>
+							<td class="px-4 py-3 text-slate-600">{c.contact ?? '-'}</td>
+							<td class="max-w-md truncate px-4 py-3 text-slate-600" title={c.address ?? ''}>{c.address ?? '-'}</td>
 						</tr>
 					{/each}
 				{/if}
@@ -52,3 +52,5 @@
 		</table>
 	</div>
 </PageShell>
+
+

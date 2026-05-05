@@ -15,3 +15,4 @@ export const load: PageServerLoad = async ({ url }) => {
 		filters: { status: projectStatus, from, to }
 	};
 };
+

@@ -1,13 +1,13 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
+import { fail, ok } from '$platform/http';
 import { createDocumentIntakeService } from '../../../modules/document-intake';
 
 /**
  * Manual upload endpoint (Phase 2). Accepts multipart/form-data with a single
  * `file` field plus optional `uploadedFrom` (default `ai_panel`). Stores the
  * file via the platform FileService, creates a Document Artifact, runs the
- * synchronous extract â†’ classify pipeline, and returns the artifact view.
+ * synchronous extract â†?classify pipeline, and returns the artifact view.
  */
 export const POST: RequestHandler = async (event) => {
 	if (!event.platform) return fail('Cloudflare platform bindings are required', 500);
@@ -68,3 +68,4 @@ export const POST: RequestHandler = async (event) => {
 
 	return ok(service.toView(processed), 201);
 };
+

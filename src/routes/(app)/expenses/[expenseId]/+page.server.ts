@@ -1,10 +1,10 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { createCoreApi } from '$lib/server/modules/core';
-import { createModuleContext } from '$lib/server/modules';
+import { createCoreApi } from '$modules/legacy/server-modules/core';
+import { createModuleContext } from '$platform/modules';
 import { createFinanceApi } from '../../../../modules/finance';
-import { deleteUploadedFileHashForEntity } from '$lib/server/uploaded-file-hash';
+import { deleteUploadedFileHashForEntity } from '$platform/files/uploaded-file-hash';
 
 export const load: PageServerLoad = async (event) => {
 	const { params, platform } = event;
@@ -95,3 +95,4 @@ export const actions: Actions = {
 		throw redirect(303, '/expenses');
 	}
 };
+

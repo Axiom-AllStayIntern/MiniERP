@@ -1,8 +1,8 @@
 import { and, desc, eq, isNull } from 'drizzle-orm';
-import { resolveSgdEquivalentForWrite } from '$lib/server/fx/resolve-sgd-equivalent';
-import { parseDocumentMetadata } from '$lib/server/document-metadata';
-import { resolveExpenseFilePreview } from '$lib/server/expense-file-preview';
-import type { ModuleContext } from '../../../lib/server/modules/types';
+import { resolveSgdEquivalentForWrite } from '$modules/finance/services/fx/resolve-sgd-equivalent';
+import { parseDocumentMetadata } from '$modules/finance/schemas/document-metadata';
+import { resolveExpenseFilePreview } from '$modules/finance/services/expense-file-preview';
+import type { ModuleContext } from '$platform/modules/types';
 import { invoicesOut, revenue } from '../../../infrastructure/db/schema';
 import { RevenueRepository } from '../repositories';
 

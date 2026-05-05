@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 
-import { createModuleContext } from '$lib/server/modules';
+import { createModuleContext } from '$platform/modules';
 import { createProjectApi } from '../../../modules/project';
 
 const PAGE_SIZE = 10;
@@ -37,3 +37,4 @@ export const load: PageServerLoad = async (event) => {
 		page: Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1
 	});
 };
+

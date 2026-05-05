@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
-import { fail, ok } from '$lib/server/http';
-import { runOcrPipeline } from '$lib/server/ocr/pipeline';
+import { fail, ok } from '$platform/http';
+import { runOcrPipeline } from '$platform/ai/ocr/pipeline';
 
 /**
  * POST /api/finance/revenue-invoice/detect
@@ -101,3 +101,4 @@ export const POST: RequestHandler = async ({ request, platform, fetch }) => {
 		rawTextLength: extracted.rawText?.length ?? 0
 	});
 };
+

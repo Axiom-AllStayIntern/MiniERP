@@ -1,5 +1,5 @@
-import type { ModuleContext } from '../../lib/server/modules/types';
-import { DocumentIntakeService } from '../../lib/server/modules/document-intake/service';
+import type { ModuleContext } from '$platform/modules/types';
+import { DocumentIntakeService } from '$modules/legacy/server-modules/document-intake/service';
 import type { DocumentIntakeSource } from './contracts';
 
 export function createDocumentIntakeLegacySource(ctx: ModuleContext): DocumentIntakeSource {
