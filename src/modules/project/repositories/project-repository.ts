@@ -1,18 +1,16 @@
-import { and, desc, eq, isNull, like, or, sql } from 'drizzle-orm';
-import type { DBClient } from '../../../infrastructure/db';
-import { customers, projectEmployees, projects } from '../../../infrastructure/db/schema';
+import { eq, isNull, and, like, or, desc, sql } from 'drizzle-orm';
+import type { DBClient } from '$infrastructure/db';
+import { projects, projectEmployees } from './project.schema';
+import { customers } from '$modules/business-partner/repositories/business-partner.schema';
+import { BaseRepository } from '$platform/modules/base-repository';
 
-export class ProjectRepository {
-	constructor(private db: DBClient) {}
+// ---------------------------------------------------------------------------
+// ProjectRepository
+// ---------------------------------------------------------------------------
 
-	async findById(projectId: string) {
-		const rows = await this.db
-			.select()
-			.from(projects)
-			.where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
-			.limit(1);
-
-		return rows[0] ?? null;
+export class ProjectRepository extends BaseRepository<typeof projects> {
+	constructor(db: DBClient) {
+		super(db, projects);
 	}
 
 	async findWithCustomer(projectId: string) {
@@ -25,7 +23,6 @@ export class ProjectRepository {
 			.leftJoin(customers, eq(projects.customerId, customers.id))
 			.where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
 			.limit(1);
-
 		return rows[0] ?? null;
 	}
 
@@ -35,23 +32,32 @@ export class ProjectRepository {
 		const conditions = [isNull(projects.deletedAt)];
 
 		if (opts?.q) {
-			conditions.push(or(like(projects.name, `%${opts.q}%`), like(projects.description, `%${opts.q}%`))!);
+			conditions.push(
+				or(
+					like(projects.name, `%${opts.q}%`),
+					like(projects.description, `%${opts.q}%`)
+				)!
+			);
 		}
 		if (opts?.status) {
 			conditions.push(eq(projects.status, opts.status));
 		}
 
-		return this.db
+		const where = and(...conditions);
+
+		const rows = await this.db
 			.select({
 				project: projects,
 				customerName: customers.name
 			})
 			.from(projects)
 			.leftJoin(customers, eq(projects.customerId, customers.id))
-			.where(and(...conditions))
+			.where(where)
 			.orderBy(desc(projects.createdAt))
 			.limit(pageSize)
 			.offset((page - 1) * pageSize);
+
+		return rows;
 	}
 
 	async getListCounts() {
@@ -73,6 +79,33 @@ export class ProjectRepository {
 		return this.db
 			.select()
 			.from(projectEmployees)
-			.where(and(eq(projectEmployees.projectId, projectId), isNull(projectEmployees.deletedAt)));
+			.where(
+				and(eq(projectEmployees.projectId, projectId), isNull(projectEmployees.deletedAt))
+			);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ProjectMemberRepository
+// ---------------------------------------------------------------------------
+
+export class ProjectMemberRepository extends BaseRepository<typeof projectEmployees> {
+	constructor(db: DBClient) {
+		super(db, projectEmployees);
+	}
+
+	async findByProjectAndEmployee(projectId: string, employeeId: string) {
+		const rows = await this.db
+			.select()
+			.from(projectEmployees)
+			.where(
+				and(
+					eq(projectEmployees.projectId, projectId),
+					eq(projectEmployees.employeeId, employeeId),
+					isNull(projectEmployees.deletedAt)
+				)
+			)
+			.limit(1);
+		return rows[0] ?? null;
 	}
 }

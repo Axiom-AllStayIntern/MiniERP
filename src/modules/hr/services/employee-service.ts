@@ -22,7 +22,7 @@ import {
 	employeeProjectAllocations,
 	payoutRecords
 } from '../repositories/employee.schema';
-import { projectEmployees } from '$modules/legacy/server-modules/project/schema';
+import { projectEmployees } from '$modules/project/repositories/project.schema';
 
 // ---------------------------------------------------------------------------
 // Helpers (absorbed from company-allocation-settle.ts)

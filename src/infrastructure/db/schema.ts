@@ -34,7 +34,7 @@ export {
 } from '$modules/business-partner/repositories/business-partner.schema';
 
 // Project module
-export { projects, projectEmployees } from '$modules/legacy/server-modules/project/schema';
+export { projects, projectEmployees } from '$modules/project/repositories/project.schema';
 
 // AR module
 export {

@@ -1,20 +1,20 @@
-import { ProjectService } from '$modules/legacy/server-modules/project/service';
+import { ProjectService } from '$modules/project/services/legacy-project-service';
 
-type LegacyProjectService = InstanceType<typeof ProjectService>;
+type ProjectServiceMethods = InstanceType<typeof ProjectService>;
 
 export interface ProjectSource {
-	getById: LegacyProjectService['getById'];
-	getWithCustomer: LegacyProjectService['getWithCustomer'];
-	list: LegacyProjectService['list'];
-	getProjectListPage: LegacyProjectService['getProjectListPage'];
-	getListCounts: LegacyProjectService['getListCounts'];
-	getProjectShell: LegacyProjectService['getProjectShell'];
-	create: LegacyProjectService['create'];
-	update: LegacyProjectService['update'];
-	archive: LegacyProjectService['archive'];
-	softDelete: LegacyProjectService['softDelete'];
-	getMembers: LegacyProjectService['getMembers'];
-	addMember: LegacyProjectService['addMember'];
-	removeMember: LegacyProjectService['removeMember'];
-	getProjectFinancials: LegacyProjectService['getProjectFinancials'];
+	getById: ProjectServiceMethods['getById'];
+	getWithCustomer: ProjectServiceMethods['getWithCustomer'];
+	list: ProjectServiceMethods['list'];
+	getProjectListPage: ProjectServiceMethods['getProjectListPage'];
+	getListCounts: ProjectServiceMethods['getListCounts'];
+	getProjectShell: ProjectServiceMethods['getProjectShell'];
+	create: ProjectServiceMethods['create'];
+	update: ProjectServiceMethods['update'];
+	archive: ProjectServiceMethods['archive'];
+	softDelete: ProjectServiceMethods['softDelete'];
+	getMembers: ProjectServiceMethods['getMembers'];
+	addMember: ProjectServiceMethods['addMember'];
+	removeMember: ProjectServiceMethods['removeMember'];
+	getProjectFinancials: ProjectServiceMethods['getProjectFinancials'];
 }

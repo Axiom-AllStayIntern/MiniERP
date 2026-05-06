@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 import type { ModuleContext } from '$platform/modules/types';
-import { ProjectRepository, ProjectMemberRepository } from './repository';
+import { ProjectRepository, ProjectMemberRepository } from '../repositories/project-repository';
 import { NotFoundError } from '$platform/modules/errors';
 import { createEvent } from '$platform/modules';
 import { schema } from '$infrastructure/db';

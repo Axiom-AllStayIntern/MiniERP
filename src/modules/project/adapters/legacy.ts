@@ -1,5 +1,5 @@
 import type { ModuleContext } from '$platform/modules/types';
-import { ProjectService } from '$modules/legacy/server-modules/project/service';
+import { ProjectService } from '$modules/project/services/legacy-project-service';
 import type { ProjectSource } from '../contracts/source';
 
 export function createProjectLegacySource(ctx: ModuleContext): ProjectSource {

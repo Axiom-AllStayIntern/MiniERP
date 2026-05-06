@@ -1,7 +1,7 @@
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { timeFields } from '$platform/modules/schema-helpers';
 import { persons } from '$modules/hr/repositories/person.schema';
-import { projects } from '../project/schema';
+import { projects } from '$modules/project/repositories/project.schema';
 
 // ---------------------------------------------------------------------------
 // GST Returns
