@@ -5,7 +5,7 @@ import {
 	allocationPeriodDay,
 	periodCalendarMonth,
 	shadowCompensationComponentId
-} from '$modules/legacy/server-modules/employee/service';
+} from '$modules/hr/services/employee-service';
 
 export {
 	staffCostPayoutStatuses,
@@ -13,7 +13,7 @@ export {
 	staffCostPayoutJoinConditions,
 	staffCostSumExpr,
 	staffCostPeriodBetween
-} from '$modules/legacy/server-modules/employee/repository';
+} from '$modules/hr/repositories/employee-repository';
 
 export { allocationPeriodDay, periodCalendarMonth, shadowCompensationComponentId };
 

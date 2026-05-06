@@ -8,18 +8,21 @@ import {
 	AllocationRepository,
 	staffCostPayoutJoinConditions,
 	staffCostSumExpr
-} from './repository';
-import { invoicesIn } from '../ar/schema';
-import { expenses } from '../expense/schema';
-import { projectExpenseOpexSumExpr, projectExpenseSalesCostSumExpr } from '../expense/repository';
-import { employees } from '../person/schema';
+} from '../repositories/employee-repository';
+import { invoicesIn } from '$modules/legacy/server-modules/ar/schema';
+import { expenses } from '$modules/legacy/server-modules/expense/schema';
+import {
+	projectExpenseOpexSumExpr,
+	projectExpenseSalesCostSumExpr
+} from '$modules/legacy/server-modules/expense/repository';
+import { employees } from '../repositories/person.schema';
 import {
 	compensationComponents,
 	employeeCompensationComponents,
 	employeeProjectAllocations,
 	payoutRecords
-} from './schema';
-import { projectEmployees } from '../project/schema';
+} from '../repositories/employee.schema';
+import { projectEmployees } from '$modules/legacy/server-modules/project/schema';
 
 // ---------------------------------------------------------------------------
 // Helpers (absorbed from company-allocation-settle.ts)
@@ -359,7 +362,7 @@ export class SettlementService {
 				)
 				.limit(1);
 
-			const note = `${ecc.label} Ã— ${weightPct}% (company â†?project)`;
+			const note = `${ecc.label} Ã— ${weightPct}% (company ï¿½?project)`;
 
 			let payoutId: string;
 			if (existingPayout) {
@@ -690,7 +693,7 @@ export class ProjectStaffingService {
 				pendingSettlementAmount,
 				pendingSettlementLabel:
 					draftPayoutsThisMonth.length > 0 || pendingComponentsCount > 0
-						? `${draftPayoutsThisMonth.length} draft payout(s) è·?${pendingComponentsCount} unsettled component(s)`
+						? `${draftPayoutsThisMonth.length} draft payout(s) ï¿½?${pendingComponentsCount} unsettled component(s)`
 						: 'None',
 				staffPctOfTotalCost
 			}

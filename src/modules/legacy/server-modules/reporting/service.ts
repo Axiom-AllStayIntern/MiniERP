@@ -14,7 +14,7 @@ import {
 	staffCostPayoutJoinConditions,
 	staffCostPeriodBetween,
 	staffCostSumExpr
-} from '../employee/repository';
+} from '$modules/hr/repositories/employee-repository';
 import { parseDocumentMetadata } from '$modules/finance/schemas/document-metadata';
 
 function isIsoDate(value: string) {

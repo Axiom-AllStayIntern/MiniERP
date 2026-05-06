@@ -1,7 +1,7 @@
 import { and, asc, between, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { ModuleContext } from '$platform/modules/types';
 import { schema } from '$infrastructure/db';
-import { estimateSingaporeResidentTax } from '../../../../modules/finance/rules';
+import { estimateSingaporeResidentTax } from '$modules/finance/rules';
 
 type EmployeeProfileInput = {
 	name: string;
@@ -198,7 +198,7 @@ export class EmployeeMasterService {
 				estimatedResidentTax,
 				byIncomeType,
 				note:
-					'Figures sum project-linked payout lines (status confirmed or paid) in the selected calendar year. IRAS reliefs beyond employee CPF are not stored; estimated tax uses resident progressive bands for illustration only éˆ?verify with IRAS / your tax advisor.'
+					'Figures sum project-linked payout lines (status confirmed or paid) in the selected calendar year. IRAS reliefs beyond employee CPF are not stored; estimated tax uses resident progressive bands for illustration only ï¿½?verify with IRAS / your tax advisor.'
 			}
 		};
 	}

@@ -1,6 +1,6 @@
 import { eq, isNull, and } from 'drizzle-orm';
 import type { DBClient } from '$infrastructure/db';
-import { persons, personRoles, employeeProfiles, employees } from './schema';
+import { persons, personRoles, employeeProfiles, employees } from './person.schema';
 import { BaseRepository } from '$platform/modules/base-repository';
 
 // ---------------------------------------------------------------------------

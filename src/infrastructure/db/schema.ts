@@ -14,7 +14,7 @@ export { uploadIdempotency, uploadFileDedup } from '$infrastructure/storage/uplo
 // better-auth tables (sessions, accounts, verifications)
 export { sessions, accounts, verifications } from '../../platform/auth/auth-tables';
 
-// Person module (includes legacy employees table)
+// Person tables (HR module)
 export {
 	persons,
 	personRoles,
@@ -22,7 +22,7 @@ export {
 	shareholderProfiles,
 	freelancerProfiles,
 	employees
-} from '$modules/legacy/server-modules/person/schema';
+} from '$modules/hr/repositories/person.schema';
 
 // Business Partner module (includes legacy customers table)
 export {
@@ -47,14 +47,14 @@ export {
 	arDocumentLinks
 } from '$modules/legacy/server-modules/ar/schema';
 
-// Employee module
+// Employee tables (HR module)
 export {
 	employeeSalaries,
 	employeeCompensationComponents,
 	employeeProjectAllocations,
 	compensationComponents,
 	payoutRecords
-} from '$modules/legacy/server-modules/employee/schema';
+} from '$modules/hr/repositories/employee.schema';
 
 // Expense module
 export {

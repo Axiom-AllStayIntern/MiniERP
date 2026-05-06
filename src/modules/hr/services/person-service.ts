@@ -1,5 +1,9 @@
 import type { ModuleContext } from '$platform/modules/types';
-import { PersonRepository, EmployeeProfileRepository, EmployeeRepository } from './repository';
+import {
+	PersonRepository,
+	EmployeeProfileRepository,
+	EmployeeRepository
+} from '../repositories/person-repository';
 import { NotFoundError } from '$platform/modules/errors';
 
 // ---------------------------------------------------------------------------

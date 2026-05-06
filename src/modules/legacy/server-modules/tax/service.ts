@@ -6,7 +6,7 @@ import {
 	staffCostPayoutJoinConditions,
 	staffCostPeriodBetween,
 	staffCostSumExpr
-} from '../employee/repository';
+} from '$modules/hr/repositories/employee-repository';
 import { GstReturnRepository, PersonIncomeRepository, TimeLogRepository } from './repository';
 
 // ---------------------------------------------------------------------------

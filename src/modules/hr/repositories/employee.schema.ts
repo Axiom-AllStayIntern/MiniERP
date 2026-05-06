@@ -1,8 +1,7 @@
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { timeFields } from '$platform/modules/schema-helpers';
-import { employees } from '../person/schema';
-import { projects } from '../project/schema';
-import { projectEmployees } from '../project/schema';
+import { employees } from './person.schema';
+import { projects, projectEmployees } from '$modules/legacy/server-modules/project/schema';
 
 // ---------------------------------------------------------------------------
 // Employee salaries (monthly records)

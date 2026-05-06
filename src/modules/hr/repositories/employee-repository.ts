@@ -6,7 +6,7 @@ import {
 	employeeProjectAllocations,
 	compensationComponents,
 	payoutRecords
-} from './schema';
+} from './employee.schema';
 import { BaseRepository } from '$platform/modules/base-repository';
 
 // ---------------------------------------------------------------------------
