@@ -1,6 +1,6 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { getDb } from '../../infrastructure/db';
-import { CompanySettingsRepository } from '$modules/legacy/server-modules/core/repository';
+import { CompanySettingsRepository } from '$platform/config/company-settings-repository';
 import type { ModuleContext } from '../modules/types';
 import { createEventBus, resetCorrelationId } from '../events';
 import { registry } from '../registry';

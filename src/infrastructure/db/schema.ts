@@ -5,14 +5,11 @@
  * migration, but infrastructure/db is now the active schema assembly point.
  */
 
-// Core module
-export {
-	users,
-	auditLogs,
-	companySettings,
-	uploadIdempotency,
-	uploadFileDedup
-} from '$modules/legacy/server-modules/core/schema';
+// Core platform tables (split across platform & infrastructure)
+export { users } from '$platform/auth/users.schema';
+export { auditLogs } from '$platform/audit/audit-log.schema';
+export { companySettings } from '$platform/config/company-settings.schema';
+export { uploadIdempotency, uploadFileDedup } from '$infrastructure/storage/upload-guards.schema';
 
 // better-auth tables (sessions, accounts, verifications)
 export { sessions, accounts, verifications } from '../../platform/auth/auth-tables';

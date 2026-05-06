@@ -1,5 +1,5 @@
 import type { DBClient } from '$infrastructure/db';
-import { CompanySettingsRepository } from '$modules/legacy/server-modules/core/repository';
+import { CompanySettingsRepository } from '$platform/config/company-settings-repository';
 import {
 	isPathEnabled as isMappedPathEnabled,
 	resolveEnabledModuleIds,

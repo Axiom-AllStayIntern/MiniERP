@@ -1,6 +1,12 @@
 import type { ModuleContext } from '$platform/modules/types';
-import { AuditService, ConfigService } from './service';
+import { AuditService } from '$platform/audit/audit-service';
+import { ConfigService } from '$platform/config/config-service';
 
+/**
+ * Thin facade combining audit + config helpers exposed to route handlers.
+ * Created during the Wave 1.2 split from legacy/core; new code should prefer
+ * importing the underlying services directly from $platform/{audit,config}.
+ */
 export type CoreApi = ReturnType<typeof createCoreApi>;
 
 export function createCoreApi(ctx: ModuleContext) {

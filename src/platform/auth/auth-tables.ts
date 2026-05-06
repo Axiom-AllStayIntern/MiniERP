@@ -1,6 +1,6 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
-import { users } from '$modules/legacy/server-modules/core/schema';
+import { users } from './users.schema';
 
 /** better-auth session storage */
 export const sessions = sqliteTable(

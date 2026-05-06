@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 
 import { createModuleContext, registry } from '$platform/modules';
-import { createCoreApi } from '$modules/legacy/server-modules/core/api';
+import { createCoreApi } from '$platform/core';
 import { fail, ok } from '$platform/http';
 
 function getValidModuleIds() {

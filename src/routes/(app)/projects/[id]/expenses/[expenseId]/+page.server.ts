@@ -1,7 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { createCoreApi } from '$modules/legacy/server-modules/core';
+import { createCoreApi } from '$platform/core';
 import { createModuleContext } from '$platform/modules';
 import { createFinanceApi } from '../../../../../../modules/finance';
 import { deleteUploadedFileHashForEntity } from '$platform/files/uploaded-file-hash';

@@ -15,7 +15,9 @@ export default defineConfig({
 	schema: [
 		'./src/modules/**/schema.ts',
 		'./src/modules/**/repositories/*.schema.ts',
-		'./src/platform/auth/auth-tables.ts'
+		'./src/platform/**/*.schema.ts',
+		'./src/platform/auth/auth-tables.ts',
+		'./src/infrastructure/**/*.schema.ts'
 	],
 	out: './drizzle/migrations',
 	dialect: 'sqlite',
