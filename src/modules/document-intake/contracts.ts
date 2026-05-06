@@ -108,13 +108,7 @@ export type DocumentIntakeCommandResult =
 
 export interface DocumentIntakeSource {
 	getDocumentStatus(documentId: string): Promise<DocumentStatusView | null>;
-	getSupplierInvoiceOcrStatus(invoiceId: string): Promise<SupplierInvoiceOcrStatusView | null>;
-	confirmSupplierInvoiceOcr(
-		invoiceId: string,
-		payload: ConfirmSupplierInvoiceOcrInput
-	): Promise<{ id: string; status: string }>;
 	uploadReferenceDocument(input: UploadReferenceDocumentInput): Promise<DocumentIntakeCommandResult>;
-	confirmUploadedObject(input: ConfirmUploadedObjectInput): Promise<DocumentIntakeCommandResult>;
 	saveDocHubUpload(input: SaveDocHubUploadInput): Promise<DocumentIntakeCommandResult>;
 	savePanelIntake(input: SavePanelIntakeInput): Promise<DocumentIntakeCommandResult>;
 }

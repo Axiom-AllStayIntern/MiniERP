@@ -9,7 +9,6 @@ import {
 	staffCostPayoutJoinConditions,
 	staffCostSumExpr
 } from '../repositories/employee-repository';
-import { invoicesIn } from '$modules/finance/repositories/legacy-invoices.schema';
 import { expenses } from '$modules/finance/repositories/expense.schema';
 import {
 	projectExpenseOpexSumExpr,
@@ -502,21 +501,19 @@ export class ProjectStaffingService {
 			.innerJoin(compensationComponents, eq(payoutRecords.componentId, compensationComponents.id))
 			.where(and(eq(payoutRecords.projectId, projectId), staffCostPayoutJoinConditions()));
 
-		const [purchaseRow] = await db
-			.select({ total: sql<number>`coalesce(sum(${invoicesIn.amount}), 0)` })
-			.from(invoicesIn)
-			.where(and(eq(invoicesIn.projectId, projectId), isNull(invoicesIn.deletedAt)));
-
+		// Wave 2.1b: invoicesIn no longer queried — sales-cost expenses (i.e. supplier
+		// invoice intake) live in expenses with expenseType='sales_cost'.
 		const expenseWhere = and(eq(expenses.projectId, projectId), isNull(expenses.deletedAt));
 		const [expSalesCostRow, expOpexRow] = await Promise.all([
 			db.select({ total: projectExpenseSalesCostSumExpr() }).from(expenses).where(expenseWhere),
 			db.select({ total: projectExpenseOpexSumExpr() }).from(expenses).where(expenseWhere)
 		]);
-		const expenseTotal = (expSalesCostRow[0]?.total ?? 0) + (expOpexRow[0]?.total ?? 0);
+		const salesCostTotal = expSalesCostRow[0]?.total ?? 0;
+		const opexTotal = expOpexRow[0]?.total ?? 0;
+		const expenseTotal = salesCostTotal + opexTotal;
 
 		const staffCostAllTime = staffAllRow?.total ?? 0;
-		const purchaseTotal = purchaseRow?.total ?? 0;
-		const totalProjectCost = purchaseTotal + staffCostAllTime + expenseTotal;
+		const totalProjectCost = staffCostAllTime + expenseTotal;
 		const staffPctOfTotalCost =
 			totalProjectCost > 0 ? Math.round((staffCostAllTime / totalProjectCost) * 1000) / 10 : 0;
 

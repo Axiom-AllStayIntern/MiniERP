@@ -6,10 +6,10 @@ import {
 	contracts,
 	customers,
 	expenses,
-	invoicesOut,
 	projects,
 	purchaseOrders,
-	quotations
+	quotations,
+	revenue
 } from '../../../infrastructure/db/schema';
 import {
 	activityVariantForAction,
@@ -139,11 +139,12 @@ export function createProjectApi(ctx: ModuleContext) {
 			.limit(PROJECT_LIST_PAGE_SIZE)
 			.offset(safeOffset);
 
+		// Wave 2.1d: invoice counts now come from revenue (canonical fact table).
 		const invoiceCountRows = await ctx.db
-			.select({ projectId: invoicesOut.projectId, total: sql<number>`count(*)` })
-			.from(invoicesOut)
-			.where(isNull(invoicesOut.deletedAt))
-			.groupBy(invoicesOut.projectId);
+			.select({ projectId: revenue.projectId, total: sql<number>`count(*)` })
+			.from(revenue)
+			.where(isNull(revenue.deletedAt))
+			.groupBy(revenue.projectId);
 		const invoiceCountMap = new Map(
 			invoiceCountRows.map((row) => [row.projectId, Number(row.total ?? 0)])
 		);

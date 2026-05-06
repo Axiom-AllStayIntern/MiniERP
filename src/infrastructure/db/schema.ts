@@ -44,9 +44,6 @@ export {
 	arDocumentLinks
 } from '$modules/project/repositories/archive.schema';
 
-// Finance legacy compat invoices + payments (DEPRECATED — Wave 2 converges these)
-export { invoicesOut, invoicesIn, payments } from '$modules/finance/repositories/legacy-invoices.schema';
-
 // Employee tables (HR module)
 export {
 	employeeSalaries,

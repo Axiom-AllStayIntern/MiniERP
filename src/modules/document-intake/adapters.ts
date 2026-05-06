@@ -7,10 +7,7 @@ export function createDocumentIntakeLegacySource(ctx: ModuleContext): DocumentIn
 
 	return {
 		getDocumentStatus: svc.getDocumentStatus.bind(svc),
-		getSupplierInvoiceOcrStatus: svc.getSupplierInvoiceOcrStatus.bind(svc),
-		confirmSupplierInvoiceOcr: svc.confirmSupplierInvoiceOcr.bind(svc),
 		uploadReferenceDocument: svc.uploadReferenceDocument.bind(svc),
-		confirmUploadedObject: svc.confirmUploadedObject.bind(svc),
 		saveDocHubUpload: svc.saveDocHubUpload.bind(svc),
 		savePanelIntake: svc.savePanelIntake.bind(svc)
 	};

@@ -1,9 +1,9 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { resolveSgdEquivalentForWrite } from '$modules/finance/services/fx/resolve-sgd-equivalent';
 import { parseDocumentMetadata } from '$modules/finance/schemas/document-metadata';
 import { resolveExpenseFilePreview } from '$modules/finance/services/expense-file-preview';
 import type { ModuleContext } from '$platform/modules/types';
-import { invoicesOut, revenue } from '../../../infrastructure/db/schema';
+import { revenue } from '../../../infrastructure/db/schema';
 import { RevenueRepository } from '../repositories';
 
 type FinanceRevenueCreateInput = {
@@ -24,7 +24,8 @@ export function createFinanceRevenueApi(ctx: ModuleContext) {
 	const getProjectRevenuePage = async (projectId: string) => {
 		const revenueRecords = await revenueRepository.findByProject(projectId);
 
-		let invoices: Array<{
+		// Wave 2.1d: invoicesOut table dropped; emit empty for legacy callers expecting it.
+		const invoices: Array<{
 			id: string;
 			invoiceNo: string;
 			date: string | null;
@@ -36,27 +37,6 @@ export function createFinanceRevenueApi(ctx: ModuleContext) {
 			total: number | null;
 			status: string | null;
 		}> = [];
-
-		try {
-			invoices = await ctx.db
-				.select({
-					id: invoicesOut.id,
-					invoiceNo: invoicesOut.invoiceNo,
-					date: invoicesOut.date,
-					dueDate: invoicesOut.dueDate,
-					currency: invoicesOut.currency,
-					subtotal: invoicesOut.subtotal,
-					gstType: invoicesOut.gstType,
-					gstAmount: invoicesOut.gstAmount,
-					total: invoicesOut.total,
-					status: invoicesOut.status
-				})
-				.from(invoicesOut)
-				.where(and(eq(invoicesOut.projectId, projectId), isNull(invoicesOut.deletedAt)))
-				.orderBy(desc(invoicesOut.date));
-		} catch {
-			invoices = [];
-		}
 
 		const revenueTotal = await revenueRepository.getProjectRevenueTotal(projectId);
 		return {

@@ -115,11 +115,12 @@ export class ProjectService {
 			.limit(PROJECT_LIST_PAGE_SIZE)
 			.offset(safeOffset);
 
+		// Wave 2.1d: invoice counts now come from revenue (canonical fact table).
 		const invoiceCountRows = await db
-			.select({ projectId: schema.invoicesOut.projectId, total: sql<number>`count(*)` })
-			.from(schema.invoicesOut)
-			.where(isNull(schema.invoicesOut.deletedAt))
-			.groupBy(schema.invoicesOut.projectId);
+			.select({ projectId: schema.revenue.projectId, total: sql<number>`count(*)` })
+			.from(schema.revenue)
+			.where(isNull(schema.revenue.deletedAt))
+			.groupBy(schema.revenue.projectId);
 		const invoiceCountMap = new Map(invoiceCountRows.map((row) => [row.projectId, Number(row.total ?? 0)]));
 
 		const projects = projectRows.map((row) => ({

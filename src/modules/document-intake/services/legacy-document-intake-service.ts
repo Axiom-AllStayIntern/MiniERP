@@ -173,52 +173,6 @@ export class DocumentIntakeService {
 		};
 	}
 
-	async getSupplierInvoiceOcrStatus(invoiceId: string) {
-		const [invoice] = await this.ctx.db
-			.select()
-			.from(schema.invoicesIn)
-			.where(eq(schema.invoicesIn.id, invoiceId))
-			.limit(1);
-
-		if (!invoice) return null;
-
-		return {
-			id: invoice.id,
-			status: invoice.status,
-			confidence: invoice.ocrConfidence,
-			result: invoice.rawOcr ? JSON.parse(invoice.rawOcr) : null
-		};
-	}
-
-	async confirmSupplierInvoiceOcr(
-		invoiceId: string,
-		payload: {
-			supplierName?: string;
-			invoiceDate?: string;
-			amount?: number;
-			currency?: string;
-			gstAmount?: number;
-			dueDate?: string;
-			poNumber?: string;
-		}
-	) {
-		await this.ctx.db
-			.update(schema.invoicesIn)
-			.set({
-				supplierName: payload.supplierName,
-				invoiceDate: payload.invoiceDate,
-				amount: payload.amount,
-				currency: payload.currency,
-				gstAmount: payload.gstAmount,
-				dueDate: payload.dueDate,
-				poNumber: payload.poNumber,
-				status: 'confirmed',
-				updatedAt: new Date().toISOString()
-			})
-			.where(eq(schema.invoicesIn.id, invoiceId));
-
-		return { id: invoiceId, status: 'confirmed' };
-	}
 
 	async uploadReferenceDocument(input: {
 		key: string;
@@ -294,49 +248,6 @@ export class DocumentIntakeService {
 		};
 	}
 
-	async confirmUploadedObject(input: {
-		key: string;
-		fileType: string;
-		projectId: string;
-		entityType: OcrQueueMessage['entityType'];
-		entityId?: string;
-		triggerOcr?: boolean;
-		skipObjectCheck?: boolean;
-	}) {
-		const exists = input.skipObjectCheck ? true : await objectExists(this.ctx.env, input.key);
-		if (!exists) {
-			return { ok: false as const, status: 404, message: 'Uploaded object was not found in R2' };
-		}
-
-		const entityId = input.entityId ?? crypto.randomUUID();
-		const now = new Date().toISOString();
-
-		if (input.entityType === 'invoice_in') {
-			await this.ctx.db.insert(schema.invoicesIn).values({
-				id: entityId,
-				projectId: input.projectId,
-				fileUrl: input.key,
-				status: 'processing',
-				createdAt: now,
-				updatedAt: now
-			});
-		}
-
-		const shouldQueue = input.triggerOcr ?? input.entityType === 'invoice_in';
-		if (shouldQueue) {
-			const message: OcrQueueMessage = {
-				id: crypto.randomUUID(),
-				fileKey: input.key,
-				fileType: input.fileType,
-				entityType: input.entityType,
-				entityId,
-				projectId: input.projectId
-			};
-			await this.ctx.env.OCR_QUEUE.send(message);
-		}
-
-		return { ok: true as const, entityId, status: shouldQueue ? 'queued' : 'saved' };
-	}
 
 	async saveDocHubUpload(input: {
 		key?: string;

@@ -5,8 +5,6 @@ import {
 	compensationComponents,
 	employees,
 	expenses,
-	invoicesIn,
-	invoicesOut,
 	payoutRecords,
 	projectEmployees,
 	revenue
@@ -103,65 +101,69 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 		const range = getQuarterRange(year, quarter);
 		if (!range) return null;
 
+		// Subtotal = revenue.amount - revenue.gstAmount (revenue.amount is gross-of-GST).
+		const subtotalExpr = sql<number>`coalesce(sum(${revenue.amount} - coalesce(${revenue.gstAmount}, 0)), 0)`;
+		const gstExpr = sql<number>`coalesce(sum(${revenue.gstAmount}), 0)`;
+
 		const [box1] = await ctx.db
-			.select({ total: sql<number>`coalesce(sum(${invoicesOut.subtotal}), 0)` })
-			.from(invoicesOut)
+			.select({ total: subtotalExpr })
+			.from(revenue)
 			.where(
 				and(
-					eq(invoicesOut.gstType, 'standard'),
-					between(invoicesOut.date, range.start, range.end),
-					isNull(invoicesOut.deletedAt)
+					eq(revenue.invoiceType, 'standard'),
+					between(revenue.date, range.start, range.end),
+					isNull(revenue.deletedAt)
 				)
 			);
 		const [box2] = await ctx.db
-			.select({ total: sql<number>`coalesce(sum(${invoicesOut.subtotal}), 0)` })
-			.from(invoicesOut)
+			.select({ total: subtotalExpr })
+			.from(revenue)
 			.where(
 				and(
-					eq(invoicesOut.gstType, 'zero'),
-					between(invoicesOut.date, range.start, range.end),
-					isNull(invoicesOut.deletedAt)
+					eq(revenue.invoiceType, 'zero_rate'),
+					between(revenue.date, range.start, range.end),
+					isNull(revenue.deletedAt)
 				)
 			);
-		const [box3] = await ctx.db
-			.select({ total: sql<number>`coalesce(sum(${invoicesOut.subtotal}), 0)` })
-			.from(invoicesOut)
+		// tax_invoice rows are also standard-rated under v4 (kept for IRAS audit trail);
+		// fold them into Box 1 so output GST stays consistent with Box 6.
+		const [box1TaxInvoice] = await ctx.db
+			.select({ total: subtotalExpr })
+			.from(revenue)
 			.where(
 				and(
-					eq(invoicesOut.gstType, 'exempt'),
-					between(invoicesOut.date, range.start, range.end),
-					isNull(invoicesOut.deletedAt)
+					eq(revenue.invoiceType, 'tax_invoice'),
+					between(revenue.date, range.start, range.end),
+					isNull(revenue.deletedAt)
 				)
 			);
-		const [purchases] = await ctx.db
-			.select({ total: sql<number>`coalesce(sum(${invoicesIn.amount}), 0)` })
-			.from(invoicesIn)
-			.where(and(between(invoicesIn.invoiceDate, range.start, range.end), isNull(invoicesIn.deletedAt)));
+		// Box 3 (exempt supplies) — revenue.invoiceType has no 'exempt' enum; reserved for
+		// future modeling. Returns 0 today.
 		const [expenseRows] = await ctx.db
 			.select({ total: sql<number>`coalesce(sum(${expenses.amount}), 0)` })
 			.from(expenses)
 			.where(and(between(expenses.date, range.start, range.end), isNull(expenses.deletedAt)));
 		const [box6] = await ctx.db
-			.select({ total: sql<number>`coalesce(sum(${invoicesOut.gstAmount}), 0)` })
-			.from(invoicesOut)
+			.select({ total: gstExpr })
+			.from(revenue)
 			.where(
 				and(
-					eq(invoicesOut.gstType, 'standard'),
-					between(invoicesOut.date, range.start, range.end),
-					isNull(invoicesOut.deletedAt)
+					inArray(revenue.invoiceType, ['standard', 'tax_invoice']),
+					between(revenue.date, range.start, range.end),
+					isNull(revenue.deletedAt)
 				)
 			);
 		const [box7] = await ctx.db
-			.select({ total: sql<number>`coalesce(sum(${invoicesIn.gstAmount}), 0)` })
-			.from(invoicesIn)
-			.where(and(between(invoicesIn.invoiceDate, range.start, range.end), isNull(invoicesIn.deletedAt)));
+			.select({ total: sql<number>`coalesce(sum(${expenses.gstAmount}), 0)` })
+			.from(expenses)
+			.where(and(between(expenses.date, range.start, range.end), isNull(expenses.deletedAt)));
 		const manual = await getGstManualBoxValues();
 
-		const b1 = box1?.total ?? 0;
+		const b1 = (box1?.total ?? 0) + (box1TaxInvoice?.total ?? 0);
 		const b2 = box2?.total ?? 0;
-		const b3 = box3?.total ?? 0;
+		const b3 = 0;
 		const b4 = b1 + b2 + b3;
-		const b5 = (purchases?.total ?? 0) + (expenseRows?.total ?? 0);
+		const b5 = expenseRows?.total ?? 0;
 		const b6 = box6?.total ?? 0;
 		const b7 = box7?.total ?? 0;
 		const b9 = Number.isFinite(manual.gst_box9_manual) ? manual.gst_box9_manual : 0;
@@ -192,14 +194,16 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 			meta: {
 				manualBoxes: ['box9', 'box10', 'box11', 'box12'],
 				notes: [
-					'Box 1-3: value of supplies (subtotal excl. GST) from customer invoices by gst_type.',
-					'Box 4: sum of boxes 1-3 (Box 4 = Box 1 + Box 2 + Box 3).',
-					'Box 5: supplier invoice amounts (invoices_in.amount) plus expenses (expenses.amount) (Box 5 = purchases + expenses). Expenses rows usually lack a split-out GST field - see Box 7 note.',
-					'Box 6: output GST from standard-rated sales only (invoices_out.gst_amount where gst_type = standard).',
-					'Box 7: input GST from supplier tax invoices only (invoices_in.gst_amount). Expense records do not currently store GST; their tax is not in Box 7 until modeled.',
-					'Box 8 = Box 6 - Box 7 (simplified) (Box 8 = Box 6 - Box 7). IRAS net payable can also involve Boxes 9-12 - maintain manually where applicable.',
-					'Box 9-12: company_settings keys gst_box9_manual - gst_box12_manual.',
-					'Box 13: set equal to Box 4 for this page (Box 13 = Box 4).'
+					'Box 1: standard-rated supplies excl. GST (revenue.amount - revenue.gstAmount where invoiceType in {standard, tax_invoice}).',
+					'Box 2: zero-rated supplies excl. GST (revenue where invoiceType = zero_rate).',
+					'Box 3: exempt supplies — currently returns 0; revenue.invoiceType has no exempt enum yet.',
+					'Box 4: sum of boxes 1-3.',
+					'Box 5: total purchases & imports (expenses.amount).',
+					'Box 6: output GST from standard-rated sales (revenue.gstAmount where invoiceType in {standard, tax_invoice}).',
+					'Box 7: input GST claimed (expenses.gstAmount). Wave 2.1a fixes status doc §12.1 — Box 7 no longer ignores expenses.gstAmount.',
+					'Box 8 = Box 6 - Box 7 (simplified). IRAS net payable can also involve Boxes 9-12 — maintain manually where applicable.',
+					'Box 9-12: company_settings keys gst_box9_manual..gst_box12_manual.',
+					'Box 13: set equal to Box 4 for this page.'
 				]
 			}
 		};
@@ -209,22 +213,27 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 		const range = getQuarterRange(year, quarter);
 		if (!range) return null;
 
+		const subtotalExpr = sql<number>`(${revenue.amount} - coalesce(${revenue.gstAmount}, 0))`;
+
+		// Box 1 (standard incl. tax_invoice variant), Box 2 (zero_rate), Box 3 (exempt — empty for now).
 		if ([1, 2, 3].includes(boxNo)) {
-			const gstType = boxNo === 1 ? 'standard' : boxNo === 2 ? 'zero' : 'exempt';
+			if (boxNo === 3) return { box: 3, invoices: [] };
+			const types: ('standard' | 'zero_rate' | 'tax_invoice')[] =
+				boxNo === 1 ? ['standard', 'tax_invoice'] : ['zero_rate'];
 			const invoices = await ctx.db
 				.select({
-					id: invoicesOut.id,
-					invoiceNo: invoicesOut.invoiceNo,
-					date: invoicesOut.date,
-					amount: invoicesOut.subtotal,
-					gstAmount: invoicesOut.gstAmount
+					id: revenue.id,
+					invoiceNo: revenue.invoiceNumber,
+					date: revenue.date,
+					amount: subtotalExpr,
+					gstAmount: revenue.gstAmount
 				})
-				.from(invoicesOut)
+				.from(revenue)
 				.where(
 					and(
-						eq(invoicesOut.gstType, gstType as 'standard' | 'zero' | 'exempt'),
-						between(invoicesOut.date, range.start, range.end),
-						isNull(invoicesOut.deletedAt)
+						inArray(revenue.invoiceType, types),
+						between(revenue.date, range.start, range.end),
+						isNull(revenue.deletedAt)
 					)
 				);
 			return { box: boxNo, invoices };
@@ -233,76 +242,68 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 		if (boxNo === 6) {
 			const invoices = await ctx.db
 				.select({
-					id: invoicesOut.id,
-					invoiceNo: invoicesOut.invoiceNo,
-					date: invoicesOut.date,
-					amount: invoicesOut.subtotal,
-					gstAmount: invoicesOut.gstAmount
+					id: revenue.id,
+					invoiceNo: revenue.invoiceNumber,
+					date: revenue.date,
+					amount: subtotalExpr,
+					gstAmount: revenue.gstAmount
 				})
-				.from(invoicesOut)
+				.from(revenue)
 				.where(
 					and(
-						eq(invoicesOut.gstType, 'standard'),
-						between(invoicesOut.date, range.start, range.end),
-						isNull(invoicesOut.deletedAt)
+						inArray(revenue.invoiceType, ['standard', 'tax_invoice']),
+						between(revenue.date, range.start, range.end),
+						isNull(revenue.deletedAt)
 					)
 				);
 			return { box: boxNo, invoices };
 		}
 
 		if (boxNo === 5) {
-			const purchases = await ctx.db
-				.select({
-					id: invoicesIn.id,
-					date: invoicesIn.invoiceDate,
-					counterparty: invoicesIn.supplierName,
-					amount: invoicesIn.amount,
-					type: sql<string>`'supplier_invoice'`
-				})
-				.from(invoicesIn)
-				.where(and(between(invoicesIn.invoiceDate, range.start, range.end), isNull(invoicesIn.deletedAt)));
+			// Box 5 = total purchases (expenses.amount).
 			const expenseRecords = await ctx.db
 				.select({
 					id: expenses.id,
 					date: expenses.date,
-					counterparty: sql<string>`coalesce(${expenses.category}, ${expenses.staffName}, 'Expense')`,
+					counterparty: sql<string>`coalesce(${expenses.vendorOrSupplier}, ${expenses.category}, ${expenses.staffName}, 'Expense')`,
 					amount: expenses.amount,
 					type: sql<string>`'expense'`
 				})
 				.from(expenses)
 				.where(and(between(expenses.date, range.start, range.end), isNull(expenses.deletedAt)));
 
-			return { box: boxNo, records: [...purchases, ...expenseRecords] };
+			return { box: boxNo, records: expenseRecords };
 		}
 
 		if (boxNo === 7) {
+			// Box 7 = input GST claimed from expenses (Wave 2.1a fix for status doc §12.1).
 			const invoices = await ctx.db
 				.select({
-					id: invoicesIn.id,
-					invoiceDate: invoicesIn.invoiceDate,
-					supplierName: invoicesIn.supplierName,
-					gstAmount: invoicesIn.gstAmount
+					id: expenses.id,
+					invoiceDate: expenses.date,
+					supplierName: expenses.vendorOrSupplier,
+					gstAmount: expenses.gstAmount
 				})
-				.from(invoicesIn)
-				.where(and(between(invoicesIn.invoiceDate, range.start, range.end), isNull(invoicesIn.deletedAt)));
+				.from(expenses)
+				.where(and(between(expenses.date, range.start, range.end), isNull(expenses.deletedAt)));
 			return { box: boxNo, invoices };
 		}
 
 		if (boxNo === 8) {
 			const [box6] = await ctx.db
-				.select({ total: sql<number>`coalesce(sum(${invoicesOut.gstAmount}), 0)` })
-				.from(invoicesOut)
+				.select({ total: sql<number>`coalesce(sum(${revenue.gstAmount}), 0)` })
+				.from(revenue)
 				.where(
 					and(
-						eq(invoicesOut.gstType, 'standard'),
-						between(invoicesOut.date, range.start, range.end),
-						isNull(invoicesOut.deletedAt)
+						inArray(revenue.invoiceType, ['standard', 'tax_invoice']),
+						between(revenue.date, range.start, range.end),
+						isNull(revenue.deletedAt)
 					)
 				);
 			const [box7] = await ctx.db
-				.select({ total: sql<number>`coalesce(sum(${invoicesIn.gstAmount}), 0)` })
-				.from(invoicesIn)
-				.where(and(between(invoicesIn.invoiceDate, range.start, range.end), isNull(invoicesIn.deletedAt)));
+				.select({ total: sql<number>`coalesce(sum(${expenses.gstAmount}), 0)` })
+				.from(expenses)
+				.where(and(between(expenses.date, range.start, range.end), isNull(expenses.deletedAt)));
 			return {
 				box: 8,
 				breakdown: {
@@ -331,15 +332,15 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 		if (boxNo === 4) {
 			const invoices = await ctx.db
 				.select({
-					id: invoicesOut.id,
-					invoiceNo: invoicesOut.invoiceNo,
-					date: invoicesOut.date,
-					amount: invoicesOut.subtotal,
-					gstType: invoicesOut.gstType,
-					gstAmount: invoicesOut.gstAmount
+					id: revenue.id,
+					invoiceNo: revenue.invoiceNumber,
+					date: revenue.date,
+					amount: subtotalExpr,
+					gstType: revenue.invoiceType,
+					gstAmount: revenue.gstAmount
 				})
-				.from(invoicesOut)
-				.where(and(between(invoicesOut.date, range.start, range.end), isNull(invoicesOut.deletedAt)));
+				.from(revenue)
+				.where(and(between(revenue.date, range.start, range.end), isNull(revenue.deletedAt)));
 			return {
 				box: boxNo,
 				invoices,
@@ -348,16 +349,17 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 		}
 
 		if (boxNo === 13) {
+			// Box 13 = total supplies including GST (revenue.amount is gross-of-GST).
 			const invoices = await ctx.db
 				.select({
-					id: invoicesOut.id,
-					invoiceNo: invoicesOut.invoiceNo,
-					date: invoicesOut.date,
-					amount: invoicesOut.total,
-					gstAmount: invoicesOut.gstAmount
+					id: revenue.id,
+					invoiceNo: revenue.invoiceNumber,
+					date: revenue.date,
+					amount: revenue.amount,
+					gstAmount: revenue.gstAmount
 				})
-				.from(invoicesOut)
-				.where(and(between(invoicesOut.date, range.start, range.end), isNull(invoicesOut.deletedAt)));
+				.from(revenue)
+				.where(and(between(revenue.date, range.start, range.end), isNull(revenue.deletedAt)));
 			return { box: boxNo, invoices };
 		}
 
@@ -372,10 +374,6 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 			.select({ total: projectRevenueTotalSumExpr() })
 			.from(revenue)
 			.where(and(between(revenue.date, start, end), isNull(revenue.deletedAt)));
-		const [purchaseRows] = await ctx.db
-			.select({ total: sql<number>`coalesce(sum(${invoicesIn.amount}), 0)` })
-			.from(invoicesIn)
-			.where(and(between(invoicesIn.invoiceDate, start, end), isNull(invoicesIn.deletedAt)));
 		const [staffRows] = await ctx.db
 			.select({ total: staffCostSumExpr() })
 			.from(payoutRecords)
@@ -386,9 +384,10 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 			.from(expenses)
 			.where(and(between(expenses.date, start, end), isNull(expenses.deletedAt)));
 
+		// Wave 2.1a: invoicesIn no longer queried — purchases are already part of expenses
+		// since the OCR / supplier-invoice intake writes expense rows in v4.
 		const taxableIncome =
 			(revenueRows?.total ?? 0) -
-			(purchaseRows?.total ?? 0) -
 			(staffRows?.total ?? 0) -
 			(expenseRows?.total ?? 0);
 		const taxPayable = calcCorporateTax(Math.max(taxableIncome, 0));
@@ -398,7 +397,7 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 			range: { start, end },
 			revenue: revenueRows?.total ?? 0,
 			costBreakdown: {
-				purchase: purchaseRows?.total ?? 0,
+				purchase: 0,
 				staff: staffRows?.total ?? 0,
 				expense: expenseRows?.total ?? 0
 			},

@@ -715,7 +715,9 @@ export class ExpenseService {
 			.where(and(eq(schema.revenue.projectId, projectId), isNull(schema.revenue.deletedAt)))
 			.orderBy(desc(schema.revenue.date), desc(schema.revenue.createdAt));
 
-		let invoices: Array<{
+		// Wave 2.1d: invoicesOut table dropped. revenue is the canonical fact table;
+		// callers should treat the legacy `invoices` field as empty for compat.
+		const invoices: Array<{
 			id: string;
 			invoiceNo: string;
 			date: string | null;
@@ -727,26 +729,6 @@ export class ExpenseService {
 			total: number | null;
 			status: string | null;
 		}> = [];
-		try {
-			invoices = await db
-				.select({
-					id: schema.invoicesOut.id,
-					invoiceNo: schema.invoicesOut.invoiceNo,
-					date: schema.invoicesOut.date,
-					dueDate: schema.invoicesOut.dueDate,
-					currency: schema.invoicesOut.currency,
-					subtotal: schema.invoicesOut.subtotal,
-					gstType: schema.invoicesOut.gstType,
-					gstAmount: schema.invoicesOut.gstAmount,
-					total: schema.invoicesOut.total,
-					status: schema.invoicesOut.status
-				})
-				.from(schema.invoicesOut)
-				.where(and(eq(schema.invoicesOut.projectId, projectId), isNull(schema.invoicesOut.deletedAt)))
-				.orderBy(desc(schema.invoicesOut.date));
-		} catch {
-			invoices = [];
-		}
 
 		const revenueTotal = await this.getProjectRevenueTotal(projectId);
 		return {

@@ -7,7 +7,6 @@ import {
 	contracts,
 	documents,
 	expenses,
-	invoicesIn,
 	payoutRecords,
 	projects,
 	purchaseOrders,
@@ -159,9 +158,15 @@ export function createFinanceInsightApi(ctx: ModuleContext) {
 			.from(revenue)
 			.where(and(between(revenue.date, current.start, current.end), isNull(revenue.deletedAt)));
 		const [supplierCost] = await ctx.db
-			.select({ total: sql<number>`coalesce(sum(${invoicesIn.amount}), 0)` })
-			.from(invoicesIn)
-			.where(and(between(invoicesIn.invoiceDate, current.start, current.end), isNull(invoicesIn.deletedAt)));
+			.select({ total: sql<number>`coalesce(sum(${expenses.amount}), 0)` })
+			.from(expenses)
+			.where(
+				and(
+					eq(expenses.expenseType, 'sales_cost'),
+					between(expenses.date, current.start, current.end),
+					isNull(expenses.deletedAt)
+				)
+			);
 		const [staffCost] = await ctx.db
 			.select({ total: staffCostSumExpr() })
 			.from(payoutRecords)
@@ -177,10 +182,14 @@ export function createFinanceInsightApi(ctx: ModuleContext) {
 			.from(revenue)
 			.where(and(between(revenue.date, previous.start, previous.end), isNull(revenue.deletedAt)));
 		const [prevSupplierCost] = await ctx.db
-			.select({ total: sql<number>`coalesce(sum(${invoicesIn.amount}), 0)` })
-			.from(invoicesIn)
+			.select({ total: sql<number>`coalesce(sum(${expenses.amount}), 0)` })
+			.from(expenses)
 			.where(
-				and(between(invoicesIn.invoiceDate, previous.start, previous.end), isNull(invoicesIn.deletedAt))
+				and(
+					eq(expenses.expenseType, 'sales_cost'),
+					between(expenses.date, previous.start, previous.end),
+					isNull(expenses.deletedAt)
+				)
 			);
 		const [prevStaffCost] = await ctx.db
 			.select({ total: staffCostSumExpr() })
@@ -206,15 +215,21 @@ export function createFinanceInsightApi(ctx: ModuleContext) {
 				.orderBy(desc(revenue.date), desc(revenue.createdAt)),
 			ctx.db
 				.select({
-					id: invoicesIn.id,
-					date: invoicesIn.invoiceDate,
-					ref: invoicesIn.poNumber,
-					note: invoicesIn.status,
-					amount: invoicesIn.amount
+					id: expenses.id,
+					date: expenses.date,
+					ref: sql<string>`coalesce(${expenses.vendorOrSupplier}, ${expenses.id})`,
+					note: sql<string>`'sales_cost'`,
+					amount: expenses.amount
 				})
-				.from(invoicesIn)
-				.where(and(between(invoicesIn.invoiceDate, current.start, current.end), isNull(invoicesIn.deletedAt)))
-				.orderBy(desc(invoicesIn.invoiceDate), desc(invoicesIn.createdAt)),
+				.from(expenses)
+				.where(
+					and(
+						eq(expenses.expenseType, 'sales_cost'),
+						between(expenses.date, current.start, current.end),
+						isNull(expenses.deletedAt)
+					)
+				)
+				.orderBy(desc(expenses.date), desc(expenses.createdAt)),
 			ctx.db
 				.select({
 					id: payoutRecords.id,
@@ -331,19 +346,22 @@ export function createFinanceInsightApi(ctx: ModuleContext) {
 		}
 
 		const baseRevenueRange = [isNull(revenue.deletedAt), inArray(revenue.projectId, projectIds)];
-		const baseSupplierRange = [isNull(invoicesIn.deletedAt), inArray(invoicesIn.projectId, projectIds)];
 		const baseStaffRange = [
 			isNull(payoutRecords.deletedAt),
 			inArray(payoutRecords.projectId, projectIds),
 			staffCostPayoutJoinConditions()
 		];
 		const baseExpenseRange = [isNull(expenses.deletedAt), inArray(expenses.projectId, projectIds)];
+		const baseSupplierRange = [
+			...baseExpenseRange,
+			eq(expenses.expenseType, 'sales_cost')
+		];
 
 		const [supplierCostSum, staffCostSum, expenseCostSum] = await Promise.all([
 			ctx.db
-				.select({ total: sql<number>`coalesce(sum(${invoicesIn.amount}), 0)` })
-				.from(invoicesIn)
-				.where(and(...baseSupplierRange, between(invoicesIn.invoiceDate, current.start, current.end))),
+				.select({ total: sql<number>`coalesce(sum(${expenses.amount}), 0)` })
+				.from(expenses)
+				.where(and(...baseSupplierRange, between(expenses.date, current.start, current.end))),
 			ctx.db
 				.select({ total: staffCostSumExpr() })
 				.from(payoutRecords)
@@ -386,12 +404,12 @@ export function createFinanceInsightApi(ctx: ModuleContext) {
 				.where(and(...baseRevenueRange, between(revenue.date, quarterStart, quarterEnd))),
 			ctx.db
 				.select({
-					date: invoicesIn.invoiceDate,
-					projectId: invoicesIn.projectId,
-					amount: invoicesIn.amount
+					date: expenses.date,
+					projectId: expenses.projectId,
+					amount: expenses.amount
 				})
-				.from(invoicesIn)
-				.where(and(...baseSupplierRange, between(invoicesIn.invoiceDate, quarterStart, quarterEnd))),
+				.from(expenses)
+				.where(and(...baseSupplierRange, between(expenses.date, quarterStart, quarterEnd))),
 			ctx.db
 				.select({
 					date: payoutRecords.period,
@@ -446,12 +464,12 @@ export function createFinanceInsightApi(ctx: ModuleContext) {
 				.groupBy(revenue.projectId),
 			ctx.db
 				.select({
-					projectId: invoicesIn.projectId,
-					total: sql<number>`coalesce(sum(${invoicesIn.amount}), 0)`
+					projectId: expenses.projectId,
+					total: sql<number>`coalesce(sum(${expenses.amount}), 0)`
 				})
-				.from(invoicesIn)
-				.where(and(...baseSupplierRange, between(invoicesIn.invoiceDate, current.start, current.end)))
-				.groupBy(invoicesIn.projectId),
+				.from(expenses)
+				.where(and(...baseSupplierRange, between(expenses.date, current.start, current.end)))
+				.groupBy(expenses.projectId),
 			ctx.db
 				.select({
 					projectId: payoutRecords.projectId,
@@ -548,16 +566,19 @@ export function createFinanceInsightApi(ctx: ModuleContext) {
 			.where(and(...revenueConditions))
 			.groupBy(revenue.projectId);
 
-		const purchaseConditions = [isNull(invoicesIn.deletedAt)];
-		if (hasRange) purchaseConditions.push(sql`${invoicesIn.invoiceDate} between ${from} and ${to}`);
+		const purchaseConditions = [
+			isNull(expenses.deletedAt),
+			eq(expenses.expenseType, 'sales_cost')
+		];
+		if (hasRange) purchaseConditions.push(sql`${expenses.date} between ${from} and ${to}`);
 		const purchaseRows = await ctx.db
 			.select({
-				projectId: invoicesIn.projectId,
-				total: sql<number>`coalesce(sum(${invoicesIn.amount}), 0)`
+				projectId: expenses.projectId,
+				total: sql<number>`coalesce(sum(${expenses.amount}), 0)`
 			})
-			.from(invoicesIn)
+			.from(expenses)
 			.where(and(...purchaseConditions))
-			.groupBy(invoicesIn.projectId);
+			.groupBy(expenses.projectId);
 
 		const staffConditions = [isNull(payoutRecords.deletedAt), staffCostPayoutJoinConditions()];
 		if (hasRange) staffConditions.push(staffCostPeriodBetween(from, to));
@@ -826,9 +847,15 @@ export function createFinanceInsightApi(ctx: ModuleContext) {
 			.from(revenue)
 			.where(and(eq(revenue.projectId, projectId), isNull(revenue.deletedAt)));
 		const [purchaseCost] = await ctx.db
-			.select({ total: sql<number>`coalesce(sum(${invoicesIn.amount}), 0)` })
-			.from(invoicesIn)
-			.where(and(eq(invoicesIn.projectId, projectId), isNull(invoicesIn.deletedAt)));
+			.select({ total: sql<number>`coalesce(sum(${expenses.amount}), 0)` })
+			.from(expenses)
+			.where(
+				and(
+					eq(expenses.projectId, projectId),
+					eq(expenses.expenseType, 'sales_cost'),
+					isNull(expenses.deletedAt)
+				)
+			);
 		const staffPayoutWhere = and(eq(payoutRecords.projectId, projectId), staffCostPayoutJoinConditions());
 		const [staffCost] = await ctx.db
 			.select({ total: staffCostSumExpr() })
@@ -858,15 +885,21 @@ export function createFinanceInsightApi(ctx: ModuleContext) {
 				.orderBy(sql`${revenue.date} desc`, sql`${revenue.createdAt} desc`),
 			ctx.db
 				.select({
-					id: invoicesIn.id,
-					label: invoicesIn.poNumber,
-					date: invoicesIn.invoiceDate,
-					status: invoicesIn.status,
-					amount: invoicesIn.amount
+					id: expenses.id,
+					label: sql<string>`coalesce(${expenses.vendorOrSupplier}, ${expenses.id})`,
+					date: expenses.date,
+					status: sql<string>`'sales_cost'`,
+					amount: expenses.amount
 				})
-				.from(invoicesIn)
-				.where(and(eq(invoicesIn.projectId, projectId), isNull(invoicesIn.deletedAt)))
-				.orderBy(sql`${invoicesIn.invoiceDate} desc`, sql`${invoicesIn.createdAt} desc`),
+				.from(expenses)
+				.where(
+					and(
+						eq(expenses.projectId, projectId),
+						eq(expenses.expenseType, 'sales_cost'),
+						isNull(expenses.deletedAt)
+					)
+				)
+				.orderBy(sql`${expenses.date} desc`, sql`${expenses.createdAt} desc`),
 			ctx.db
 				.select({
 					id: payoutRecords.id,

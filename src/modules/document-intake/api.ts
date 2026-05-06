@@ -7,10 +7,7 @@ export type DocumentIntakeApi = ReturnType<typeof createDocumentIntakePublicApi>
 export function createDocumentIntakePublicApi(source: DocumentIntakeSource) {
 	return {
 		getDocumentStatus: source.getDocumentStatus,
-		getSupplierInvoiceOcrStatus: source.getSupplierInvoiceOcrStatus,
-		confirmSupplierInvoiceOcr: source.confirmSupplierInvoiceOcr,
 		uploadReferenceDocument: source.uploadReferenceDocument,
-		confirmUploadedObject: source.confirmUploadedObject,
 		saveDocHubUpload: source.saveDocHubUpload,
 		savePanelIntake: source.savePanelIntake
 	};
