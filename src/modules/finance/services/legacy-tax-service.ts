@@ -7,7 +7,11 @@ import {
 	staffCostPeriodBetween,
 	staffCostSumExpr
 } from '$modules/hr/repositories/employee-repository';
-import { GstReturnRepository, PersonIncomeRepository, TimeLogRepository } from './repository';
+import {
+	GstReturnRepository,
+	PersonIncomeRepository,
+	TimeLogRepository
+} from '../repositories/legacy-tax-repository';
 
 // ---------------------------------------------------------------------------
 // Singapore resident progressive tax schedule

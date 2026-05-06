@@ -65,8 +65,8 @@ export {
 	expenseCategories
 } from '$modules/finance/repositories/expense.schema';
 
-// Tax module
-export { gstReturns, personIncome, timeLogs } from '$modules/legacy/server-modules/tax/schema';
+// Tax tables (finance module)
+export { gstReturns, personIncome, timeLogs } from '$modules/finance/repositories/tax.schema';
 
 // Document Intake module (target-layer artifact storage)
 export { documentArtifacts } from '../../modules/document-intake/repositories/document-artifact.schema';

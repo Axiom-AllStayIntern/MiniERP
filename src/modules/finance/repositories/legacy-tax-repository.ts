@@ -1,6 +1,6 @@
 import { eq, isNull, and, desc } from 'drizzle-orm';
 import type { DBClient } from '$infrastructure/db';
-import { gstReturns, personIncome, timeLogs } from './schema';
+import { gstReturns, personIncome, timeLogs } from './tax.schema';
 import { BaseRepository } from '$platform/modules/base-repository';
 
 // ---------------------------------------------------------------------------
