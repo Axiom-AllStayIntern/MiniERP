@@ -36,16 +36,16 @@ export {
 // Project module
 export { projects, projectEmployees } from '$modules/project/repositories/project.schema';
 
-// AR module
+// Project archive documents (contracts / quotations / POs)
 export {
 	contracts,
 	quotations,
-	invoicesOut,
 	purchaseOrders,
-	invoicesIn,
-	payments,
 	arDocumentLinks
-} from '$modules/legacy/server-modules/ar/schema';
+} from '$modules/project/repositories/archive.schema';
+
+// Finance legacy compat invoices + payments (DEPRECATED — Wave 2 converges these)
+export { invoicesOut, invoicesIn, payments } from '$modules/finance/repositories/legacy-invoices.schema';
 
 // Employee tables (HR module)
 export {

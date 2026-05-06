@@ -6,7 +6,6 @@
  */
 import { businessPartnerModule } from '$modules/business-partner';
 import { coreModule } from '$platform/core';
-import { arModule } from '$modules/legacy/server-modules/ar';
 import { documentIntakeModule } from '$modules/document-intake';
 import { financeModule } from '$modules/finance';
 import { employeeModule, personModule } from '$modules/hr';
@@ -20,7 +19,6 @@ registerModules([
 	businessPartnerModule,
 	projectModule,
 	financeModule,
-	arModule,
 	employeeModule,
 	documentIntakeModule
 ]);

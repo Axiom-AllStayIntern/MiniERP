@@ -9,7 +9,7 @@ import {
 	staffCostPayoutJoinConditions,
 	staffCostSumExpr
 } from '../repositories/employee-repository';
-import { invoicesIn } from '$modules/legacy/server-modules/ar/schema';
+import { invoicesIn } from '$modules/finance/repositories/legacy-invoices.schema';
 import { expenses } from '$modules/finance/repositories/expense.schema';
 import {
 	projectExpenseOpexSumExpr,

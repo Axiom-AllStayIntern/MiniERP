@@ -377,7 +377,7 @@
 				rawDetectedText: detectRawText || null
 			};
 
-			const saveRes = await fetch('/api/ar/save-project-document', {
+			const saveRes = await fetch('/api/finance/save-project-document', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify(payload)

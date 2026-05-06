@@ -34,11 +34,7 @@ const MODULE_PATH_MAPPINGS: ModulePathMapping[] = [
 	{ prefix: '/reports', moduleId: 'finance' },
 	{ prefix: '/dashboard', moduleId: 'finance' },
 
-	// Legacy AR compatibility (removed in Wave 1.8)
-	{ prefix: '/api/ar', moduleId: 'ar' },
-	{ prefix: '/ar', moduleId: 'ar' },
-
-	// Project (target module already exists; Wave 1.4 finishes the migration)
+	// Project (target module — Wave 1.4 finished)
 	{ prefix: '/api/projects', moduleId: 'project' },
 	{ prefix: '/projects', moduleId: 'project' },
 
