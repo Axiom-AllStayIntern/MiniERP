@@ -3,9 +3,9 @@ import type { ModuleContext } from '$platform/modules/types';
 import {
 	companySettings,
 	compensationComponents,
-	employees,
 	expenses,
 	payoutRecords,
+	persons,
 	projectEmployees,
 	revenue
 } from '../../../infrastructure/db/schema';
@@ -417,15 +417,15 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 		const end = `${year}-12-31`;
 
 		const [employee] = await ctx.db
-			.select({ id: employees.id })
-			.from(employees)
-			.where(and(eq(employees.id, employeeId), isNull(employees.deletedAt)))
+			.select({ id: persons.id })
+			.from(persons)
+			.where(and(eq(persons.id, employeeId), isNull(persons.deletedAt)))
 			.limit(1);
 
 		if (!employee) return null;
 
 		const payoutFilter = and(
-			eq(projectEmployees.employeeId, employeeId),
+			eq(projectEmployees.personId, employeeId),
 			between(payoutRecords.period, start, end),
 			inArray(payoutRecords.status, ['confirmed', 'paid'])
 		);

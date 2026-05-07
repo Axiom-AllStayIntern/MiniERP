@@ -1,7 +1,7 @@
-import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { timeFields } from '$platform/modules/schema-helpers';
-import { customers } from '$modules/business-partner/repositories/business-partner.schema';
-import { employees } from '$modules/hr/repositories/person.schema';
+import { businessPartners } from '$modules/business-partner/repositories/business-partner.schema';
+import { persons } from '$modules/hr/repositories/person.schema';
 
 // ---------------------------------------------------------------------------
 // Projects
@@ -9,11 +9,7 @@ import { employees } from '$modules/hr/repositories/person.schema';
 
 export const projects = sqliteTable('projects', {
 	id: text('id').primaryKey(),
-	customerId: text('customer_id')
-		.notNull()
-		.references(() => customers.id),
-	/** Will be populated once BusinessPartner migration completes */
-	businessPartnerId: text('business_partner_id'),
+	businessPartnerId: text('business_partner_id').references(() => businessPartners.id),
 	name: text('name').notNull(),
 	status: text('status').notNull().default('active'),
 	type: text('type', { enum: ['delivery', 'ongoing', 'internal'] }),
@@ -25,7 +21,6 @@ export const projects = sqliteTable('projects', {
 
 // ---------------------------------------------------------------------------
 // ProjectMembers (who works on this project)
-// Previously named projectEmployees â€?kept as same DB table for compat
 // ---------------------------------------------------------------------------
 
 export const projectEmployees = sqliteTable('project_employees', {
@@ -33,11 +28,7 @@ export const projectEmployees = sqliteTable('project_employees', {
 	projectId: text('project_id')
 		.notNull()
 		.references(() => projects.id),
-	employeeId: text('employee_id')
-		.notNull()
-		.references(() => employees.id),
-	/** Will reference persons.id once Person migration completes */
-	personId: text('person_id'),
+	personId: text('person_id').references(() => persons.id),
 	name: text('name').notNull(),
 	role: text('role'),
 	staffType: text('staff_type', {

@@ -3,8 +3,8 @@ import { NotFoundError } from '$platform/modules/errors';
 import { and, desc, eq, gte, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 import {
 	auditLogs,
+	businessPartners,
 	contracts,
-	customers,
 	expenses,
 	projects,
 	purchaseOrders,
@@ -97,7 +97,7 @@ export function createProjectApi(ctx: ModuleContext) {
 		const projectConditions: SQL[] = [isNull(projects.deletedAt)];
 		if (q) {
 			projectConditions.push(
-				or(like(projects.name, `%${q}%`), like(projects.id, `%${q}%`), like(sql`coalesce(${customers.name}, '')`, `%${q}%`))!
+				or(like(projects.name, `%${q}%`), like(projects.id, `%${q}%`), like(sql`coalesce(${businessPartners.name}, '')`, `%${q}%`))!
 			);
 		}
 		if (status) projectConditions.push(eq(projects.status, status));
@@ -112,7 +112,7 @@ export function createProjectApi(ctx: ModuleContext) {
 			ctx.db
 				.select({ total: sql<number>`count(*)` })
 				.from(projects)
-				.leftJoin(customers, eq(projects.customerId, customers.id))
+				.leftJoin(businessPartners, eq(projects.businessPartnerId, businessPartners.id))
 				.where(and(...projectConditions))
 		]);
 
@@ -125,15 +125,15 @@ export function createProjectApi(ctx: ModuleContext) {
 			.select({
 				id: projects.id,
 				name: projects.name,
-				customerId: projects.customerId,
+				customerId: projects.businessPartnerId,
 				status: projects.status,
 				startDate: projects.startDate,
 				endDate: projects.endDate,
 				updatedAt: projects.updatedAt,
-				customerName: customers.name
+				customerName: businessPartners.name
 			})
 			.from(projects)
-			.leftJoin(customers, eq(projects.customerId, customers.id))
+			.leftJoin(businessPartners, eq(projects.businessPartnerId, businessPartners.id))
 			.where(and(...projectConditions))
 			.orderBy(desc(projects.updatedAt))
 			.limit(PROJECT_LIST_PAGE_SIZE)
@@ -189,11 +189,13 @@ export function createProjectApi(ctx: ModuleContext) {
 			throw new NotFoundError('Project', projectId);
 		}
 
-		const [customer] = await ctx.db
-			.select({ id: customers.id, name: customers.name })
-			.from(customers)
-			.where(eq(customers.id, project.customerId))
-			.limit(1);
+		const [customer] = project.businessPartnerId
+			? await ctx.db
+					.select({ id: businessPartners.id, name: businessPartners.name })
+					.from(businessPartners)
+					.where(eq(businessPartners.id, project.businessPartnerId))
+					.limit(1)
+			: [];
 
 		const [projectListCounts, [contractsCountRow], [quotationsCountRow], [purchaseOrdersCountRow], [expensesCountRow]] =
 			await Promise.all([
@@ -320,7 +322,7 @@ export function createProjectApi(ctx: ModuleContext) {
 
 		return {
 			project,
-			customerName: customer?.name ?? project.customerId,
+			customerName: customer?.name ?? project.businessPartnerId ?? '',
 			projectListCounts,
 			submoduleCounts: {
 				contracts: Number(contractsCountRow?.n ?? 0),

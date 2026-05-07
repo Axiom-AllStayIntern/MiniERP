@@ -36,7 +36,7 @@ export const actions: Actions = {
 		const ctx = await createModuleContext(event);
 		const project = createProjectApi(ctx);
 		const created = await project.create({
-			customerId,
+			businessPartnerId: customerId,
 			name,
 			status,
 			startDate: startDate || undefined,

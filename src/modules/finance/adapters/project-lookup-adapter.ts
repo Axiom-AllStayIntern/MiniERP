@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { DBClient } from '../../../infrastructure/db';
-import { customers, projects } from '../../../infrastructure/db/schema';
+import { businessPartners, projects } from '../../../infrastructure/db/schema';
 
 export interface ProjectLookupAdapter<TProject = unknown> {
 	getProjectById(projectId: string): Promise<TProject | null>;
@@ -32,10 +32,10 @@ export async function findFinanceProjectLookup(
 			status: projects.status,
 			startDate: projects.startDate,
 			endDate: projects.endDate,
-			customerName: customers.name
+			customerName: businessPartners.name
 		})
 		.from(projects)
-		.leftJoin(customers, eq(projects.customerId, customers.id))
+		.leftJoin(businessPartners, eq(projects.businessPartnerId, businessPartners.id))
 		.where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
 		.limit(1);
 

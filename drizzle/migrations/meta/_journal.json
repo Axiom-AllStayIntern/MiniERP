@@ -15,6 +15,13 @@
       "when": 1778049555286,
       "tag": "0001_wide_echo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1778116359226,
+      "tag": "0002_even_captain_flint",
+      "breakpoints": true
     }
   ]
 }

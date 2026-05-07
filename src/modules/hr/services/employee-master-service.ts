@@ -29,25 +29,61 @@ export class EmployeeMasterService {
 	constructor(private ctx: ModuleContext) {}
 
 	async listEmployees() {
-		return this.ctx.db
-			.select()
-			.from(schema.employees)
-			.where(isNull(schema.employees.deletedAt))
-			.orderBy(desc(schema.employees.updatedAt));
+		// Wave 2.2: legacy employees table dropped. Compose persons + employee_profiles
+		// to surface the v3 employee shape (type / status / dates / cpf / taxResident).
+		const rows = await this.ctx.db
+			.select({
+				id: schema.persons.id,
+				name: schema.persons.name,
+				email: schema.persons.email,
+				phone: schema.persons.phone,
+				taxId: schema.persons.taxId,
+				metadata: schema.persons.metadata,
+				createdAt: schema.persons.createdAt,
+				updatedAt: schema.persons.updatedAt,
+				deletedAt: schema.persons.deletedAt,
+				type: schema.employeeProfiles.employmentType,
+				status: schema.employeeProfiles.status,
+				startDate: schema.employeeProfiles.startDate,
+				endDate: schema.employeeProfiles.endDate,
+				contact: schema.persons.email,
+				cpfApplicable: schema.employeeProfiles.cpfApplicable,
+				taxResidentLabel: schema.employeeProfiles.taxResidentLabel
+			})
+			.from(schema.persons)
+			.leftJoin(
+				schema.employeeProfiles,
+				eq(schema.persons.id, schema.employeeProfiles.personId)
+			)
+			.where(isNull(schema.persons.deletedAt))
+			.orderBy(desc(schema.persons.updatedAt));
+		return rows;
 	}
 
 	async createEmployeeProfile(data: EmployeeProfileInput) {
 		const id = crypto.randomUUID();
+		const profileId = crypto.randomUUID();
 		const now = new Date().toISOString();
-		await this.ctx.db.insert(schema.employees).values({
+
+		await this.ctx.db.insert(schema.persons).values({
 			id,
 			name: data.name,
-			type: data.type as (typeof schema.employees.$inferInsert)['type'],
+			email: data.contact || null,
+			taxId: data.taxId || null,
+			metadata: null,
+			createdAt: now,
+			updatedAt: now
+		});
+
+		await this.ctx.db.insert(schema.employeeProfiles).values({
+			id: profileId,
+			personId: id,
+			employmentType: data.type as (typeof schema.employeeProfiles.$inferInsert)['employmentType'],
 			status: data.status,
 			startDate: data.startDate || null,
 			endDate: data.endDate || null,
-			contact: data.contact || null,
-			taxId: data.taxId || null,
+			cpfApplicable: data.cpfApplicable ?? true,
+			taxResidentLabel: data.taxResidentLabel || null,
 			metadata: null,
 			createdAt: now,
 			updatedAt: now
@@ -59,9 +95,30 @@ export class EmployeeMasterService {
 	async getEmployeeDetailPage(employeeId: string, taxYearParam: string | null) {
 		const db = this.ctx.db;
 		const [employee] = await db
-			.select()
-			.from(schema.employees)
-			.where(and(eq(schema.employees.id, employeeId), isNull(schema.employees.deletedAt)))
+			.select({
+				id: schema.persons.id,
+				name: schema.persons.name,
+				email: schema.persons.email,
+				phone: schema.persons.phone,
+				taxId: schema.persons.taxId,
+				metadata: schema.persons.metadata,
+				createdAt: schema.persons.createdAt,
+				updatedAt: schema.persons.updatedAt,
+				deletedAt: schema.persons.deletedAt,
+				type: schema.employeeProfiles.employmentType,
+				status: schema.employeeProfiles.status,
+				startDate: schema.employeeProfiles.startDate,
+				endDate: schema.employeeProfiles.endDate,
+				contact: schema.persons.email,
+				cpfApplicable: schema.employeeProfiles.cpfApplicable,
+				taxResidentLabel: schema.employeeProfiles.taxResidentLabel
+			})
+			.from(schema.persons)
+			.leftJoin(
+				schema.employeeProfiles,
+				eq(schema.persons.id, schema.employeeProfiles.personId)
+			)
+			.where(and(eq(schema.persons.id, employeeId), isNull(schema.persons.deletedAt)))
 			.limit(1);
 
 		if (!employee) return null;
@@ -76,7 +133,7 @@ export class EmployeeMasterService {
 		const periodEnd = `${taxYear}-12-31`;
 
 		const payoutTaxFilter = and(
-			eq(schema.projectEmployees.employeeId, employeeId),
+			eq(schema.projectEmployees.personId, employeeId),
 			between(schema.payoutRecords.period, periodStart, periodEnd),
 			inArray(schema.payoutRecords.status, ['confirmed', 'paid'])
 		);
@@ -125,7 +182,7 @@ export class EmployeeMasterService {
 				.innerJoin(schema.projects, eq(schema.projectEmployees.projectId, schema.projects.id))
 				.where(
 					and(
-						eq(schema.projectEmployees.employeeId, employeeId),
+						eq(schema.projectEmployees.personId, employeeId),
 						isNull(schema.projectEmployees.deletedAt),
 						isNull(schema.projects.deletedAt)
 					)
@@ -204,21 +261,36 @@ export class EmployeeMasterService {
 	}
 
 	async updateEmployeeProfile(employeeId: string, data: EmployeeProfileInput) {
+		const now = new Date().toISOString();
+
 		await this.ctx.db
-			.update(schema.employees)
+			.update(schema.persons)
 			.set({
 				name: data.name,
-				type: data.type as (typeof schema.employees.$inferInsert)['type'],
+				email: data.contact || null,
+				taxId: data.taxId || null,
+				updatedAt: now
+			})
+			.where(and(eq(schema.persons.id, employeeId), isNull(schema.persons.deletedAt)));
+
+		await this.ctx.db
+			.update(schema.employeeProfiles)
+			.set({
+				employmentType:
+					data.type as (typeof schema.employeeProfiles.$inferInsert)['employmentType'],
 				status: data.status,
 				startDate: data.startDate || null,
 				endDate: data.endDate || null,
-				contact: data.contact || null,
-				taxId: data.taxId || null,
 				cpfApplicable: data.cpfApplicable ?? false,
 				taxResidentLabel: data.taxResidentLabel || null,
-				updatedAt: new Date().toISOString()
+				updatedAt: now
 			})
-			.where(and(eq(schema.employees.id, employeeId), isNull(schema.employees.deletedAt)));
+			.where(
+				and(
+					eq(schema.employeeProfiles.personId, employeeId),
+					isNull(schema.employeeProfiles.deletedAt)
+				)
+			);
 	}
 
 	async addCompanyComponent(employeeId: string, data: CompanyComponentInput) {
@@ -262,7 +334,7 @@ export class EmployeeMasterService {
 		const participating = await this.ctx.db
 			.select({ projectId: schema.projectEmployees.projectId })
 			.from(schema.projectEmployees)
-			.where(and(eq(schema.projectEmployees.employeeId, employeeId), isNull(schema.projectEmployees.deletedAt)));
+			.where(and(eq(schema.projectEmployees.personId, employeeId), isNull(schema.projectEmployees.deletedAt)));
 
 		const weights: { projectId: string; pct: number }[] = [];
 		for (const row of participating) {
@@ -312,8 +384,17 @@ export class EmployeeMasterService {
 	async deleteEmployee(employeeId: string) {
 		const now = new Date().toISOString();
 		await this.ctx.db
-			.update(schema.employees)
+			.update(schema.persons)
+			.set({ deletedAt: now, updatedAt: now })
+			.where(and(eq(schema.persons.id, employeeId), isNull(schema.persons.deletedAt)));
+		await this.ctx.db
+			.update(schema.employeeProfiles)
 			.set({ deletedAt: now, updatedAt: now, status: 'inactive' })
-			.where(and(eq(schema.employees.id, employeeId), isNull(schema.employees.deletedAt)));
+			.where(
+				and(
+					eq(schema.employeeProfiles.personId, employeeId),
+					isNull(schema.employeeProfiles.deletedAt)
+				)
+			);
 	}
 }

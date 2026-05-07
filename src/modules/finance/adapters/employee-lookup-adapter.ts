@@ -1,6 +1,6 @@
 import { asc, eq, isNull } from 'drizzle-orm';
 import type { DBClient } from '../../../infrastructure/db';
-import { employees } from '../../../infrastructure/db/schema';
+import { persons } from '../../../infrastructure/db/schema';
 
 export interface EmployeeLookupAdapter<TEmployee = unknown> {
 	getEmployeeById(employeeId: string): Promise<TEmployee | null>;
@@ -20,12 +20,12 @@ export type FinanceEmployeeDirectoryRow = {
 export async function listFinanceEmployees(db: DBClient): Promise<FinanceEmployeeDirectoryRow[]> {
 	return db
 		.select({
-			id: employees.id,
-			name: employees.name
+			id: persons.id,
+			name: persons.name
 		})
-		.from(employees)
-		.where(isNull(employees.deletedAt))
-		.orderBy(asc(employees.name));
+		.from(persons)
+		.where(isNull(persons.deletedAt))
+		.orderBy(asc(persons.name));
 }
 
 export async function findFinanceEmployeeNameById(
@@ -33,9 +33,9 @@ export async function findFinanceEmployeeNameById(
 	employeeId: string
 ): Promise<string | null> {
 	const [row] = await db
-		.select({ name: employees.name })
-		.from(employees)
-		.where(eq(employees.id, employeeId))
+		.select({ name: persons.name })
+		.from(persons)
+		.where(eq(persons.id, employeeId))
 		.limit(1);
 
 	return row?.name ?? null;

@@ -1,4 +1,5 @@
--- Reset non-OCR tables for repeatable local testing
+-- Reset non-OCR tables for repeatable local testing (Wave 2.2: dropped customers,
+-- employees, invoices_in, invoices_out, payments — see Migration Plan).
 DELETE FROM audit_logs;
 DELETE FROM sessions;
 DELETE FROM accounts;
@@ -9,8 +10,6 @@ DELETE FROM compensation_components;
 DELETE FROM project_employees;
 DELETE FROM employee_project_allocations;
 DELETE FROM employee_compensation_components;
-DELETE FROM invoices_in;
-DELETE FROM invoices_out;
 DELETE FROM purchase_orders;
 DELETE FROM quotations;
 DELETE FROM contracts;
@@ -19,51 +18,23 @@ DELETE FROM gst_returns;
 DELETE FROM company_settings;
 DELETE FROM expense_categories;
 DELETE FROM projects;
-DELETE FROM employees;
-DELETE FROM customers;
+DELETE FROM employee_profiles;
+DELETE FROM person_roles;
+DELETE FROM persons;
+DELETE FROM business_partners;
 DELETE FROM users;
 
 -- Auth: use /register + email verification (better-auth). No SQL user rows — passwords live in `accounts`.
 
--- Customers
-INSERT INTO customers (id, name, address, contact, gst_reg_no, metadata, created_at, updated_at, deleted_at)
+-- Customers (Wave 2.2: now stored in business_partners with type='customer')
+INSERT INTO business_partners (id, name, type, address, contact, gst_reg_no, metadata, created_at, updated_at, deleted_at)
 VALUES
-	(
-		'cust-demo-001',
-		'Demo Trading Pte Ltd',
-		'1 Raffles Place, Singapore',
-		'finance@demotrading.sg',
-		'GST-REG-DEMO-001',
-		'{"source":"mock-seed"}',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'cust-demo-002',
-		'Lion City Imports',
-		'80 Robinson Road, Singapore',
-		'ops@lioncity-imports.sg',
-		'GST-REG-DEMO-002',
-		'{"source":"mock-seed"}',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'cust-demo-003',
-		'Harbourline Logistics',
-		'10 Anson Road, Singapore',
-		'accounts@harbourline.sg',
-		'GST-REG-DEMO-003',
-		'{"source":"mock-seed"}',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	);
+	('cust-demo-001', 'Demo Trading Pte Ltd', 'customer', '1 Raffles Place, Singapore', 'finance@demotrading.sg', 'GST-REG-DEMO-001', '{"source":"mock-seed"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('cust-demo-002', 'Lion City Imports', 'customer', '80 Robinson Road, Singapore', 'ops@lioncity-imports.sg', 'GST-REG-DEMO-002', '{"source":"mock-seed"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('cust-demo-003', 'Harbourline Logistics', 'customer', '10 Anson Road, Singapore', 'accounts@harbourline.sg', 'GST-REG-DEMO-003', '{"source":"mock-seed"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
 
 -- Projects
-INSERT INTO projects (id, customer_id, name, status, start_date, end_date, description, created_at, updated_at, deleted_at)
+INSERT INTO projects (id, business_partner_id, name, status, start_date, end_date, description, created_at, updated_at, deleted_at)
 VALUES
 	(
 		'proj-demo-001',
@@ -206,304 +177,19 @@ VALUES
 	('po-demo-006', 'proj-demo-008', 'PO-2026-021', 'mock://po/po-demo-006.pdf', 'Borneo Port Services', 11200, 'SGD', '2026-02-15', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
 	('po-demo-007', 'proj-demo-009', 'PO-2026-041', 'mock://po/po-demo-007.pdf', 'Jurong Re-export Services', 18900, 'SGD', '2026-04-18', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
 
-INSERT INTO invoices_in (id, project_id, po_id, supplier_name, invoice_date, amount, currency, gst_amount, due_date, po_number, status, file_url, ocr_confidence, raw_ocr, created_at, updated_at, deleted_at)
-VALUES
-	(
-		'iin-demo-001',
-		'proj-demo-001',
-		'po-demo-001',
-		'PT Nusantara Supply',
-		'2026-03-10',
-		42000,
-		'SGD',
-		3780,
-		'2026-04-09',
-		'PO-2026-001',
-		'confirmed',
-		'mock://supplier-invoices/iin-demo-001.pdf',
-		0.96,
-		'{"method":"mock-seed","note":"non-ocr manual baseline"}',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iin-demo-002',
-		'proj-demo-002',
-		'po-demo-002',
-		'KL Spare Parts Sdn Bhd',
-		'2026-03-14',
-		15000,
-		'SGD',
-		1350,
-		'2026-04-13',
-		'PO-2026-002',
-		'pending_review',
-		'mock://supplier-invoices/iin-demo-002.pdf',
-		0.88,
-		'{"method":"mock-seed","note":"pending confirmation sample"}',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iin-demo-003',
-		'proj-demo-005',
-		'po-demo-003',
-		'Saigon Retail Supply JSC',
-		'2025-08-20',
-		21000,
-		'SGD',
-		1890,
-		'2025-09-19',
-		'PO-2025-073',
-		'confirmed',
-		'mock://supplier-invoices/iin-demo-003.pdf',
-		0.95,
-		'{"method":"mock-seed"}',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iin-demo-004',
-		'proj-demo-006',
-		'po-demo-004',
-		'Manila Cold Storage Corp',
-		'2025-10-28',
-		9800,
-		'SGD',
-		882,
-		'2025-11-27',
-		'PO-2025-104',
-		'pending_review',
-		'mock://supplier-invoices/iin-demo-004.pdf',
-		0.86,
-		'{"method":"mock-seed"}',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iin-demo-005',
-		'proj-demo-007',
-		'po-demo-005',
-		'Yangon Agro Milling Co',
-		'2025-12-16',
-		17500,
-		'SGD',
-		1575,
-		'2026-01-15',
-		'PO-2025-122',
-		'confirmed',
-		'mock://supplier-invoices/iin-demo-005.pdf',
-		0.93,
-		'{"method":"mock-seed"}',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iin-demo-006',
-		'proj-demo-008',
-		'po-demo-006',
-		'Borneo Port Services',
-		'2026-02-21',
-		11200,
-		'SGD',
-		1008,
-		'2026-03-23',
-		'PO-2026-021',
-		'pending_review',
-		'mock://supplier-invoices/iin-demo-006.pdf',
-		0.84,
-		'{"method":"mock-seed"}',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iin-demo-007',
-		'proj-demo-009',
-		'po-demo-007',
-		'Jurong Re-export Services',
-		'2026-04-24',
-		18900,
-		'SGD',
-		1701,
-		'2026-05-24',
-		'PO-2026-041',
-		'confirmed',
-		'mock://supplier-invoices/iin-demo-007.pdf',
-		0.97,
-		'{"method":"mock-seed"}',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	);
 
--- Customer invoices
-INSERT INTO invoices_out (id, project_id, customer_id, invoice_no, date, due_date, currency, subtotal, gst_type, gst_amount, total, status, pdf_url, line_items, created_at, updated_at, deleted_at)
+-- Employees and compensation (Wave 2.2: persons + employee_profiles replace legacy employees)
+INSERT INTO persons (id, name, email, phone, tax_id, metadata, created_at, updated_at, deleted_at)
 VALUES
-	(
-		'iout-demo-001',
-		'proj-demo-001',
-		'cust-demo-001',
-		'INV-2026-001',
-		'2026-03-03',
-		'2026-03-31',
-		'SGD',
-		60000,
-		'standard',
-		5400,
-		65400,
-		'issued',
-		'mock://customer-invoices/iout-demo-001.pdf',
-		'[{"item":"Import service fee","qty":1,"unitPrice":60000}]',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iout-demo-002',
-		'proj-demo-001',
-		'cust-demo-001',
-		'INV-2026-002',
-		'2026-03-18',
-		'2026-04-17',
-		'SGD',
-		25000,
-		'standard',
-		2250,
-		27250,
-		'paid',
-		'mock://customer-invoices/iout-demo-002.pdf',
-		'[{"item":"Storage and logistics fee","qty":1,"unitPrice":25000}]',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iout-demo-003',
-		'proj-demo-002',
-		'cust-demo-002',
-		'INV-2026-003',
-		'2026-02-26',
-		'2026-03-28',
-		'SGD',
-		18000,
-		'zero',
-		0,
-		18000,
-		'draft',
-		'mock://customer-invoices/iout-demo-003.pdf',
-		'[{"item":"Consolidation service","qty":1,"unitPrice":18000}]',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iout-demo-004',
-		'proj-demo-005',
-		'cust-demo-002',
-		'INV-2025-081',
-		'2025-08-26',
-		'2025-09-25',
-		'SGD',
-		32000,
-		'standard',
-		2880,
-		34880,
-		'paid',
-		'mock://customer-invoices/iout-demo-004.pdf',
-		'[{"item":"Vietnam distribution setup","qty":1,"unitPrice":32000}]',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iout-demo-005',
-		'proj-demo-006',
-		'cust-demo-003',
-		'INV-2025-102',
-		'2025-10-30',
-		'2025-11-29',
-		'SGD',
-		14000,
-		'standard',
-		1260,
-		15260,
-		'issued',
-		'mock://customer-invoices/iout-demo-005.pdf',
-		'[{"item":"Cold chain planning fee","qty":1,"unitPrice":14000}]',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iout-demo-006',
-		'proj-demo-007',
-		'cust-demo-001',
-		'INV-2025-121',
-		'2025-12-22',
-		'2026-01-21',
-		'SGD',
-		26000,
-		'standard',
-		2340,
-		28340,
-		'paid',
-		'mock://customer-invoices/iout-demo-006.pdf',
-		'[{"item":"Rice procurement advisory","qty":1,"unitPrice":26000}]',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iout-demo-007',
-		'proj-demo-008',
-		'cust-demo-003',
-		'INV-2026-021',
-		'2026-02-25',
-		'2026-03-27',
-		'SGD',
-		12500,
-		'zero',
-		0,
-		12500,
-		'draft',
-		'mock://customer-invoices/iout-demo-007.pdf',
-		'[{"item":"Transshipment route assessment","qty":1,"unitPrice":12500}]',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	),
-	(
-		'iout-demo-008',
-		'proj-demo-009',
-		'cust-demo-002',
-		'INV-2026-041',
-		'2026-04-28',
-		'2026-05-28',
-		'SGD',
-		41000,
-		'standard',
-		3690,
-		44690,
-		'issued',
-		'mock://customer-invoices/iout-demo-008.pdf',
-		'[{"item":"Re-export hub launch package","qty":1,"unitPrice":41000}]',
-		CURRENT_TIMESTAMP,
-		CURRENT_TIMESTAMP,
-		NULL
-	);
+	('emp-demo-001', 'Alice Tan', 'alice.tan@smartfin.local', NULL, 'S1234567A', '{"dept":"operations"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('emp-demo-002', 'Rahim Iskandar', 'rahim@smartfin.local', NULL, 'S2345678B', '{"dept":"finance"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('emp-demo-003', 'Wang Lei', 'wang.lei@smartfin.local', NULL, 'F3344556C', '{"dept":"trade"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
 
--- Employees and compensation
-INSERT INTO employees (id, name, type, status, start_date, end_date, contact, tax_id, cpf_applicable, tax_resident_label, metadata, created_at, updated_at, deleted_at)
+INSERT INTO employee_profiles (id, person_id, employment_type, status, start_date, end_date, cpf_applicable, tax_resident_label, location, metadata, created_at, updated_at, deleted_at)
 VALUES
-	('emp-demo-001', 'Alice Tan', 'full_time', 'active', '2025-08-01', NULL, 'alice.tan@smartfin.local', 'S1234567A', 1, 'Singapore citizen', '{"dept":"operations"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
-	('emp-demo-002', 'Rahim Iskandar', 'part_time', 'active', '2025-11-01', NULL, 'rahim@smartfin.local', 'S2345678B', 1, 'Singapore PR', '{"dept":"finance"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
-	('emp-demo-003', 'Wang Lei', 'freelancer', 'active', '2026-01-10', NULL, 'wang.lei@smartfin.local', 'F3344556C', 1, 'Non-resident', '{"dept":"trade"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
+	('prof-demo-001', 'emp-demo-001', 'full_time', 'active', '2025-08-01', NULL, 1, 'Singapore citizen', NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('prof-demo-002', 'emp-demo-002', 'part_time', 'active', '2025-11-01', NULL, 1, 'Singapore PR', NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
+	('prof-demo-003', 'emp-demo-003', 'freelancer', 'active', '2026-01-10', NULL, 1, 'Non-resident', NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
 
 INSERT INTO employee_compensation_components (id, employee_id, label, income_type, rule_type, value, floor, cap, frequency, taxable, effective_from, effective_to, created_at, updated_at, deleted_at)
 VALUES
@@ -521,7 +207,7 @@ VALUES
 	('sal-demo-002', 'emp-demo-002', '2026-03', 3200, 180, 640, 544, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
 	('sal-demo-003', 'emp-demo-003', '2026-03', 4500, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL);
 
-INSERT INTO project_employees (id, project_id, employee_id, name, role, staff_type, date_in, date_out, cpf_applicable, created_at, updated_at, deleted_at)
+INSERT INTO project_employees (id, project_id, person_id, name, role, staff_type, date_in, date_out, cpf_applicable, created_at, updated_at, deleted_at)
 VALUES
 	('pe-proj-demo-001-emp-demo-001', 'proj-demo-001', 'emp-demo-001', 'Alice Tan', NULL, 'fulltime', '2025-08-01', NULL, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),
 	('pe-proj-demo-001-emp-demo-003', 'proj-demo-001', 'emp-demo-003', 'Wang Lei', NULL, 'freelancer', '2026-01-10', NULL, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL),

@@ -1,7 +1,7 @@
 import { eq, isNull, and, like, or, desc, sql } from 'drizzle-orm';
 import type { DBClient } from '$infrastructure/db';
 import { projects, projectEmployees } from './project.schema';
-import { customers } from '$modules/business-partner/repositories/business-partner.schema';
+import { businessPartners } from '$modules/business-partner/repositories/business-partner.schema';
 import { BaseRepository } from '$platform/modules/base-repository';
 
 // ---------------------------------------------------------------------------
@@ -17,10 +17,10 @@ export class ProjectRepository extends BaseRepository<typeof projects> {
 		const rows = await this.db
 			.select({
 				project: projects,
-				customerName: customers.name
+				customerName: businessPartners.name
 			})
 			.from(projects)
-			.leftJoin(customers, eq(projects.customerId, customers.id))
+			.leftJoin(businessPartners, eq(projects.businessPartnerId, businessPartners.id))
 			.where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
 			.limit(1);
 		return rows[0] ?? null;
@@ -48,10 +48,10 @@ export class ProjectRepository extends BaseRepository<typeof projects> {
 		const rows = await this.db
 			.select({
 				project: projects,
-				customerName: customers.name
+				customerName: businessPartners.name
 			})
 			.from(projects)
-			.leftJoin(customers, eq(projects.customerId, customers.id))
+			.leftJoin(businessPartners, eq(projects.businessPartnerId, businessPartners.id))
 			.where(where)
 			.orderBy(desc(projects.createdAt))
 			.limit(pageSize)
@@ -94,14 +94,14 @@ export class ProjectMemberRepository extends BaseRepository<typeof projectEmploy
 		super(db, projectEmployees);
 	}
 
-	async findByProjectAndEmployee(projectId: string, employeeId: string) {
+	async findByProjectAndPerson(projectId: string, personId: string) {
 		const rows = await this.db
 			.select()
 			.from(projectEmployees)
 			.where(
 				and(
 					eq(projectEmployees.projectId, projectId),
-					eq(projectEmployees.employeeId, employeeId),
+					eq(projectEmployees.personId, personId),
 					isNull(projectEmployees.deletedAt)
 				)
 			)

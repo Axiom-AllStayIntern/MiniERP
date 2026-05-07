@@ -11,7 +11,7 @@ import {
 	type SQL
 } from 'drizzle-orm';
 import type { DBClient } from '../../../infrastructure/db';
-import { customers, projects } from '../../../infrastructure/db/schema';
+import { businessPartners, projects } from '../../../infrastructure/db/schema';
 
 export const DOC_HUB_PROJECT_PAGE_SIZE = 5;
 
@@ -79,7 +79,7 @@ export async function getDocHubProjectPicker(
 			or(
 				like(projects.name, `%${input.q}%`),
 				like(projects.id, `%${input.q}%`),
-				like(customers.name, `%${input.q}%`)
+				like(businessPartners.name, `%${input.q}%`)
 			)!
 		);
 	}
@@ -89,7 +89,7 @@ export async function getDocHubProjectPicker(
 	const projectCountRows = await db
 		.select({ total: sql<number>`count(*)` })
 		.from(projects)
-		.leftJoin(customers, eq(projects.customerId, customers.id))
+		.leftJoin(businessPartners, eq(projects.businessPartnerId, businessPartners.id))
 		.where(and(...projectConditions));
 	const total = Number(projectCountRows[0]?.total ?? 0);
 	const totalPages = Math.max(1, Math.ceil(total / DOC_HUB_PROJECT_PAGE_SIZE));
@@ -100,13 +100,13 @@ export async function getDocHubProjectPicker(
 		.select({
 			id: projects.id,
 			name: projects.name,
-			customerName: customers.name,
+			customerName: businessPartners.name,
 			status: projects.status,
 			startDate: projects.startDate,
 			endDate: projects.endDate
 		})
 		.from(projects)
-		.leftJoin(customers, eq(projects.customerId, customers.id))
+		.leftJoin(businessPartners, eq(projects.businessPartnerId, businessPartners.id))
 		.where(and(...projectConditions))
 		.orderBy(desc(projects.startDate), desc(projects.updatedAt))
 		.limit(DOC_HUB_PROJECT_PAGE_SIZE)
@@ -144,13 +144,13 @@ export async function getDocHubProjectPicker(
 			.select({
 				id: projects.id,
 				name: projects.name,
-				customerName: customers.name,
+				customerName: businessPartners.name,
 				status: projects.status,
 				startDate: projects.startDate,
 				endDate: projects.endDate
 			})
 			.from(projects)
-			.leftJoin(customers, eq(projects.customerId, customers.id))
+			.leftJoin(businessPartners, eq(projects.businessPartnerId, businessPartners.id))
 			.where(and(isNull(projects.deletedAt), eq(projects.id, input.projectId)))
 			.limit(1);
 		if (fallbackProject) {

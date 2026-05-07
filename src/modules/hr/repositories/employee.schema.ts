@@ -1,6 +1,6 @@
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { timeFields } from '$platform/modules/schema-helpers';
-import { employees } from './person.schema';
+import { persons } from './person.schema';
 import { projects, projectEmployees } from '$modules/project/repositories/project.schema';
 
 // ---------------------------------------------------------------------------
@@ -11,7 +11,7 @@ export const employeeSalaries = sqliteTable('employee_salaries', {
 	id: text('id').primaryKey(),
 	employeeId: text('employee_id')
 		.notNull()
-		.references(() => employees.id),
+		.references(() => persons.id),
 	month: text('month').notNull(),
 	salary: real('salary').notNull().default(0),
 	allowance: real('allowance').notNull().default(0),
@@ -28,7 +28,7 @@ export const employeeCompensationComponents = sqliteTable('employee_compensation
 	id: text('id').primaryKey(),
 	employeeId: text('employee_id')
 		.notNull()
-		.references(() => employees.id),
+		.references(() => persons.id),
 	label: text('label').notNull(),
 	incomeType: text('income_type', {
 		enum: ['salary', 'bonus', 'allowance', 'dividend', 'reimbursement']
@@ -58,7 +58,7 @@ export const employeeProjectAllocations = sqliteTable('employee_project_allocati
 	id: text('id').primaryKey(),
 	employeeId: text('employee_id')
 		.notNull()
-		.references(() => employees.id),
+		.references(() => persons.id),
 	projectId: text('project_id')
 		.notNull()
 		.references(() => projects.id),

@@ -25,7 +25,8 @@ export const POST: RequestHandler = async (event) => {
 		const project = createProjectApi(ctx);
 
 		const body = (await event.request.json()) as {
-			customerId?: string;
+			businessPartnerId?: string;
+			customerId?: string; // legacy alias accepted for backward-compat callers
 			name?: string;
 			status?: string;
 			description?: string;
@@ -33,12 +34,13 @@ export const POST: RequestHandler = async (event) => {
 			endDate?: string;
 		};
 
-		if (!body.customerId || !body.name) {
-			return fail('Missing required fields: customerId, name');
+		const businessPartnerId = body.businessPartnerId ?? body.customerId;
+		if (!body.name) {
+			return fail('Missing required fields: name');
 		}
 
 		const result = await project.create({
-			customerId: body.customerId,
+			businessPartnerId,
 			name: body.name,
 			status: body.status,
 			description: body.description,

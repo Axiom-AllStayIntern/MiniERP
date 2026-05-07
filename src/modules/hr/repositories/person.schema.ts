@@ -2,7 +2,7 @@ import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { timeFields } from '$platform/modules/schema-helpers';
 
 // ---------------------------------------------------------------------------
-// Person (base identity table â€?one row per natural person)
+// Person (base identity table ï¿½?one row per natural person)
 // ---------------------------------------------------------------------------
 
 export const persons = sqliteTable('persons', {
@@ -87,23 +87,3 @@ export const freelancerProfiles = sqliteTable('freelancer_profiles', {
 	...timeFields
 });
 
-// ---------------------------------------------------------------------------
-// Legacy employees table (kept for backward compatibility during migration)
-// ---------------------------------------------------------------------------
-
-export const employees = sqliteTable('employees', {
-	id: text('id').primaryKey(),
-	name: text('name').notNull(),
-	type: text('type', {
-		enum: ['full_time', 'part_time', 'freelancer', 'advisor', 'overseas_staff']
-	}).notNull(),
-	status: text('status').notNull().default('active'),
-	startDate: text('start_date'),
-	endDate: text('end_date'),
-	contact: text('contact'),
-	taxId: text('tax_id'),
-	cpfApplicable: integer('cpf_applicable', { mode: 'boolean' }).notNull().default(true),
-	taxResidentLabel: text('tax_resident_label'),
-	metadata: text('metadata'),
-	...timeFields
-});

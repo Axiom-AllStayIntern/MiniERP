@@ -52,10 +52,11 @@ export class PersonService {
 	}
 
 	async updateEmployee(id: string, data: Record<string, unknown>) {
-		return this.legacyEmployeeRepo.update(id, data);
+		// Wave 2.2: legacy employees table dropped — updates flow through persons.
+		return this.personRepo.update(id, data);
 	}
 
 	async softDeleteEmployee(id: string) {
-		return this.legacyEmployeeRepo.softDelete(id);
+		return this.personRepo.softDelete(id);
 	}
 }

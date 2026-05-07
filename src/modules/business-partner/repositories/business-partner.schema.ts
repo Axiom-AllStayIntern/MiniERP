@@ -66,16 +66,3 @@ export const partnerCustomerProfiles = sqliteTable('partner_customer_profiles', 
 	...timeFields
 });
 
-// ---------------------------------------------------------------------------
-// Legacy customers table (kept for backward compatibility during migration)
-// ---------------------------------------------------------------------------
-
-export const customers = sqliteTable('customers', {
-	id: text('id').primaryKey(),
-	name: text('name').notNull(),
-	address: text('address'),
-	contact: text('contact'),
-	gstRegNo: text('gst_reg_no'),
-	metadata: text('metadata'),
-	...timeFields
-});

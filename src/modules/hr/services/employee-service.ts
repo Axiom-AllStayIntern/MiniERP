@@ -14,7 +14,7 @@ import {
 	projectExpenseOpexSumExpr,
 	projectExpenseSalesCostSumExpr
 } from '$modules/finance/repositories/legacy-expense-repository';
-import { employees } from '../repositories/person.schema';
+import { persons } from '../repositories/person.schema';
 import {
 	compensationComponents,
 	employeeCompensationComponents,
@@ -161,11 +161,11 @@ export class SettlementService {
 		const now = new Date().toISOString();
 		let lines = 0;
 		const [member] = await db
-			.select({ personId: projectEmployees.personId, employeeId: projectEmployees.employeeId })
+			.select({ personId: projectEmployees.personId })
 			.from(projectEmployees)
 			.where(eq(projectEmployees.id, peId))
 			.limit(1);
-		const personId = member?.personId ?? member?.employeeId ?? peId;
+		const personId = member?.personId ?? peId;
 
 		for (const c of components) {
 			if (c.frequency !== 'monthly' && c.frequency !== 'one_off') continue;
@@ -451,10 +451,10 @@ export class ProjectStaffingService {
 		const rosterRows = await db
 			.select({
 				pe: projectEmployees,
-				masterName: employees.name
+				masterName: persons.name
 			})
 			.from(projectEmployees)
-			.leftJoin(employees, eq(projectEmployees.employeeId, employees.id))
+			.leftJoin(persons, eq(projectEmployees.personId, persons.id))
 			.where(and(eq(projectEmployees.projectId, projectId), isNull(projectEmployees.deletedAt)))
 			.orderBy(asc(projectEmployees.name));
 
@@ -463,7 +463,7 @@ export class ProjectStaffingService {
 			masterName: row.masterName
 		}));
 
-		const assignedIds = roster.map((row) => row.employeeId);
+		const assignedIds = roster.map((row) => row.personId).filter((id): id is string => Boolean(id));
 		const peIds = roster.map((row) => row.id);
 
 		const allocationRows =
@@ -482,16 +482,19 @@ export class ProjectStaffingService {
 
 		const allocByEmployee = new Map(allocationRows.map((allocation) => [allocation.employeeId, allocation.weightPct ?? 0]));
 
+		// Wave 2.2: legacy employees.type/status/active filter dropped — return all
+		// non-deleted persons. type/status now live in employee_profiles via personId
+		// join when needed; basic assignment screens just need id/name.
 		const allEmployees = await db
 			.select({
-				id: employees.id,
-				name: employees.name,
-				type: employees.type,
-				status: employees.status
+				id: persons.id,
+				name: persons.name,
+				type: sql<string>`'employee'`,
+				status: sql<string>`'active'`
 			})
-			.from(employees)
-			.where(and(isNull(employees.deletedAt), eq(employees.status, 'active')))
-			.orderBy(asc(employees.name));
+			.from(persons)
+			.where(isNull(persons.deletedAt))
+			.orderBy(asc(persons.name));
 
 		const assignableEmployees = allEmployees.filter((employee) => !assignedIds.includes(employee.id));
 
@@ -644,14 +647,14 @@ export class ProjectStaffingService {
 				.reduce((sum, payout) => sum + payout.computedAmount, 0);
 			const taxableTotal = settledPayouts.reduce((sum, payout) => sum + payout.taxableAmount, 0);
 
-			const allocationPct = allocByEmployee.get(pe.employeeId) ?? 0;
+			const allocationPct = allocByEmployee.get(pe.personId ?? '') ?? 0;
 
 			return {
 				peId: pe.id,
 				name: pe.name,
 				staffType: pe.staffType,
 				role: pe.role,
-				employeeId: pe.employeeId,
+				employeeId: pe.personId,
 				masterName: pe.masterName,
 				allocationPct,
 				initials: initialsFromName(pe.name),
@@ -715,34 +718,42 @@ export class ProjectStaffingService {
 
 		if (!pe) return null;
 
-		const [employee] = await db
-			.select()
-			.from(employees)
-			.where(and(eq(employees.id, pe.employeeId), isNull(employees.deletedAt)))
-			.limit(1);
+		const personIdForLookups = pe.personId ?? '';
 
-		const [allocationRow] = await db
-			.select()
-			.from(employeeProjectAllocations)
-			.where(
-				and(
-					eq(employeeProjectAllocations.employeeId, pe.employeeId),
-					eq(employeeProjectAllocations.projectId, projectId),
-					isNull(employeeProjectAllocations.deletedAt)
-				)
-			)
-			.limit(1);
+		const [employee] = personIdForLookups
+			? await db
+					.select()
+					.from(persons)
+					.where(and(eq(persons.id, personIdForLookups), isNull(persons.deletedAt)))
+					.limit(1)
+			: [];
 
-		const companyComponents = await db
-			.select()
-			.from(employeeCompensationComponents)
-			.where(
-				and(
-					eq(employeeCompensationComponents.employeeId, pe.employeeId),
-					isNull(employeeCompensationComponents.deletedAt)
-				)
-			)
-			.orderBy(desc(employeeCompensationComponents.effectiveFrom));
+		const [allocationRow] = personIdForLookups
+			? await db
+					.select()
+					.from(employeeProjectAllocations)
+					.where(
+						and(
+							eq(employeeProjectAllocations.employeeId, personIdForLookups),
+							eq(employeeProjectAllocations.projectId, projectId),
+							isNull(employeeProjectAllocations.deletedAt)
+						)
+					)
+					.limit(1)
+			: [];
+
+		const companyComponents = personIdForLookups
+			? await db
+					.select()
+					.from(employeeCompensationComponents)
+					.where(
+						and(
+							eq(employeeCompensationComponents.employeeId, personIdForLookups),
+							isNull(employeeCompensationComponents.deletedAt)
+						)
+					)
+					.orderBy(desc(employeeCompensationComponents.effectiveFrom))
+			: [];
 
 		const weightPct = allocationRow?.weightPct ?? 0;
 		const companyAllocationPreview = companyComponents.map((component) => {
@@ -851,10 +862,11 @@ export class ProjectStaffingService {
 		let compLines = 0;
 
 		for (const { pe } of rosterRows) {
+			if (!pe.personId) continue;
 			const allocationResult = await this.settlement.settleCompanyAllocation({
 				projectId,
 				peId: pe.id,
-				employeeId: pe.employeeId,
+				employeeId: pe.personId,
 				monthYm
 			});
 			if (allocationResult.ok) allocLines += allocationResult.lines;
@@ -890,7 +902,7 @@ export class ProjectStaffingService {
 			.where(
 				and(
 					eq(projectEmployees.projectId, projectId),
-					eq(projectEmployees.employeeId, input.employeeId),
+					eq(projectEmployees.personId, input.employeeId),
 					isNull(projectEmployees.deletedAt)
 				)
 			)
@@ -900,8 +912,8 @@ export class ProjectStaffingService {
 
 		const [employee] = await db
 			.select()
-			.from(employees)
-			.where(and(eq(employees.id, input.employeeId), isNull(employees.deletedAt)))
+			.from(persons)
+			.where(and(eq(persons.id, input.employeeId), isNull(persons.deletedAt)))
 			.limit(1);
 
 		if (!employee) return { ok: false as const, message: 'Employee not found.' };
@@ -912,7 +924,7 @@ export class ProjectStaffingService {
 		const [prior] = await db
 			.select()
 			.from(projectEmployees)
-			.where(and(eq(projectEmployees.projectId, projectId), eq(projectEmployees.employeeId, input.employeeId)))
+			.where(and(eq(projectEmployees.projectId, projectId), eq(projectEmployees.personId, input.employeeId)))
 			.limit(1);
 
 		if (prior?.deletedAt) {
@@ -924,7 +936,7 @@ export class ProjectStaffingService {
 					staffType: input.staffType as (typeof projectEmployees.$inferInsert)['staffType'],
 					dateIn: input.dateIn,
 					dateOut: input.dateOut,
-					cpfApplicable: employee.cpfApplicable,
+					cpfApplicable: true,
 					deletedAt: null,
 					updatedAt: now
 				})
@@ -933,13 +945,13 @@ export class ProjectStaffingService {
 			await db.insert(projectEmployees).values({
 				id: peId,
 				projectId,
-				employeeId: input.employeeId,
+				personId: input.employeeId,
 				name: employee.name,
 				role: input.role,
 				staffType: input.staffType as (typeof projectEmployees.$inferInsert)['staffType'],
 				dateIn: input.dateIn,
 				dateOut: input.dateOut,
-				cpfApplicable: employee.cpfApplicable,
+				cpfApplicable: true,
 				createdAt: now,
 				updatedAt: now
 			});
@@ -1018,11 +1030,13 @@ export class ProjectStaffingService {
 
 		if (!pe) return { ok: false as const, message: 'Assignment not found.' };
 
-		const [employee] = await db
-			.select({ name: employees.name })
-			.from(employees)
-			.where(eq(employees.id, pe.employeeId))
-			.limit(1);
+		const [employee] = pe.personId
+			? await db
+					.select({ name: persons.name })
+					.from(persons)
+					.where(eq(persons.id, pe.personId))
+					.limit(1)
+			: [];
 
 		await db
 			.update(projectEmployees)
@@ -1121,11 +1135,12 @@ export class ProjectStaffingService {
 			.limit(1);
 
 		if (!pe) return { ok: false as const, message: 'Assignment not found.' };
+		if (!pe.personId) return { ok: false as const, message: 'Assignment has no linked person.' };
 
 		return this.settlement.settleCompanyAllocation({
 			projectId,
 			peId: projectEmployeeId,
-			employeeId: pe.employeeId,
+			employeeId: pe.personId,
 			monthYm
 		});
 	}

@@ -151,12 +151,12 @@ export class ExpenseService {
 
 		const employees = await db
 			.select({
-				id: schema.employees.id,
-				name: schema.employees.name
+				id: schema.persons.id,
+				name: schema.persons.name
 			})
-			.from(schema.employees)
-			.where(isNull(schema.employees.deletedAt))
-			.orderBy(schema.employees.name);
+			.from(schema.persons)
+			.where(isNull(schema.persons.deletedAt))
+			.orderBy(schema.persons.name);
 
 		let businessTrips: Array<{
 			id: string;
@@ -284,18 +284,20 @@ export class ExpenseService {
 					status: schema.projects.status,
 					startDate: schema.projects.startDate,
 					endDate: schema.projects.endDate,
-					customerId: schema.projects.customerId
+					businessPartnerId: schema.projects.businessPartnerId
 				})
 				.from(schema.projects)
 				.where(and(eq(schema.projects.id, projectIdParam), isNull(schema.projects.deletedAt)))
 				.limit(1);
 
 			if (row) {
-				const [customer] = await this.ctx.db
-					.select({ name: schema.customers.name })
-					.from(schema.customers)
-					.where(eq(schema.customers.id, row.customerId))
-					.limit(1);
+				const [customer] = row.businessPartnerId
+					? await this.ctx.db
+							.select({ name: schema.businessPartners.name })
+							.from(schema.businessPartners)
+							.where(eq(schema.businessPartners.id, row.businessPartnerId))
+							.limit(1)
+					: [];
 				preselectedProject = {
 					id: row.id,
 					name: row.name,
@@ -462,12 +464,12 @@ export class ExpenseService {
 	private async getEmployeeDirectory() {
 		return this.ctx.db
 			.select({
-				id: schema.employees.id,
-				name: schema.employees.name
+				id: schema.persons.id,
+				name: schema.persons.name
 			})
-			.from(schema.employees)
-			.where(isNull(schema.employees.deletedAt))
-			.orderBy(asc(schema.employees.name));
+			.from(schema.persons)
+			.where(isNull(schema.persons.deletedAt))
+			.orderBy(asc(schema.persons.name));
 	}
 
 	async create(data: {
@@ -531,9 +533,9 @@ export class ExpenseService {
 		}
 
 		const [employee] = await this.ctx.db
-			.select({ name: schema.employees.name })
-			.from(schema.employees)
-			.where(eq(schema.employees.id, employeeId))
+			.select({ name: schema.persons.name })
+			.from(schema.persons)
+			.where(eq(schema.persons.id, employeeId))
 			.limit(1);
 		if (!employee && data.requireEmployee) {
 			return { ok: false as const, error: 'Employee not found', status: 404 };

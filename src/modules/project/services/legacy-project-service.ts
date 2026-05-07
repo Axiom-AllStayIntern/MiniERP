@@ -72,7 +72,7 @@ export class ProjectService {
 				or(
 					like(schema.projects.name, `%${q}%`),
 					like(schema.projects.id, `%${q}%`),
-					like(sql`coalesce(${schema.customers.name}, '')`, `%${q}%`)
+					like(sql`coalesce(${schema.businessPartners.name}, '')`, `%${q}%`)
 				)!
 			);
 		}
@@ -88,7 +88,7 @@ export class ProjectService {
 			db
 				.select({ total: sql<number>`count(*)` })
 				.from(schema.projects)
-				.leftJoin(schema.customers, eq(schema.projects.customerId, schema.customers.id))
+				.leftJoin(schema.businessPartners, eq(schema.projects.businessPartnerId, schema.businessPartners.id))
 				.where(and(...projectConditions))
 		]);
 
@@ -101,15 +101,15 @@ export class ProjectService {
 			.select({
 				id: schema.projects.id,
 				name: schema.projects.name,
-				customerId: schema.projects.customerId,
+				customerId: schema.projects.businessPartnerId,
 				status: schema.projects.status,
 				startDate: schema.projects.startDate,
 				endDate: schema.projects.endDate,
 				updatedAt: schema.projects.updatedAt,
-				customerName: schema.customers.name
+				customerName: schema.businessPartners.name
 			})
 			.from(schema.projects)
-			.leftJoin(schema.customers, eq(schema.projects.customerId, schema.customers.id))
+			.leftJoin(schema.businessPartners, eq(schema.projects.businessPartnerId, schema.businessPartners.id))
 			.where(and(...projectConditions))
 			.orderBy(desc(schema.projects.updatedAt))
 			.limit(PROJECT_LIST_PAGE_SIZE)
@@ -168,11 +168,13 @@ export class ProjectService {
 			throw new NotFoundError('Project', projectId);
 		}
 
-		const [customer] = await db
-			.select({ id: schema.customers.id, name: schema.customers.name })
-			.from(schema.customers)
-			.where(eq(schema.customers.id, project.customerId))
-			.limit(1);
+		const [customer] = project.businessPartnerId
+			? await db
+					.select({ id: schema.businessPartners.id, name: schema.businessPartners.name })
+					.from(schema.businessPartners)
+					.where(eq(schema.businessPartners.id, project.businessPartnerId))
+					.limit(1)
+			: [];
 
 		const [
 			[allProjectsCountRow],
@@ -308,7 +310,7 @@ export class ProjectService {
 
 		return {
 			project,
-			customerName: customer?.name ?? project.customerId,
+			customerName: customer?.name ?? project.businessPartnerId ?? '',
 			projectListCounts: {
 				all: Number(allProjectsCountRow?.n ?? 0),
 				active: Number(activeProjectsCountRow?.n ?? 0)
@@ -325,7 +327,7 @@ export class ProjectService {
 	}
 
 	async create(data: {
-		customerId: string;
+		businessPartnerId?: string | null;
 		name: string;
 		status?: string;
 		startDate?: string;

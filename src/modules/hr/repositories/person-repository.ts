@@ -1,6 +1,6 @@
 import { eq, isNull, and } from 'drizzle-orm';
 import type { DBClient } from '$infrastructure/db';
-import { persons, personRoles, employeeProfiles, employees } from './person.schema';
+import { persons, personRoles, employeeProfiles } from './person.schema';
 import { BaseRepository } from '$platform/modules/base-repository';
 
 // ---------------------------------------------------------------------------
@@ -80,11 +80,25 @@ export class EmployeeProfileRepository extends BaseRepository<typeof employeePro
 }
 
 // ---------------------------------------------------------------------------
-// Legacy EmployeeRepository (wraps old employees table during migration)
+// EmployeeRepository — Wave 2.2 backward-compat surface for callers still
+// using the legacy "employee" entity. Now resolves to persons + employee_profiles
+// via PersonRepository / EmployeeProfileRepository; the legacy `employees`
+// table was dropped.
 // ---------------------------------------------------------------------------
 
-export class EmployeeRepository extends BaseRepository<typeof employees> {
+export class EmployeeRepository {
+	private personRepo: PersonRepository;
+	private profileRepo: EmployeeProfileRepository;
+
 	constructor(db: DBClient) {
-		super(db, employees);
+		this.personRepo = new PersonRepository(db);
+		this.profileRepo = new EmployeeProfileRepository(db);
+	}
+
+	async findById(personId: string) {
+		const person = await this.personRepo.findById(personId);
+		if (!person) return null;
+		const profile = await this.profileRepo.findByPersonId(personId);
+		return { ...person, profile };
 	}
 }

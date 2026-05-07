@@ -20,17 +20,15 @@ export {
 	personRoles,
 	employeeProfiles,
 	shareholderProfiles,
-	freelancerProfiles,
-	employees
+	freelancerProfiles
 } from '$modules/hr/repositories/person.schema';
 
-// Business Partner module (includes legacy customers table)
+// Business Partner module
 export {
 	businessPartners,
 	partnerSupplierProfiles,
 	partnerCustomerProfiles,
-	partnerContacts,
-	customers
+	partnerContacts
 } from '$modules/business-partner/repositories/business-partner.schema';
 
 // Project module
