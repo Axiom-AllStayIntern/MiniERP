@@ -29,6 +29,8 @@ Required keys:
 - totalAmount: numeric grand total (number or null). No currency symbols.
 - gstAmount: numeric GST/VAT amount (number or null). No currency symbols.
 - currency: ISO currency code if present, otherwise null.
+- serviceName: SaaS/service/product name if present, otherwise null.
+- period: billing/service period if present, otherwise null.
 - confidence: number between 0 and 1, your overall confidence.
 
 Use null for any field you cannot confidently extract.
@@ -46,6 +48,8 @@ Required keys:
 - gstAmount: numeric GST/VAT amount if shown (number or null).
 - currency: ISO currency code if present, otherwise null.
 - recipientName: the staff / recipient named on the receipt if any (string or null).
+- destination: travel/accommodation destination if present, otherwise null.
+- trackingNumber: logistics tracking / AWB number if present, otherwise null.
 - confidence: number between 0 and 1.
 
 Use null for any field you cannot confidently extract.

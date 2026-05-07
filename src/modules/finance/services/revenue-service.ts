@@ -15,6 +15,8 @@ type FinanceRevenueCreateInput = {
 	amount: number;
 	currency?: string;
 	gstAmount?: number;
+	documentRef?: string | null;
+	metadata?: string | null;
 	notes?: string | null;
 };
 

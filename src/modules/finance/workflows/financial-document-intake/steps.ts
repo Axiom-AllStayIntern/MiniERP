@@ -82,7 +82,8 @@ export async function runFieldExtractionStep(
 			fileName: input.fileName,
 			text: input.text,
 			artifactConfidence: input.artifactConfidence,
-			categoryId: input.categoryId
+			categoryId: input.categoryId,
+			outputShape: 'legacy'
 		},
 		ctx
 	);

@@ -54,7 +54,7 @@ export const businessTrips = sqliteTable('business_trips', {
 });
 
 // ---------------------------------------------------------------------------
-// Expenses â€?redesigned per smartfin-expense-revenue-design.md
+// Expenses ï¿½?redesigned per smartfin-expense-revenue-design.md
 //
 // Key principles:
 //   - Record-on-save: no draft/confirmed/void status flow
@@ -97,7 +97,7 @@ export const expenses = sqliteTable('expenses', {
 });
 
 // ---------------------------------------------------------------------------
-// Revenue â€?standalone table per design doc section 5 & 6.3
+// Revenue ï¿½?standalone table per design doc section 5 & 6.3
 // ---------------------------------------------------------------------------
 
 export const revenue = sqliteTable('revenue', {
@@ -118,6 +118,7 @@ export const revenue = sqliteTable('revenue', {
 	gstAmount: real('gst_amount').default(0),
 
 	documentRef: text('document_ref'),
+	metadata: text('metadata'),
 	notes: text('notes'),
 	...timeFields
 });

@@ -52,7 +52,7 @@ export const financialDocumentIntakeWorkflow: FinancialDocumentIntakeWorkflowDef
 		},
 		{
 			id: 'document_intake',
-			allowedCapabilities: ['document-intake.classify-document'],
+			allowedCapabilities: [],
 			riskLevel: 'R1',
 			requiresUserConfirmation: false,
 			nextSteps: ['bucket_selection']

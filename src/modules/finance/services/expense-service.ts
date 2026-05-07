@@ -101,6 +101,7 @@ type FinanceProjectExpenseInput = {
 	projectId?: string | null;
 	expenseType: ExpenseType;
 	category: string;
+	docType?: 'invoice' | 'receipt' | 'po' | null;
 	amount: number;
 	currency?: string;
 	date: string;
@@ -112,6 +113,7 @@ type FinanceProjectExpenseInput = {
 	notes?: string | null;
 	metadata?: string | null;
 	documentRef?: string | null;
+	gstAmount?: number | null;
 };
 
 type FinanceBusinessTripFilters = { projectId?: string | null; employeeId?: string | null };
@@ -540,7 +542,9 @@ export function createFinanceExpenseApi(ctx: ModuleContext) {
 			destination: data.destination ?? null,
 			notes: data.notes ?? null,
 			metadata: data.metadata ?? null,
-			documentRef: data.documentRef ?? null
+			documentRef: data.documentRef ?? null,
+			docType: data.docType ?? null,
+			gstAmount: data.gstAmount ?? null
 		});
 
 		await ctx.eventBus.emit(

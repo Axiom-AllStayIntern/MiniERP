@@ -1,9 +1,10 @@
 import type { BriefItem, QuickAction } from '../types';
 
 /**
- * Phase 3 mock data. Quick Actions and Brief items now route into the
- * unified `financial-document-intake` workflow with category hints. The
- * intake hint maps to the canonical category ids in
+ * Phase 3 mock data. Quick Actions for new uploads route into the unified
+ * `financial-document-intake` workflow with category hints. Existing drafted
+ * documents route into the Ship 2C `finance-inbox` layer. The intake hint maps
+ * to the canonical category ids in
  * `src/modules/finance/workflows/financial-document-intake/categories.ts`
  * so the workflow's bucket/kind steps can pre-select sensible defaults.
  *
@@ -19,8 +20,7 @@ export const mockBriefItems: BriefItem[] = [
 		id: 'brief-1',
 		title: '3 supplier invoices waiting on you',
 		detail: 'From Axiom Tech, Cloudfactor SG, Neon Robotics — OCR draft ready.',
-		workflowId: 'financial-document-intake',
-		workflowHint: { docType: 'invoice_in' },
+		workflowId: 'finance-inbox',
 		urgency: 'due-soon',
 		count: 3
 	},
@@ -34,8 +34,7 @@ export const mockBriefItems: BriefItem[] = [
 		id: 'brief-3',
 		title: '2 expense claims need approval',
 		detail: 'Joyce and Wei Ming submitted travel receipts this morning.',
-		workflowId: 'financial-document-intake',
-		workflowHint: { docType: 'expense' },
+		workflowId: 'finance-inbox',
 		urgency: 'normal',
 		count: 2
 	}
@@ -65,6 +64,12 @@ export const mockQuickActions: QuickAction[] = [
 		icon: 'file-text',
 		workflowId: 'financial-document-intake',
 		workflowHint: { docType: 'contract' }
+	},
+	{
+		id: 'qa-inbox',
+		label: 'Inbox',
+		icon: 'inbox',
+		workflowId: 'finance-inbox'
 	},
 	{
 		id: 'qa-allowance',

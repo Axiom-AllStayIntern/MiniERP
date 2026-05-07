@@ -82,11 +82,18 @@
 	const fieldsPreview = (item: DocumentArtifactView) => {
 		const f = item.suggestedFields?.fields as Record<string, unknown> | undefined;
 		if (!f) return null;
-		const counterparty =
-			(typeof f.counterpartyName === 'string' && f.counterpartyName) || null;
-		const amount = typeof f.totalAmount === 'number' ? f.totalAmount : null;
-		const currency = typeof f.currency === 'string' ? f.currency : 'SGD';
-		const docNum = typeof f.documentNumber === 'string' ? f.documentNumber : null;
+		const str = (...keys: string[]) => {
+			for (const key of keys) if (typeof f[key] === 'string' && f[key]) return f[key] as string;
+			return null;
+		};
+		const num = (...keys: string[]) => {
+			for (const key of keys) if (typeof f[key] === 'number') return f[key] as number;
+			return null;
+		};
+		const counterparty = str('supplier_name', 'vendor', 'customer_name', 'client_name', 'recipient_name', 'counterpartyName');
+		const amount = num('amount', 'invoice_amount', 'totalAmount');
+		const currency = str('currency', 'invoice_currency') ?? 'SGD';
+		const docNum = str('invoice_number', 'receipt_number', 'po_number', 'contract_number', 'quotation_number', 'documentNumber');
 		return { counterparty, amount, currency, docNum };
 	};
 

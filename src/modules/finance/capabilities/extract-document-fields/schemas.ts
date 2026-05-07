@@ -23,6 +23,8 @@ export const invoiceSchemaV1 = z.object({
 	totalAmount: z.number().finite().nullable(),
 	gstAmount: z.number().finite().nullable(),
 	currency: z.string().nullable(),
+	serviceName: z.string().nullable().optional(),
+	period: z.string().nullable().optional(),
 	confidence: z.number().min(0).max(1).optional()
 });
 export type InvoiceLlmV1 = z.infer<typeof invoiceSchemaV1>;
@@ -39,6 +41,8 @@ export const receiptSchemaV1 = z.object({
 	gstAmount: z.number().finite().nullable(),
 	currency: z.string().nullable(),
 	recipientName: z.string().nullable(),
+	destination: z.string().nullable().optional(),
+	trackingNumber: z.string().nullable().optional(),
 	confidence: z.number().min(0).max(1).optional()
 });
 export type ReceiptLlmV1 = z.infer<typeof receiptSchemaV1>;

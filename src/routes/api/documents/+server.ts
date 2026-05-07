@@ -19,10 +19,10 @@ import {
  *     (workers/document-processor.ts) runs extract → classify → field-extract
  *     and lands the artifact in `ready_for_review`.
  *
- * Dev fallback: when DOCUMENT_QUEUE binding is absent (local dev without
- * `wrangler dev` queue support, or unit tests), we run the pipeline inline
- * so the developer experience matches production. This is a pure
- * conditional — production always has the binding.
+ * Dev fallback: local wrangler queue producer/consumer processes do not
+ * reliably share messages. On localhost (or when DOCUMENT_PROCESS_INLINE=true),
+ * run the pipeline inline so UI development doesn't strand artifacts in
+ * `stored`. Production still uses DOCUMENT_QUEUE unless queue send fails.
  *
  * Request fields (multipart/form-data):
  *  - `file` (required): the document binary
@@ -105,6 +105,10 @@ export const POST: RequestHandler = async (event) => {
 		clientExtractionMethod
 	};
 
+	if (shouldProcessInlineForDev(event)) {
+		return await processInlineFallback(service, message, env, 201);
+	}
+
 	if (env.DOCUMENT_QUEUE) {
 		try {
 			await env.DOCUMENT_QUEUE.send(message);
@@ -112,7 +116,7 @@ export const POST: RequestHandler = async (event) => {
 			// Queue push failed — fall through to inline processing so the
 			// upload doesn't get stuck. The artifact row already exists.
 			console.error('[POST /api/documents] queue send failed, falling back to inline:', err);
-			return await processInlineFallback(service, message);
+			return await processInlineFallback(service, message, env, 201);
 		}
 		// 202 Accepted — pipeline is running asynchronously. The caller polls
 		// GET /api/documents/[id]/status (or the /finance/inbox page) for
@@ -121,12 +125,29 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Dev / local fallback: no queue binding.
-	return await processInlineFallback(service, message);
+	return await processInlineFallback(service, message, env, 201);
 };
+
+function shouldProcessInlineForDev(event: Parameters<RequestHandler>[0]): boolean {
+	const env = event.platform?.env as (Env & {
+		DOCUMENT_PROCESS_INLINE?: string;
+		DOCUMENT_QUEUE_FORCE_ASYNC?: string;
+	}) | undefined;
+	if (env?.DOCUMENT_QUEUE_FORCE_ASYNC === 'true') return false;
+	if (env?.DOCUMENT_PROCESS_INLINE === 'true') return true;
+
+	// Wrangler local queue producer/consumer dev servers do not reliably share
+	// messages across separate processes. Keep localhost uploads usable by
+	// processing inline; deployed workers still use the queue.
+	const host = event.url.hostname;
+	return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0';
+}
 
 async function processInlineFallback(
 	service: ReturnType<typeof createDocumentIntakeService>,
-	message: DocumentProcessorMessage
+	message: DocumentProcessorMessage,
+	env: Env,
+	status = 201
 ) {
 	// Lazy-load finance bits only on the inline path so the typical
 	// queue-driven prod path doesn't pull them into the HTTP worker bundle.
@@ -156,7 +177,7 @@ async function processInlineFallback(
 
 				const result = await extractDocumentFieldsCapability.execute(
 					{ documentId, fileName, text, categoryId, artifactConfidence: classificationConfidence },
-					{ tenantId, userId: message.userId, useMock: true }
+					{ tenantId, userId: message.userId, env, useMock: !env.AI }
 				);
 				const cat = findCategoryById(categoryId);
 				const fieldKeys = cat?.llmFields ?? Object.keys(result.fields);
@@ -170,7 +191,7 @@ async function processInlineFallback(
 				};
 			}
 		});
-		return ok(service.toView(processed), 201);
+		return ok(service.toView(processed), status);
 	} catch (err) {
 		const message2 = err instanceof Error ? err.message : 'Processing failed';
 		return fail(message2, 500, { documentId: message.documentId });

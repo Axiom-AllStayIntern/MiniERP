@@ -43,23 +43,13 @@ const { validateExpenseRecord } = financeRules;
  *  - `payloadHash` (required): sha-256 of the canonical payload (tamper guard)
  */
 
-interface ConfirmedFields {
-	documentNumber: string;
-	counterpartyName: string;
-	currency: string;
-	totalAmount: number;
-	gstAmount: number;
-	issueDate: string;
-	dueDate: string;
-}
-
 interface ConfirmedPayload {
 	documentId: string;
 	categoryId: string;
 	supplierId?: string | null;
 	poId?: string | null;
 	projectId?: string | null;
-	fields: ConfirmedFields;
+	fields: Record<string, unknown>;
 }
 
 interface ConfirmBody {
@@ -67,31 +57,167 @@ interface ConfirmBody {
 	payloadHash: string;
 }
 
-function buildExpenseInput(payload: ConfirmedPayload, category: CategoryDefinition) {
+function readString(fields: Record<string, unknown>, keys: string[], fallback = '') {
+	for (const key of keys) {
+		const value = fields[key];
+		if (typeof value === 'string' && value.trim()) return value.trim();
+		if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+	}
+	return fallback;
+}
+
+function readNumber(fields: Record<string, unknown>, keys: string[], fallback = 0) {
+	for (const key of keys) {
+		const value = fields[key];
+		if (typeof value === 'number' && Number.isFinite(value)) return value;
+		if (typeof value === 'string' && value.trim()) {
+			const n = Number(value);
+			if (Number.isFinite(n)) return n;
+		}
+	}
+	return fallback;
+}
+
+function readBoolean(fields: Record<string, unknown>, keys: string[], fallback = false) {
+	for (const key of keys) {
+		const value = fields[key];
+		if (typeof value === 'boolean') return value;
+		if (typeof value === 'string' && value.trim()) {
+			const normalized = value.trim().toLowerCase();
+			if (['true', 'yes', '1', 'on'].includes(normalized)) return true;
+			if (['false', 'no', '0', 'off'].includes(normalized)) return false;
+		}
+	}
+	return fallback;
+}
+
+function metadataFromFields(
+	fields: Record<string, unknown>,
+	exclude: string[]
+): Record<string, unknown> {
+	const excluded = new Set(exclude);
+	const metadata: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(fields)) {
+		if (excluded.has(key)) continue;
+		if (value === null || value === undefined || value === '') continue;
+		metadata[key] = value;
+	}
+	return metadata;
+}
+
+function normalizeConfirmedFields(fields: Record<string, unknown>) {
+	return {
+		documentNumber: readString(fields, [
+			'invoice_number',
+			'receipt_number',
+			'po_number',
+			'contract_number',
+			'quotation_number',
+			'documentNumber',
+			'invoiceNumber',
+			'receiptNumber',
+			'poNumber'
+		]),
+		counterpartyName: readString(fields, [
+			'supplier_name',
+			'vendor',
+			'recipient_name',
+			'customer_name',
+			'client_name',
+			'staff_name',
+			'counterpartyName',
+			'supplierName',
+			'customerName'
+		]),
+		currency: readString(fields, ['currency', 'invoice_currency', 'invoiceCurrency'], 'SGD').toUpperCase(),
+		totalAmount: readNumber(fields, ['amount', 'total', 'invoice_amount', 'totalAmount', 'invoiceAmount']),
+		gstAmount: readNumber(fields, ['gst_amount', 'invoice_gst_amount', 'gstAmount', 'invoiceGstAmount']),
+		issueDate: readString(fields, ['date', 'invoice_date', 'issueDate', 'invoiceDate']),
+		dueDate: readString(fields, ['due_date', 'invoice_due_date', 'dueDate', 'invoiceDueDate'])
+	};
+}
+
+function buildExpenseInput(payload: ConfirmedPayload, category: CategoryDefinition, documentId: string) {
+	const normalized = normalizeConfirmedFields(payload.fields);
+	const projectId = payload.projectId ?? (readString(payload.fields, ['project_id', 'projectId']) || null);
+	const reimbursement = readBoolean(payload.fields, ['reimbursement'], false);
+	const businessTrip = readBoolean(payload.fields, ['business_trip', 'businessTrip'], false);
+	const destination = readString(payload.fields, ['destination']) || null;
+	const staffName = readString(payload.fields, ['staff_name', 'recipient_name', 'staffName']) || null;
+	const metadata = metadataFromFields(payload.fields, [
+		'project_id',
+		'projectId',
+		'date',
+		'amount',
+		'currency',
+		'gst_amount',
+		'vendor',
+		'supplier_name',
+		'recipient_name',
+		'staff_name',
+		'reimbursement',
+		'business_trip',
+		'destination'
+	]);
 	const expenseType = category.expenseType ?? 'opex';
 	const cat = category.category ?? 'others';
 	return {
 		expenseType,
 		category: cat,
-		amount: payload.fields.totalAmount,
-		currency: payload.fields.currency,
-		date: payload.fields.issueDate,
-		vendorOrSupplier: payload.fields.counterpartyName,
-		notes: `Recorded via inbox · ${category.label} · ${payload.fields.documentNumber}${payload.poId ? ` · po=${payload.poId}` : ''}`
+		docType: category.expenseDocType,
+		projectId,
+		amount: normalized.totalAmount,
+		currency: normalized.currency,
+		date: normalized.issueDate,
+		gstAmount: normalized.gstAmount,
+		vendorOrSupplier: normalized.counterpartyName,
+		staffName,
+		reimbursement,
+		businessTrip,
+		destination,
+		documentRef: documentId,
+		metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
+		notes: `Recorded via inbox · ${category.label} · ${normalized.documentNumber}${payload.poId ? ` · po=${payload.poId}` : ''}`
 	} as const;
 }
 
-function buildRevenueInput(payload: ConfirmedPayload) {
+function buildRevenueInput(payload: ConfirmedPayload, documentId: string) {
+	const normalized = normalizeConfirmedFields(payload.fields);
+	const projectId = payload.projectId ?? (readString(payload.fields, ['project_id', 'projectId']) || null);
+	const metadata = metadataFromFields(payload.fields, [
+		'project_id',
+		'projectId',
+		'invoice_type',
+		'invoiceType',
+		'invoice_number',
+		'invoiceNumber',
+		'customer_name',
+		'customerName',
+		'client_name',
+		'date',
+		'invoice_date',
+		'invoice_amount',
+		'amount',
+		'invoice_currency',
+		'currency',
+		'invoice_gst_amount',
+		'gst_amount'
+	]);
 	return {
-		projectId: payload.projectId ?? null,
-		invoiceType: 'tax_invoice' as const,
-		invoiceNumber: payload.fields.documentNumber,
-		clientName: payload.fields.counterpartyName,
-		date: payload.fields.issueDate,
-		amount: payload.fields.totalAmount,
-		currency: payload.fields.currency,
-		gstAmount: payload.fields.gstAmount,
-		notes: `Recorded via inbox · invoice ${payload.fields.documentNumber}`
+		projectId,
+		invoiceType: readString(payload.fields, ['invoice_type', 'invoiceType'], 'tax_invoice') as
+			| 'standard'
+			| 'zero_rate'
+			| 'tax_invoice',
+		invoiceNumber: normalized.documentNumber,
+		clientName: normalized.counterpartyName,
+		date: normalized.issueDate,
+		amount: normalized.totalAmount,
+		currency: normalized.currency,
+		gstAmount: normalized.gstAmount,
+		documentRef: documentId,
+		metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
+		notes: `Recorded via inbox · invoice ${normalized.documentNumber}`
 	};
 }
 
@@ -168,7 +294,7 @@ export const POST: RequestHandler = async (event) => {
 	let finalAction: string;
 
 	if (category.persistTarget === 'expenses') {
-		const expenseInput = buildExpenseInput(body.payload, category);
+		const expenseInput = buildExpenseInput(body.payload, category, artifact.id);
 		const validation = validateExpenseRecord(expenseInput);
 		if (!validation.success) {
 			const issues = validation.error.issues.map((issue) => ({
@@ -195,14 +321,14 @@ export const POST: RequestHandler = async (event) => {
 			});
 			return fail('Validation failed', 400, { issues });
 		}
-		const created = await finance.expenses.createStandaloneExpense(expenseInput);
+		const created = await finance.expenses.create(expenseInput);
 		entityId = created.id;
 		entityType = 'expense';
 		entityRoute = '/finance/expenses';
 		toolId = 'finance.create-expense-record';
 		finalAction = `expense.created.${category.expenseType}.${category.category}`;
 	} else if (category.persistTarget === 'revenue') {
-		const created = await finance.revenue.createRevenue(buildRevenueInput(body.payload));
+		const created = await finance.revenue.createRevenue(buildRevenueInput(body.payload, artifact.id));
 		entityId = created.id;
 		entityType = 'revenue';
 		entityRoute = '/finance/doc-hub/customer-invoices';

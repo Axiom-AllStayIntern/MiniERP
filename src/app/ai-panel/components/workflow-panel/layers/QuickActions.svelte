@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Receipt, Wallet, FileText, LineChart, Sparkles, CornerDownLeft } from 'lucide-svelte';
+	import { Receipt, Wallet, FileText, LineChart, Sparkles, CornerDownLeft, Inbox } from 'lucide-svelte';
 	import { panel } from '$app-layer/ai-panel/workflow/panel.svelte';
 	import { mockQuickActions } from '$app-layer/ai-panel/workflow/mock/today-brief';
 	import type { QuickAction } from '$app-layer/ai-panel/workflow/types';
@@ -17,6 +17,8 @@
 				return FileText;
 			case 'line-chart':
 				return LineChart;
+			case 'inbox':
+				return Inbox;
 			default:
 				return Sparkles;
 		}

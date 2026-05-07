@@ -23,6 +23,7 @@
 	import DocMatchesStep from './finance-document-intake/MatchesStep.svelte';
 	import DocProjectStep from './finance-document-intake/ProjectStep.svelte';
 	import DocConfirmStep from './finance-document-intake/ConfirmStep.svelte';
+	import FinanceInboxLayer from './finance-inbox/InboxLayer.svelte';
 	// Phase 3 stage 5 allowance-recording (no document)
 	import AllowanceFormStep from './finance-allowance/AllowanceFormStep.svelte';
 	import AllowanceConfirmStep from './finance-allowance/AllowanceConfirmStep.svelte';
@@ -41,6 +42,7 @@
 		if (workflowId === 'document-intake') return stepIndex < 5;
 		if (workflowId === 'vendor-invoice-intake') return stepIndex < 5;
 		if (workflowId === 'financial-document-intake') return stepIndex < 8;
+		if (workflowId === 'finance-inbox') return false;
 		if (workflowId === 'allowance-recording') return stepIndex < 2;
 		return true;
 	});
@@ -107,6 +109,8 @@
 			{:else if stepIndex === 8}
 				<DoneStep />
 			{/if}
+		{:else if workflowId === 'finance-inbox'}
+			<FinanceInboxLayer />
 		{:else if workflowId === 'allowance-recording'}
 			{#if stepIndex === 0}
 				<AllowanceFormStep />

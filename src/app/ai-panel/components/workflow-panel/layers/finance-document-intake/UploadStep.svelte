@@ -3,13 +3,11 @@
 	import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 	import { panel } from '$app-layer/ai-panel/workflow/panel.svelte';
 	import {
-		advanceWorkflow,
-		startFinancialDocumentIntakeWorkflow,
 		uploadDocument,
 		type DocumentProcessingStatus
 	} from '$app-layer/ai-panel/workflow/finance-workflow-api';
 
-	type Stage = 'idle' | 'parsing' | 'storing' | 'extracting' | 'wiring' | 'error';
+	type Stage = 'idle' | 'parsing' | 'storing' | 'queued' | 'error';
 
 	let fileInput: HTMLInputElement | null = $state(null);
 	let dragOver = $state(false);
@@ -151,38 +149,19 @@
 				return;
 			}
 
-			const wfState = (panel.activeWorkflow?.state as Record<string, unknown> | undefined) ?? {};
-			let serverWorkflowId = wfState.serverWorkflowId as string | undefined;
-			const presetCategoryId = wfState.presetCategoryId as string | undefined;
-
-			if (!serverWorkflowId) {
-				const started = await startFinancialDocumentIntakeWorkflow({
-					source: 'quick_action',
-					intentHint: wfState.hintDocType as string | undefined,
-					categoryId: presetCategoryId
-				});
-				serverWorkflowId = started.workflowId;
-				panel.patchState({ serverWorkflowId, serverStep: started.currentStep });
-			}
-
-			stage = 'wiring';
-			const advance = await advanceWorkflow(serverWorkflowId, {
-				targetStep: 'document_intake',
-				payload: { documentId: artifact.id, fileName: file.name }
-			});
-
+			stage = 'queued';
+			panel.startWorkflow('finance-inbox');
 			panel.patchState({
+				initialTab: artifact.processingStatus === 'ready_for_review' ? 'review' : 'processing',
+				justUploadedDocumentId: artifact.id,
 				documentId: artifact.id,
 				documentArtifactId: artifact.id,
 				documentArtifactStatus: artifact.processingStatus,
 				documentClassification: artifact.classification,
 				suggestedDocumentType: artifact.documentType,
 				fileName: file.name,
-				fileSize: file.size,
-				serverStep: advance.currentStep
+				fileSize: file.size
 			});
-
-			panel.advanceStep();
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not start the workflow.';
 			stage = 'error';
@@ -229,8 +208,7 @@
 		class:is-dragging={dragOver}
 		class:is-busy={stage === 'parsing' ||
 			stage === 'storing' ||
-			stage === 'extracting' ||
-			stage === 'wiring'}
+			stage === 'queued'}
 		class:is-error={stage === 'error'}
 		ondragover={onDragOver}
 		ondragleave={onDragLeave}
@@ -238,13 +216,12 @@
 		onclick={stage === 'error' ? onRetry : onBrowseClick}
 		disabled={stage === 'parsing' ||
 			stage === 'storing' ||
-			stage === 'extracting' ||
-			stage === 'wiring'}
+			stage === 'queued'}
 	>
 		<span class="drop-glow" aria-hidden="true"></span>
 
 		<span class="drop-icon">
-			{#if stage === 'parsing' || stage === 'storing' || stage === 'extracting' || stage === 'wiring'}
+			{#if stage === 'parsing' || stage === 'storing' || stage === 'queued'}
 				<Loader2 size={30} strokeWidth={1.6} />
 			{:else if stage === 'error'}
 				<AlertTriangle size={30} strokeWidth={1.6} />
@@ -260,10 +237,8 @@
 				Reading {fileName} locally…
 			{:else if stage === 'storing'}
 				Storing {fileName}…
-			{:else if stage === 'extracting'}
-				Reading {fileName}…
-			{:else if stage === 'wiring'}
-				Wiring it into the workflow…
+			{:else if stage === 'queued'}
+				Adding {fileName} to Inbox…
 			{:else if stage === 'error'}
 				Couldn't start
 			{:else}
@@ -275,7 +250,7 @@
 			{#if stage === 'error'}
 				{error}
 			{:else}
-				PDF or photo. Invoice, receipt, PO, customer invoice �?I'll figure out the rest.
+				PDF or photo. Invoice, receipt, PO, customer invoice - I'll figure out the rest.
 			{/if}
 		</span>
 
@@ -286,10 +261,8 @@
 				Extracting text in browser (pdf.js)
 			{:else if stage === 'storing'}
 				Stashing in object storage
-			{:else if stage === 'extracting'}
-				Server-side OCR + document classification
-			{:else if stage === 'wiring'}
-				Handing off to financial-document-intake
+			{:else if stage === 'queued'}
+				The async worker will extract, classify, and prefill fields
 			{/if}
 		</span>
 	</button>

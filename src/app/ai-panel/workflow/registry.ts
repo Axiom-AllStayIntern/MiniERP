@@ -117,3 +117,13 @@ registerWorkflow({
 		{ id: 'done', label: 'Done', hint: 'Recorded' }
 	]
 });
+
+registerWorkflow({
+	id: 'finance-inbox',
+	title: 'Document Inbox',
+	shortTitle: 'Inbox',
+	description: 'Review documents processed by the async intake pipeline.',
+	entryLabel: 'Review inbox',
+	icon: 'inbox',
+	steps: [{ id: 'inbox', label: 'Review', hint: 'Ready / processing / confirmed' }]
+});

@@ -7,8 +7,10 @@
  * by the workflow's bucket/category step picks both the prompt + schema and
  * the heuristic branch.
  *
- * Output shape stays compatible with the Phase-2 `ExtractInvoiceFieldsOutput`
- * so the matching and confirmation steps don't have to change yet.
+ * Output is category-field oriented for the Inbox pipeline: keys match the
+ * selected category's `llmFields` (`invoice_number`, `vendor`,
+ * `tracking_number`, etc.). Legacy workflow callers can request the old
+ * common field projection via `outputShape: 'legacy'`.
  */
 import type { ZodType } from 'zod';
 import { runStructuredOutput } from '../../../../platform/ai/ai-runtime';
@@ -23,7 +25,6 @@ import {
 	buildEvidence,
 	pickFixture,
 	type ExtractedInvoiceFields,
-	type ExtractInvoiceFieldsOutput,
 	type ExtractionProvider
 } from '../extract-invoice-fields/mock';
 import { runHeuristicExtraction, type HeuristicCommonFields } from './heuristic';
@@ -62,9 +63,27 @@ export interface ExtractDocumentFieldsInput {
 	/** Category id from the workflow state, e.g. `expense.sales_cost.invoice`.
 	 *  When absent the capability defaults to invoice extraction (Phase 2 behavior). */
 	categoryId?: string;
+	/** Legacy finance workflow still expects documentNumber/counterpartyName. Inbox leaves this unset. */
+	outputShape?: 'category' | 'legacy';
 }
 
-export type ExtractDocumentFieldsOutput = ExtractInvoiceFieldsOutput;
+export interface ExtractDocumentFieldsOutput {
+	fields: Record<string, unknown>;
+	confidence: number;
+	evidence: FinanceEvidence[];
+	provider: ExtractionProvider;
+}
+
+interface CommonFields extends ExtractedInvoiceFields {
+	recipientName?: string | null;
+	description?: string | null;
+	trackingNumber?: string | null;
+	serviceName?: string | null;
+	period?: string | null;
+	destination?: string | null;
+	subtotal?: number | null;
+	poNumber?: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // Heuristic → common ExtractedInvoiceFields projection
@@ -72,7 +91,7 @@ export type ExtractDocumentFieldsOutput = ExtractInvoiceFieldsOutput;
 
 function projectHeuristic(
 	fields: HeuristicCommonFields
-): ExtractedInvoiceFields | null {
+): CommonFields | null {
 	if (
 		!fields.documentNumber ||
 		!fields.supplierName ||
@@ -89,7 +108,10 @@ function projectHeuristic(
 		totalAmount: fields.totalAmount,
 		gstAmount: fields.gstAmount ?? 0,
 		issueDate: fields.issueDate,
-		dueDate: fields.dueDate ?? fields.issueDate
+		dueDate: fields.dueDate ?? fields.issueDate,
+		recipientName: fields.recipientName,
+		description: fields.description,
+		trackingNumber: fields.trackingNumber
 	};
 }
 
@@ -101,7 +123,7 @@ interface LlmConfig<T> {
 	systemPrompt: string;
 	schema: ZodType<T>;
 	schemaName: string;
-	mapToFields: (value: T) => ExtractedInvoiceFields | null;
+	mapToFields: (value: T) => CommonFields | null;
 	confidenceFromValue: (value: T) => number | undefined;
 }
 
@@ -127,7 +149,9 @@ function configForDocType(docType: CategoryDocType): LlmConfig<unknown> | null {
 					totalAmount: v.totalAmount,
 					gstAmount: v.gstAmount ?? 0,
 					issueDate: v.issueDate,
-					dueDate: v.dueDate ?? v.issueDate
+					dueDate: v.dueDate ?? v.issueDate,
+					serviceName: v.serviceName ?? null,
+					period: v.period ?? null
 				};
 			},
 			confidenceFromValue: (raw) => (raw as InvoiceLlmV1).confidence
@@ -153,7 +177,10 @@ function configForDocType(docType: CategoryDocType): LlmConfig<unknown> | null {
 					totalAmount: v.totalAmount,
 					gstAmount: v.gstAmount ?? 0,
 					issueDate: v.date,
-					dueDate: v.date
+					dueDate: v.date,
+					recipientName: v.recipientName ?? null,
+					destination: v.destination ?? null,
+					trackingNumber: v.trackingNumber ?? null
 				};
 			},
 			confidenceFromValue: (raw) => (raw as ReceiptLlmV1).confidence
@@ -180,7 +207,8 @@ function configForDocType(docType: CategoryDocType): LlmConfig<unknown> | null {
 					totalAmount: v.totalAmount,
 					gstAmount: 0,
 					issueDate: v.date,
-					dueDate: v.date
+					dueDate: v.date,
+					description: v.description ?? null
 				};
 			},
 			confidenceFromValue: (raw) => (raw as PoLlmV1).confidence
@@ -207,7 +235,9 @@ function configForDocType(docType: CategoryDocType): LlmConfig<unknown> | null {
 					totalAmount: v.totalAmount,
 					gstAmount: v.gstAmount ?? 0,
 					issueDate: v.invoiceDate,
-					dueDate: v.invoiceDueDate ?? v.invoiceDate
+					dueDate: v.invoiceDueDate ?? v.invoiceDate,
+					subtotal: v.subtotal ?? null,
+					poNumber: v.poNumber ?? null
 				};
 			},
 			confidenceFromValue: (raw) => (raw as CustomerInvoiceLlmV1).confidence
@@ -222,7 +252,7 @@ async function tryLlmExtraction(
 	ctx: CapabilityContextWithEnv,
 	categoryId: string,
 	documentId: string
-): Promise<{ fields: ExtractedInvoiceFields; confidence: number; provider: ExtractionProvider } | null> {
+): Promise<{ fields: CommonFields; confidence: number; provider: ExtractionProvider } | null> {
 	if (!ctx.env?.AI) return null;
 	const cfg = configForDocType(docType);
 	if (!cfg) return null;
@@ -262,21 +292,118 @@ async function tryLlmExtraction(
 // Capability
 // ---------------------------------------------------------------------------
 
-function buildEvidenceForReal(provider: ExtractionProvider): FinanceEvidence[] {
-	const labels: Array<keyof ExtractedInvoiceFields> = [
-		'documentNumber',
-		'counterpartyName',
-		'currency',
-		'totalAmount',
-		'gstAmount',
-		'issueDate',
-		'dueDate'
-	];
+function buildEvidenceForFields(provider: ExtractionProvider, fields: Record<string, unknown>): FinanceEvidence[] {
+	const labels = Object.keys(fields);
 	return labels.map((field) => ({
 		type: 'extracted_field',
 		refId: `${provider}://${field}`,
 		summary: `Extracted ${field} via ${provider}`
 	}));
+}
+
+function withTextHints(fields: CommonFields, text: string): CommonFields {
+	const pick = (...patterns: RegExp[]) => {
+		for (const pattern of patterns) {
+			const match = text.match(pattern);
+			if (match?.[1]) return match[1].trim();
+		}
+		return null;
+	};
+	return {
+		...fields,
+		serviceName:
+			fields.serviceName ??
+			pick(/\bservice\s*(?:name)?[:\s]+([^\n]{3,80})/i, /\bsubscription[:\s]+([^\n]{3,80})/i),
+		period:
+			fields.period ??
+			pick(/\b(?:billing|service)?\s*period[:\s]+([^\n]{3,80})/i, /\bperiod[:\s]+([^\n]{3,80})/i),
+		destination:
+			fields.destination ??
+			pick(/\bdestination[:\s]+([^\n]{3,80})/i, /\blocation[:\s]+([^\n]{3,80})/i)
+	};
+}
+
+function setIfValue(output: Record<string, unknown>, key: string, value: unknown) {
+	if (value === null || value === undefined || value === '') return;
+	output[key] = value;
+}
+
+function categoryValue(key: string, fields: CommonFields): unknown {
+	switch (key) {
+		case 'invoice_number':
+		case 'receipt_number':
+		case 'contract_number':
+		case 'quotation_number':
+			return fields.documentNumber;
+		case 'po_number':
+			return fields.poNumber ?? fields.documentNumber;
+		case 'supplier_name':
+		case 'vendor':
+			return fields.counterpartyName;
+		case 'recipient_name':
+		case 'staff_name':
+			return fields.recipientName ?? fields.counterpartyName;
+		case 'customer_name':
+		case 'client_name':
+			return fields.counterpartyName;
+		case 'date':
+		case 'invoice_date':
+		case 'effective_date':
+			return fields.issueDate;
+		case 'due_date':
+		case 'invoice_due_date':
+			return fields.dueDate;
+		case 'amount':
+		case 'invoice_amount':
+			return fields.totalAmount;
+		case 'currency':
+		case 'invoice_currency':
+			return fields.currency;
+		case 'gst_amount':
+		case 'invoice_gst_amount':
+			return fields.gstAmount;
+		case 'invoice_subtotal':
+			return fields.subtotal;
+		case 'description':
+		case 'scope':
+			return fields.description;
+		case 'tracking_number':
+			return fields.trackingNumber;
+		case 'service_name':
+			return fields.serviceName;
+		case 'period':
+			return fields.period;
+		case 'destination':
+			return fields.destination;
+		default:
+			return undefined;
+	}
+}
+
+function projectForCategory(fields: CommonFields, category: CategoryDefinition | null): Record<string, unknown> {
+	if (!category) return { ...fields };
+	const output: Record<string, unknown> = {};
+	for (const key of category.llmFields) setIfValue(output, key, categoryValue(key, fields));
+	return output;
+}
+
+function outputFor(
+	fields: CommonFields,
+	category: CategoryDefinition | null,
+	outputShape: ExtractDocumentFieldsInput['outputShape']
+): Record<string, unknown> {
+	if (outputShape === 'legacy') {
+		return {
+			documentNumber: fields.documentNumber,
+			counterpartyName: fields.counterpartyName,
+			currency: fields.currency,
+			totalAmount: fields.totalAmount,
+			gstAmount: fields.gstAmount,
+			issueDate: fields.issueDate,
+			dueDate: fields.dueDate
+		};
+	}
+	return projectForCategory(fields, category);
 }
 
 function resolveDocType(input: ExtractDocumentFieldsInput): {
@@ -306,10 +433,14 @@ export const extractDocumentFieldsCapability: FinanceCapability<
 		// 1. No usable text → fixture mock fallback (Phase 1/2 demo path).
 		if (!input.text || input.text.length < MIN_TEXT_LENGTH_FOR_REAL_EXTRACT) {
 			const fixture = pickFixture({ documentId: input.documentId, fileName: input.fileName });
+			const fields = outputFor(fixture.fields, category, input.outputShape);
 			return {
-				fields: fixture.fields,
+				fields,
 				confidence: fixture.confidence,
-				evidence: buildEvidence(fixture.fields),
+				evidence:
+					input.outputShape === 'legacy'
+						? buildEvidence(fixture.fields)
+						: buildEvidenceForFields('mock-v1', fields),
 				provider: 'mock-v1'
 			};
 		}
@@ -317,12 +448,13 @@ export const extractDocumentFieldsCapability: FinanceCapability<
 		// 2. Heuristic-first over real text, branched by docType.
 		const heuristic = runHeuristicExtraction(input.text, docType);
 		if (heuristic.confidence >= HEURISTIC_ACCEPT_THRESHOLD) {
-			const fields = projectHeuristic(heuristic.fields);
-			if (fields) {
+			const common = projectHeuristic(heuristic.fields);
+			if (common) {
+				const fields = outputFor(withTextHints(common, input.text), category, input.outputShape);
 				return {
 					fields,
 					confidence: heuristic.confidence,
-					evidence: buildEvidenceForReal('heuristic'),
+					evidence: buildEvidenceForFields('heuristic', fields),
 					provider: 'heuristic'
 				};
 			}
@@ -337,31 +469,37 @@ export const extractDocumentFieldsCapability: FinanceCapability<
 			input.documentId
 		);
 		if (llm) {
+			const fields = outputFor(withTextHints(llm.fields, input.text), category, input.outputShape);
 			return {
-				fields: llm.fields,
+				fields,
 				confidence: llm.confidence,
-				evidence: buildEvidenceForReal(llm.provider),
+				evidence: buildEvidenceForFields(llm.provider, fields),
 				provider: llm.provider
 			};
 		}
 
 		// 4. Below-threshold heuristic that still produced usable fields.
-		const fields = projectHeuristic(heuristic.fields);
-		if (fields) {
+		const common = projectHeuristic(heuristic.fields);
+		if (common) {
+			const fields = outputFor(withTextHints(common, input.text), category, input.outputShape);
 			return {
 				fields,
 				confidence: heuristic.confidence,
-				evidence: buildEvidenceForReal('heuristic'),
+				evidence: buildEvidenceForFields('heuristic', fields),
 				provider: 'heuristic'
 			};
 		}
 
 		// 5. Final: filename-keyed fixture.
 		const fixture = pickFixture({ documentId: input.documentId, fileName: input.fileName });
+		const fields = outputFor(fixture.fields, category, input.outputShape);
 		return {
-			fields: fixture.fields,
+			fields,
 			confidence: fixture.confidence,
-			evidence: buildEvidence(fixture.fields),
+			evidence:
+				input.outputShape === 'legacy'
+					? buildEvidence(fixture.fields)
+					: buildEvidenceForFields('mock-v1', fields),
 			provider: 'mock-v1'
 		};
 	}
