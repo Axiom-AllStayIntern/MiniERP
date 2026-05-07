@@ -21,7 +21,9 @@
 		"db:migrate:remote": "wrangler d1 migrations apply smartfin-db --remote",
 		"db:seed:local": "wrangler d1 execute smartfin-db --local --file drizzle/seeds/local-customers.sql",
 		"db:seed:mock:local": "wrangler d1 execute smartfin-db --local --file drizzle/seeds/local-mock-full.sql",
-		"db:test:mock:local": "npm run db:migrate:local && npm run db:seed:mock:local"
+		"db:test:mock:local": "npm run db:migrate:local && npm run db:seed:mock:local",
+		"deploy:document-processor": "wrangler deploy --config workers/wrangler.document-processor.jsonc",
+		"dev:document-processor": "wrangler dev --config workers/wrangler.document-processor.jsonc"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-cloudflare": "^7.2.6",

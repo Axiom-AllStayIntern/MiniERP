@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { DBClient } from '../../../infrastructure/db';
 import type {
 	DocumentArtifact,
@@ -9,6 +9,7 @@ import type {
 	DocumentSourceMetadata,
 	DocumentType,
 	OriginalFileMeta,
+	SuggestedFieldsResult,
 	TextExtractionResult
 } from '../schemas/document-artifact.schema';
 import { documentArtifacts } from './document-artifact.schema';
@@ -54,6 +55,8 @@ interface DocumentArtifactRow {
 	sourceMetadata: string | null;
 	textExtraction: string | null;
 	classification: string | null;
+	suggestedFields: string | null;
+	suggestedCategoryId: string | null;
 	normalizedMetadata: string | null;
 	securityFlags: string | null;
 	sizeBytes: number | null;
@@ -76,6 +79,8 @@ function rowToArtifact(row: DocumentArtifactRow): DocumentArtifact {
 		sourceMetadata: fromJson<DocumentSourceMetadata>(row.sourceMetadata),
 		textExtraction: fromJson<TextExtractionResult>(row.textExtraction),
 		classification: fromJson<DocumentClassificationResult>(row.classification),
+		suggestedFields: fromJson<SuggestedFieldsResult>(row.suggestedFields),
+		suggestedCategoryId: row.suggestedCategoryId ?? undefined,
 		normalizedMetadata: fromJson<Record<string, unknown>>(row.normalizedMetadata),
 		securityFlags: fromJson<DocumentSecurityFlag[]>(row.securityFlags),
 		createdAt: row.createdAt,
@@ -89,7 +94,7 @@ export class DocumentArtifactRepository {
 	async create(input: CreateDocumentArtifactInput): Promise<DocumentArtifact> {
 		const id = input.id ?? crypto.randomUUID();
 		const now = nowIso();
-		const row = {
+		const row: DocumentArtifactRow = {
 			id,
 			tenantId: input.tenantId,
 			source: input.source,
@@ -99,6 +104,8 @@ export class DocumentArtifactRepository {
 			sourceMetadata: toJsonOrNull(input.sourceMetadata),
 			textExtraction: toJsonOrNull(input.textExtraction),
 			classification: toJsonOrNull(input.classification),
+			suggestedFields: null,
+			suggestedCategoryId: null,
 			normalizedMetadata: toJsonOrNull(input.normalizedMetadata),
 			securityFlags: toJsonOrNull(input.securityFlags),
 			sizeBytes: input.originalFile.sizeBytes,
@@ -167,6 +174,8 @@ export class DocumentArtifactRepository {
 			documentType: DocumentType;
 			textExtraction: TextExtractionResult;
 			classification: DocumentClassificationResult;
+			suggestedFields: SuggestedFieldsResult | null;
+			suggestedCategoryId: string | null;
 			normalizedMetadata: Record<string, unknown>;
 			securityFlags: DocumentSecurityFlag[];
 		}>
@@ -180,10 +189,85 @@ export class DocumentArtifactRepository {
 			update.classification = JSON.stringify(patch.classification);
 			update.documentType = patch.classification.documentType;
 		}
+		if (patch.suggestedFields !== undefined)
+			update.suggestedFields = patch.suggestedFields === null
+				? null
+				: JSON.stringify(patch.suggestedFields);
+		if (patch.suggestedCategoryId !== undefined)
+			update.suggestedCategoryId = patch.suggestedCategoryId;
 		if (patch.normalizedMetadata !== undefined)
 			update.normalizedMetadata = JSON.stringify(patch.normalizedMetadata);
 		if (patch.securityFlags !== undefined)
 			update.securityFlags = JSON.stringify(patch.securityFlags);
 		await this.db.update(documentArtifacts).set(update).where(eq(documentArtifacts.id, id));
+	}
+
+	async setSuggestedFields(
+		id: string,
+		fields: SuggestedFieldsResult,
+		categoryId: string
+	): Promise<void> {
+		await this.db
+			.update(documentArtifacts)
+			.set({
+				suggestedFields: JSON.stringify(fields),
+				suggestedCategoryId: categoryId,
+				updatedAt: nowIso()
+			})
+			.where(eq(documentArtifacts.id, id));
+	}
+
+	async clearSuggestedFields(id: string): Promise<void> {
+		await this.db
+			.update(documentArtifacts)
+			.set({
+				suggestedFields: null,
+				suggestedCategoryId: null,
+				updatedAt: nowIso()
+			})
+			.where(eq(documentArtifacts.id, id));
+	}
+
+	/**
+	 * List artifacts for the inbox, filtered by status. Used by /finance/inbox
+	 * page and AI Panel inbox layer (Ship 2). Excludes soft-deleted (none yet
+	 * since artifact has no deletedAt — left as future Ship 3 work).
+	 */
+	async listByStatuses(
+		tenantId: string,
+		statuses: DocumentProcessingStatus[],
+		opts: { limit?: number; offset?: number } = {}
+	): Promise<DocumentArtifact[]> {
+		const limit = opts.limit ?? 100;
+		const offset = opts.offset ?? 0;
+		const rows = await this.db
+			.select()
+			.from(documentArtifacts)
+			.where(
+				and(
+					eq(documentArtifacts.tenantId, tenantId),
+					inArray(documentArtifacts.processingStatus, statuses)
+				)
+			)
+			.orderBy(desc(documentArtifacts.createdAt))
+			.limit(limit)
+			.offset(offset);
+		return rows.map((row) => rowToArtifact(row as DocumentArtifactRow));
+	}
+
+	async countByStatuses(
+		tenantId: string,
+		statuses: DocumentProcessingStatus[]
+	): Promise<number> {
+		const rows = await this.db
+			.select({ n: sql<number>`count(*)` })
+			.from(documentArtifacts)
+			.where(
+				and(
+					eq(documentArtifacts.tenantId, tenantId),
+					inArray(documentArtifacts.processingStatus, statuses)
+				)
+			);
+		return Number(rows[0]?.n ?? 0);
 	}
 }

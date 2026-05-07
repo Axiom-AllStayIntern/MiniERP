@@ -287,7 +287,10 @@ export type DocumentProcessingStatus =
 	| 'ocr_completed'
 	| 'classification_pending'
 	| 'classified'
+	| 'fields_extraction_pending'
+	| 'ready_for_review'
 	| 'ready_for_workflow'
+	| 'confirmed'
 	| 'needs_manual_review'
 	| 'failed';
 
@@ -353,11 +356,19 @@ export interface DocumentStatusResponse {
 
 export function uploadDocument(
 	file: File,
-	opts: { uploadedFrom?: 'ai_panel' | 'finance_workspace' | 'task_mode' } = {}
+	opts: {
+		uploadedFrom?: 'ai_panel' | 'finance_workspace' | 'task_mode';
+		clientExtractedText?: string;
+		clientExtractionMethod?: 'pdfjs' | 'vision_first_page' | 'manual';
+	} = {}
 ): Promise<DocumentArtifactPostResponse> {
 	const form = new FormData();
 	form.append('file', file);
 	form.append('uploadedFrom', opts.uploadedFrom ?? 'ai_panel');
+	if (opts.clientExtractedText) {
+		form.append('clientExtractedText', opts.clientExtractedText);
+		form.append('clientExtractionMethod', opts.clientExtractionMethod ?? 'manual');
+	}
 	return postMultipart<DocumentArtifactPostResponse>('/api/documents', form);
 }
 
@@ -368,12 +379,15 @@ export function getDocumentStatus(documentId: string): Promise<DocumentStatusRes
 }
 
 export const TERMINAL_DOCUMENT_STATUSES: DocumentProcessingStatus[] = [
+	'ready_for_review',
 	'ready_for_workflow',
+	'confirmed',
 	'needs_manual_review',
 	'failed'
 ];
 
 export const READY_DOCUMENT_STATUSES: DocumentProcessingStatus[] = [
+	'ready_for_review',
 	'ready_for_workflow',
 	'text_extracted',
 	'classified'

@@ -442,4 +442,62 @@ export const DEFAULT_SUPPLIER_INVOICE_CATEGORY_ID = 'expense.sales_cost.invoice'
 /** Default category when the classifier produces no useful guess. */
 export const FALLBACK_CATEGORY_ID = 'expense.opex.others';
 
+/**
+ * Maps a classifier-emitted `documentType` to the canonical category id the
+ * field-extraction capability should use as its prompt/schema target.
+ *
+ * Used by the async document-processor worker (Ship 2): after the artifact is
+ * `classified`, the worker looks up a default categoryId here, then calls
+ * `extract-document-fields` against that category's `llmFields`. Returning
+ * `null` signals "we don't know enough to auto-extract — let the user pick a
+ * category in the inbox first" (the worker will leave the artifact in
+ * `ready_for_review` with no `suggestedFields`).
+ *
+ * Mapping rationale:
+ * - `supplier_invoice` → sales_cost.invoice (project-linked default; matches
+ *   DEFAULT_SUPPLIER_INVOICE_CATEGORY_ID)
+ * - `receipt` → opex.others (generic fallback; user can re-pick a more
+ *   specific opex category like meal/transport in the inbox)
+ * - `customer_invoice` → revenue.invoice_out (only revenue category that
+ *   exists today)
+ * - `purchase_order` / `contract` / `quotation` → matching document_only
+ *   categories (no expenses/revenue write, archive-only)
+ * - `bank_statement` / `tax_document` / `logistics_document` / `unknown` →
+ *   null. Bank statements & tax docs have no canonical category yet;
+ *   logistics is ambiguous (could be sales_cost or opex.logistics depending
+ *   on context) so we defer to user.
+ */
+export function categoryIdForDocumentType(
+	documentType:
+		| 'supplier_invoice'
+		| 'receipt'
+		| 'purchase_order'
+		| 'customer_invoice'
+		| 'logistics_document'
+		| 'contract'
+		| 'quotation'
+		| 'bank_statement'
+		| 'tax_document'
+		| 'unknown'
+): string | null {
+	switch (documentType) {
+		case 'supplier_invoice':
+			return DEFAULT_SUPPLIER_INVOICE_CATEGORY_ID;
+		case 'receipt':
+			return FALLBACK_CATEGORY_ID;
+		case 'customer_invoice':
+			return 'revenue.invoice_out';
+		case 'purchase_order':
+			return 'document_only.purchase_order';
+		case 'contract':
+			return 'document_only.contract';
+		case 'quotation':
+			return 'document_only.quotation';
+		case 'bank_statement':
+		case 'tax_document':
+		case 'logistics_document':
+		case 'unknown':
+			return null;
+	}
+}
 

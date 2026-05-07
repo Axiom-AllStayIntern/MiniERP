@@ -38,7 +38,10 @@ export const documentProcessingStatusSchema = z.enum([
 	'ocr_completed',
 	'classification_pending',
 	'classified',
+	'fields_extraction_pending',
+	'ready_for_review',
 	'ready_for_workflow',
+	'confirmed',
 	'needs_manual_review',
 	'failed'
 ]);
@@ -152,6 +155,21 @@ export const documentClassificationResultSchema = z.object({
 
 export type DocumentClassificationResult = z.infer<typeof documentClassificationResultSchema>;
 
+/**
+ * AI-suggested business fields ready for user review (Ship 2 inbox pipeline).
+ * Worker populates this after classify + extract-document-fields runs against
+ * the suggested category. ConfirmStep renders fields with confidence colors.
+ */
+export const suggestedFieldsResultSchema = z.object({
+	fields: z.record(z.string(), z.unknown()),
+	confidence: z.record(z.string(), z.number().min(0).max(1)).optional(),
+	evidence: z.unknown().optional(),
+	categoryId: z.string(),
+	extractedAt: z.string()
+});
+
+export type SuggestedFieldsResult = z.infer<typeof suggestedFieldsResultSchema>;
+
 export const documentArtifactSchema = z.object({
 	id: z.string(),
 	tenantId: z.string(),
@@ -162,6 +180,8 @@ export const documentArtifactSchema = z.object({
 	processingStatus: documentProcessingStatusSchema,
 	textExtraction: textExtractionResultSchema.optional(),
 	classification: documentClassificationResultSchema.optional(),
+	suggestedFields: suggestedFieldsResultSchema.optional(),
+	suggestedCategoryId: z.string().optional(),
 	normalizedMetadata: z.record(z.string(), z.unknown()).optional(),
 	securityFlags: z.array(documentSecurityFlagSchema).optional(),
 	createdAt: z.string(),

@@ -66,6 +66,17 @@
 			]
 		},
 		{
+			title: 'Inbox',
+			items: [
+				{
+					href: '/finance/inbox',
+					label: 'Document Inbox',
+					moduleId: 'document-intake',
+					icon: 'I'
+				}
+			]
+		},
+		{
 			title: 'Documents',
 			items: [{ href: '/finance/doc-hub', label: 'Doc Hub', moduleId: 'ar', icon: 'F' }]
 		}

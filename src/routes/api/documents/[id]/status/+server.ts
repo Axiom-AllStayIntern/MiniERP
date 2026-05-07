@@ -36,6 +36,8 @@ export const GET: RequestHandler = async (event) => {
 			processingStatus: artifact.processingStatus,
 			documentType: artifact.documentType,
 			classification: artifact.classification,
+			suggestedFields: artifact.suggestedFields,
+			suggestedCategoryId: artifact.suggestedCategoryId,
 			securityFlags: artifact.securityFlags ?? [],
 			updatedAt: artifact.updatedAt
 		});

@@ -115,30 +115,44 @@ export async function extractTextFromBlob(
 	}
 
 	if (isPdfMime(fileRef.mimeType, fileRef.fileName)) {
+		// DEPRECATED Ship 1: this byte-heuristic only "works" on PDFs whose text
+		// streams are uncompressed plain ASCII (extremely rare). For modern PDFs
+		// the bytes are mostly compressed Flate streams + structural keywords,
+		// so this path produces garbage that breaks downstream classification.
+		//
+		// The canonical PDF text path is now the browser pdfjs extractor in
+		// src/app/ai-panel/.../UploadStep.svelte (and intake/DropZone.svelte).
+		// Server callers should pass `clientExtractedText` to processDocument()
+		// rather than relying on this.
+		//
+		// Kept here as a last-resort fallback so non-AI-Panel upload sources
+		// (e.g. future email intake) don't crash, but it will mark the artifact
+		// as needs_manual_review for any non-trivial PDF.
 		const bytes = await fileService.getBytes(fileRef.key);
 		if (!bytes) return buildFailure('blob_not_found', `No object at ${fileRef.key}`, 'pdf_text');
 		const text = decodePdfHeuristicBytes(bytes);
-		if (text.length >= MIN_USEFUL_PDF_TEXT) {
+		const hasWordLikeAscii = /[A-Za-z]{4,}/.test(
+			text.replace(/\bobj\b|\bendobj\b|\bstream\b|\bendstream\b|\bxref\b/g, '')
+		);
+		if (text.length >= MIN_USEFUL_PDF_TEXT && hasWordLikeAscii) {
 			return {
 				method: 'pdf_text',
 				status: 'success',
 				text,
-				confidence: 0.7,
-				provider: 'builtin_pdf'
+				confidence: 0.5,
+				provider: 'builtin_pdf_legacy'
 			};
 		}
-		// Scanned PDF: page-1 raster + vision is a Phase 4 follow-up. For now
-		// we return a clean partial result so the artifact lands in
-		// `needs_manual_review`.
 		return {
 			method: 'pdf_text',
 			status: 'partial',
 			text,
-			confidence: 0.2,
-			provider: 'builtin_pdf',
+			confidence: 0.1,
+			provider: 'builtin_pdf_legacy',
 			error: {
 				code: 'low_text_yield',
-				message: 'PDF text layer was empty or unreadable; OCR fallback not wired in Phase 2.'
+				message:
+					'Server-side PDF heuristic could not extract usable text. Use the AI Panel upload (browser pdfjs) for PDFs.'
 			}
 		};
 	}

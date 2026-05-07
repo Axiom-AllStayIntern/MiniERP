@@ -53,5 +53,8 @@ export type {
 	DocumentClassificationResult,
 	TextExtractionResult,
 	OriginalFileMeta,
-	DocumentSourceMetadata
+	DocumentSourceMetadata,
+	SuggestedFieldsResult
 } from './schemas/document-artifact.schema';
+export { suggestedFieldsResultSchema } from './schemas/document-artifact.schema';
+export type { DocumentProcessorMessage } from './schemas/queue-messages';

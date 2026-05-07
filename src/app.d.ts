@@ -6,6 +6,18 @@ declare global {
 		R2: R2Bucket;
 		KV: KVNamespace;
 		OCR_QUEUE: Queue;
+		/**
+		 * Async document-processing queue (Ship 2 inbox pipeline).
+		 *
+		 * Producers: POST /api/documents (after stored), POST
+		 * /api/documents/[id]/reclassify.
+		 * Consumer: workers/document-processor.ts.
+		 *
+		 * Optional binding because the SvelteKit dev server may run without a
+		 * queue locally; in that case the upload route should fall back to
+		 * inline sync processing (best-effort dev UX).
+		 */
+		DOCUMENT_QUEUE?: Queue;
 		AI?: Ai;
 		/** Workers AI vision model for document image OCR (default @cf/meta/llama-3.2-11b-vision-instruct). */
 		WORKERS_AI_VISION_MODEL?: string;

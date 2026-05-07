@@ -13,6 +13,7 @@ import type {
 	DocumentArtifact,
 	DocumentClassificationResult,
 	DocumentProcessingStatus,
+	SuggestedFieldsResult,
 	TextExtractionResult
 } from '../schemas/document-artifact.schema';
 
@@ -44,11 +45,57 @@ export interface CreateDocumentFromUploadInput {
 	sizeBytes?: number;
 }
 
+/**
+ * Optional callback that runs after classification to extract structured
+ * fields per the document type. Lives in finance domain (it's
+ * category-aware), so document-intake takes it as an injected callback to
+ * preserve modular boundary. Worker provides this when calling
+ * processDocument; legacy sync callers omit it.
+ */
+export interface FieldExtractorInput {
+	tenantId: string;
+	documentId: string;
+	fileName: string;
+	text: string;
+	documentType: DocumentArtifact['documentType'];
+	classificationConfidence: number;
+}
+
+export interface FieldExtractorResult {
+	fields: Record<string, unknown>;
+	confidence: Record<string, number> | undefined;
+	evidence?: unknown;
+	categoryId: string;
+}
+
+export type FieldExtractor = (
+	input: FieldExtractorInput
+) => Promise<FieldExtractorResult | null>;
+
 export interface ProcessDocumentInput {
 	tenantId?: string;
 	documentId: string;
 	mode?: 'sync';
 	useMock?: boolean;
+	/**
+	 * Pre-extracted text supplied by the upload caller (typically the AI Panel
+	 * client-side pdfjs path). When present, processDocument skips its own
+	 * server-side text extraction and trusts this text. The Cloudflare Workers
+	 * runtime cannot run pdfjs reliably, so the browser is the canonical text
+	 * extraction path for PDF documents (Ship 1 of upload pipeline redesign).
+	 */
+	clientExtractedText?: string;
+	/** How the client extracted the text. Used in audit metadata for evaluation. */
+	clientExtractionMethod?: 'pdfjs' | 'vision_first_page' | 'manual';
+	/**
+	 * Optional finance-side field extraction step. When present and the
+	 * artifact reaches the `classified` state, the service invokes this to
+	 * populate `suggestedFields` + `suggestedCategoryId` before transitioning
+	 * to `ready_for_review`. Async pipeline (queue worker) supplies this;
+	 * legacy sync callers omit it. Module boundary preserved by inversion of
+	 * control — document-intake never imports finance.
+	 */
+	fieldExtractor?: FieldExtractor;
 }
 
 export interface DocumentArtifactView {
@@ -74,6 +121,8 @@ export interface DocumentArtifactView {
 		error?: TextExtractionResult['error'];
 	};
 	classification?: DocumentClassificationResult;
+	suggestedFields?: SuggestedFieldsResult;
+	suggestedCategoryId?: string;
 	securityFlags?: DocumentArtifact['securityFlags'];
 	createdAt: string;
 	updatedAt: string;
@@ -103,6 +152,8 @@ function toView(artifact: DocumentArtifact): DocumentArtifactView {
 				}
 			: undefined,
 		classification: artifact.classification,
+		suggestedFields: artifact.suggestedFields,
+		suggestedCategoryId: artifact.suggestedCategoryId,
 		securityFlags: artifact.securityFlags,
 		createdAt: artifact.createdAt,
 		updatedAt: artifact.updatedAt
@@ -117,6 +168,21 @@ export interface DocumentIntakeService {
 	getDocumentArtifact(input: {
 		tenantId?: string;
 		documentId: string;
+	}): Promise<DocumentArtifact | null>;
+	markConfirmed(input: {
+		tenantId?: string;
+		documentId: string;
+		entityType?: string;
+		entityId?: string;
+		categoryId?: string;
+	}): Promise<DocumentArtifact | null>;
+	replaceSuggestedFields(input: {
+		tenantId?: string;
+		documentId: string;
+		fields: Record<string, unknown>;
+		confidence?: Record<string, number>;
+		evidence?: unknown;
+		categoryId: string;
 	}): Promise<DocumentArtifact | null>;
 	toView: typeof toView;
 }
@@ -247,18 +313,34 @@ export function createDocumentIntakeService(
 		try {
 			await repo.setStatus(artifact.id, 'text_extraction_pending');
 
+			// Ship 1: prefer client-extracted text. The browser pdfjs path produces
+			// reliable text from PDFs (the Workers byte heuristic cannot — modern
+			// PDFs compress text streams). The server only runs OCR when the client
+			// could not extract (images, scanned PDFs that the client rasterized
+			// to image and re-uploaded as JPEG).
 			const useMock = input.useMock ?? !ctx.env.AI;
-			const extraction = await extractTextFromBlob({
-				fileRef: {
-					key: artifact.originalFile.storageRef,
-					mimeType: artifact.originalFile.mimeType,
-					fileName: artifact.originalFile.fileName,
-					sizeBytes: artifact.originalFile.sizeBytes
-				},
-				fileService,
-				env: ctx.env,
-				useMock
-			});
+			let extraction: TextExtractionResult;
+			if (input.clientExtractedText && input.clientExtractedText.length >= 48) {
+				extraction = {
+					method: 'manual',
+					status: 'success',
+					text: input.clientExtractedText,
+					confidence: 0.9,
+					provider: `client_${input.clientExtractionMethod ?? 'manual'}`
+				};
+			} else {
+				extraction = await extractTextFromBlob({
+					fileRef: {
+						key: artifact.originalFile.storageRef,
+						mimeType: artifact.originalFile.mimeType,
+						fileName: artifact.originalFile.fileName,
+						sizeBytes: artifact.originalFile.sizeBytes
+					},
+					fileService,
+					env: ctx.env,
+					useMock
+				});
+			}
 			await repo.setTextExtraction(artifact.id, extraction);
 
 			if (extraction.status === 'failed') {
@@ -309,19 +391,62 @@ export function createDocumentIntakeService(
 				}
 			});
 
+			// Low classification confidence is a hint, not a blocker. The downstream
+			// BucketStep / KindStep let the user pick the correct bucket+kind, so a
+			// low-confidence classification just means "AI couldn't pre-fill, user
+			// will choose". Mark a soft security flag for audit but keep the
+			// artifact moving forward.
 			if (classification.confidence < MIN_CLASSIFICATION_CONFIDENCE) {
 				await repo.addSecurityFlag(artifact.id, 'low_ocr_confidence');
-				await repo.setStatus(artifact.id, 'needs_manual_review');
-				const review = await repo.findById(artifact.id, tenantId);
-				await audit(review!, 'document.needs_manual_review', 'failed', {
-					errorCode: 'low_classification_confidence'
-				});
-				return review!;
 			}
 
-			await repo.setStatus(artifact.id, 'ready_for_workflow');
+			// Optional field extraction step (Ship 2 async pipeline). Worker
+			// supplies a finance-aware extractor; legacy sync callers don't.
+			if (input.fieldExtractor && extraction.text) {
+				await repo.setStatus(artifact.id, 'fields_extraction_pending');
+				try {
+					const extracted = await input.fieldExtractor({
+						tenantId,
+						documentId: artifact.id,
+						fileName: artifact.originalFile.fileName,
+						text: extraction.text,
+						documentType: classification.documentType,
+						classificationConfidence: classification.confidence
+					});
+					if (extracted) {
+						const result: SuggestedFieldsResult = {
+							fields: extracted.fields,
+							confidence: extracted.confidence,
+							evidence: extracted.evidence,
+							categoryId: extracted.categoryId,
+							extractedAt: new Date().toISOString()
+						};
+						await repo.setSuggestedFields(artifact.id, result, extracted.categoryId);
+						const afterFields = await repo.findById(artifact.id, tenantId);
+						await audit(afterFields!, 'document.fields_extracted', 'ok', {
+							outputRefs: {
+								categoryId: extracted.categoryId,
+								fieldCount: Object.keys(extracted.fields).length
+							}
+						});
+					} else {
+						// No category mapping — that's fine; user picks in inbox.
+						await audit(artifact, 'document.fields_extraction_skipped', 'ok', {
+							outputRefs: { reason: 'no_category_mapping' }
+						});
+					}
+				} catch (err) {
+					// Field extraction is best-effort. Failure does not fail the
+					// artifact — it just means the user reviews with empty pre-fill.
+					await audit(artifact, 'document.fields_extraction_failed', 'failed', {
+						errorCode: err instanceof Error ? err.message.slice(0, 80) : 'extractor_error'
+					});
+				}
+			}
+
+			await repo.setStatus(artifact.id, 'ready_for_review');
 			const ready = await repo.findById(artifact.id, tenantId);
-			await audit(ready!, 'document.ready_for_workflow');
+			await audit(ready!, 'document.ready_for_review');
 			return ready!;
 		} catch (err) {
 			await repo.setStatus(artifact.id, 'failed');
@@ -340,5 +465,79 @@ export function createDocumentIntakeService(
 		return repo.findById(input.documentId, input.tenantId ?? 'default');
 	}
 
-	return { createDocumentFromUpload, processDocument, getDocumentArtifact, toView };
+	/**
+	 * Mark the artifact as user-confirmed (terminal state for the inbox
+	 * pipeline). Called by POST /api/documents/[id]/confirm AFTER the
+	 * downstream finance persistence (expenses/revenue/archive) succeeds.
+	 * Confirmed artifacts drop out of the active inbox view but stay in the
+	 * DB for the 30-day retention window (see Ship 3 for retention sweep).
+	 */
+	async function markConfirmed(input: {
+		tenantId?: string;
+		documentId: string;
+		entityType?: string;
+		entityId?: string;
+		categoryId?: string;
+	}): Promise<DocumentArtifact | null> {
+		const tenantId = input.tenantId ?? 'default';
+		const artifact = await repo.findById(input.documentId, tenantId);
+		if (!artifact) return null;
+		await repo.setStatus(artifact.id, 'confirmed');
+		const updated = await repo.findById(artifact.id, tenantId);
+		await audit(updated!, 'document.confirmed', 'ok', {
+			outputRefs: {
+				entityType: input.entityType,
+				entityId: input.entityId,
+				categoryId: input.categoryId
+			}
+		});
+		return updated;
+	}
+
+	/**
+	 * Replace `suggestedFields` and `suggestedCategoryId` after the user
+	 * picks a different category in the inbox. Called by POST
+	 * /api/documents/[id]/reclassify; the route runs the finance-side
+	 * extract-document-fields capability against the existing textExtraction
+	 * (no re-OCR, no re-classify) and passes the result here.
+	 */
+	async function replaceSuggestedFields(input: {
+		tenantId?: string;
+		documentId: string;
+		fields: Record<string, unknown>;
+		confidence?: Record<string, number>;
+		evidence?: unknown;
+		categoryId: string;
+	}): Promise<DocumentArtifact | null> {
+		const tenantId = input.tenantId ?? 'default';
+		const artifact = await repo.findById(input.documentId, tenantId);
+		if (!artifact) return null;
+		const result: SuggestedFieldsResult = {
+			fields: input.fields,
+			confidence: input.confidence,
+			evidence: input.evidence,
+			categoryId: input.categoryId,
+			extractedAt: new Date().toISOString()
+		};
+		await repo.setSuggestedFields(artifact.id, result, input.categoryId);
+		// Keep status at ready_for_review — reclassify is a re-render, not a
+		// state machine transition.
+		const updated = await repo.findById(artifact.id, tenantId);
+		await audit(updated!, 'document.reclassified', 'ok', {
+			outputRefs: {
+				categoryId: input.categoryId,
+				fieldCount: Object.keys(input.fields).length
+			}
+		});
+		return updated;
+	}
+
+	return {
+		createDocumentFromUpload,
+		processDocument,
+		getDocumentArtifact,
+		markConfirmed,
+		replaceSuggestedFields,
+		toView
+	};
 }

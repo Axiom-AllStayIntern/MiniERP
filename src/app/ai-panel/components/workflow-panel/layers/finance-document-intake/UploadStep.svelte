@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { UploadCloud, FileText, Loader2, AlertTriangle } from 'lucide-svelte';
+	import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 	import { panel } from '$app-layer/ai-panel/workflow/panel.svelte';
 	import {
 		advanceWorkflow,
@@ -8,7 +9,7 @@
 		type DocumentProcessingStatus
 	} from '$app-layer/ai-panel/workflow/finance-workflow-api';
 
-	type Stage = 'idle' | 'storing' | 'extracting' | 'wiring' | 'error';
+	type Stage = 'idle' | 'parsing' | 'storing' | 'extracting' | 'wiring' | 'error';
 
 	let fileInput: HTMLInputElement | null = $state(null);
 	let dragOver = $state(false);
@@ -17,16 +18,128 @@
 	let error = $state('');
 
 	const TERMINAL_BAD: DocumentProcessingStatus[] = ['needs_manual_review', 'failed'];
+	const MIN_USEFUL_CLIENT_TEXT = 48;
+
+	// ---------------------------------------------------------------------------
+	// Client-side text extraction (Ship 1 of upload pipeline redesign).
+	// Same pattern as src/app/ai-panel/components/workflow-panel/layers/intake/DropZone.svelte.
+	// PDF: pdfjs text layer; if too thin, render page 1 â†’ JPEG â†’ server vision OCR.
+	// Image: skip client extraction, server runs vision OCR.
+	// ---------------------------------------------------------------------------
+	type PdfJs = typeof import('pdfjs-dist');
+	let _pdfJsCache: PdfJs | null = null;
+
+	async function loadPdfJs(): Promise<PdfJs> {
+		if (_pdfJsCache) return _pdfJsCache;
+		const lib = await import('pdfjs-dist');
+		lib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+		_pdfJsCache = lib;
+		return lib;
+	}
+
+	async function extractPdfText(file: File): Promise<string> {
+		const pdfjs = await loadPdfJs();
+		const data = new Uint8Array(await file.arrayBuffer());
+		const pdf = await Promise.race([
+			pdfjs.getDocument({ data }).promise,
+			new Promise<never>((_, reject) =>
+				setTimeout(() => reject(new Error('PDF parse timeout')), 15000)
+			)
+		]);
+		const maxPages = Math.min(pdf.numPages, 8);
+		const chunks: string[] = [];
+		for (let i = 1; i <= maxPages; i++) {
+			const page = await pdf.getPage(i);
+			const content = await page.getTextContent();
+			const line = content.items
+				.map((item) => ('str' in item ? item.str : ''))
+				.join(' ')
+				.replace(/\s+/g, ' ')
+				.trim();
+			if (line) chunks.push(line);
+		}
+		return chunks.join('\n').trim();
+	}
+
+	async function renderPdfFirstPageJpeg(file: File): Promise<File | null> {
+		try {
+			const pdfjs = await loadPdfJs();
+			const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) })
+				.promise;
+			if (pdf.numPages < 1) return null;
+			const page = await pdf.getPage(1);
+			const base = page.getViewport({ scale: 1 });
+			const viewport = page.getViewport({
+				scale: Math.min(2.5, 1600 / Math.max(base.width, 1))
+			});
+			const canvas = document.createElement('canvas');
+			canvas.width = Math.ceil(viewport.width);
+			canvas.height = Math.ceil(viewport.height);
+			const ctx = canvas.getContext('2d');
+			if (!ctx) return null;
+			await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+			const blob = await new Promise<Blob | null>((resolve) =>
+				canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.88)
+			);
+			if (!blob) return null;
+			const baseName = file.name.replace(/\.pdf$/i, '') || 'document';
+			return new File([blob], `${baseName}-p1.jpg`, { type: 'image/jpeg' });
+		} catch {
+			return null;
+		}
+	}
+
+	type ClientExtraction = {
+		text: string;
+		method: 'pdfjs' | 'vision_first_page' | 'manual';
+		uploadFile: File;
+	};
+
+	async function buildClientExtraction(file: File): Promise<ClientExtraction> {
+		const mime = (file.type || '').toLowerCase();
+		const name = file.name.toLowerCase();
+		const isPdf = mime === 'application/pdf' || name.endsWith('.pdf');
+		const isImage =
+			mime.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(name);
+
+		if (isImage) {
+			// Server-side vision OCR will handle this; nothing to extract on client.
+			return { text: '', method: 'manual', uploadFile: file };
+		}
+
+		if (isPdf) {
+			const text = await extractPdfText(file).catch(() => '');
+			if (text.length >= MIN_USEFUL_CLIENT_TEXT) {
+				return { text, method: 'pdfjs', uploadFile: file };
+			}
+			// Scanned PDF: rasterize first page â†’ JPEG, upload that as the artifact.
+			// Server-side vision OCR handles it from there.
+			const jpeg = await renderPdfFirstPageJpeg(file);
+			if (jpeg) {
+				return { text: '', method: 'vision_first_page', uploadFile: jpeg };
+			}
+			// Last-resort: upload the original PDF; server will mark needs_manual_review.
+			return { text: '', method: 'manual', uploadFile: file };
+		}
+
+		return { text: '', method: 'manual', uploadFile: file };
+	}
 
 	async function onFile(file: File) {
 		if (!file) return;
 		fileName = file.name;
 		error = '';
-		stage = 'storing';
+		stage = 'parsing';
 
 		try {
-			stage = 'extracting';
-			const artifact = await uploadDocument(file, { uploadedFrom: 'ai_panel' });
+			const extraction = await buildClientExtraction(file);
+
+			stage = 'storing';
+			const artifact = await uploadDocument(extraction.uploadFile, {
+				uploadedFrom: 'ai_panel',
+				clientExtractedText: extraction.text || undefined,
+				clientExtractionMethod: extraction.method
+			});
 
 			if (TERMINAL_BAD.includes(artifact.processingStatus)) {
 				error =
@@ -114,18 +227,24 @@
 		type="button"
 		class="drop-area"
 		class:is-dragging={dragOver}
-		class:is-busy={stage === 'storing' || stage === 'extracting' || stage === 'wiring'}
+		class:is-busy={stage === 'parsing' ||
+			stage === 'storing' ||
+			stage === 'extracting' ||
+			stage === 'wiring'}
 		class:is-error={stage === 'error'}
 		ondragover={onDragOver}
 		ondragleave={onDragLeave}
 		ondrop={onDrop}
 		onclick={stage === 'error' ? onRetry : onBrowseClick}
-		disabled={stage === 'storing' || stage === 'extracting' || stage === 'wiring'}
+		disabled={stage === 'parsing' ||
+			stage === 'storing' ||
+			stage === 'extracting' ||
+			stage === 'wiring'}
 	>
 		<span class="drop-glow" aria-hidden="true"></span>
 
 		<span class="drop-icon">
-			{#if stage === 'storing' || stage === 'extracting' || stage === 'wiring'}
+			{#if stage === 'parsing' || stage === 'storing' || stage === 'extracting' || stage === 'wiring'}
 				<Loader2 size={30} strokeWidth={1.6} />
 			{:else if stage === 'error'}
 				<AlertTriangle size={30} strokeWidth={1.6} />
@@ -137,10 +256,15 @@
 		</span>
 
 		<span class="drop-heading">
-			{#if stage === 'storing'}
-				Storing {fileName}â€?			{:else if stage === 'extracting'}
-				Reading {fileName}â€?			{:else if stage === 'wiring'}
-				Wiring it into the workflowâ€?			{:else if stage === 'error'}
+			{#if stage === 'parsing'}
+				Reading {fileName} locallyâ€¦
+			{:else if stage === 'storing'}
+				Storing {fileName}â€¦
+			{:else if stage === 'extracting'}
+				Reading {fileName}â€¦
+			{:else if stage === 'wiring'}
+				Wiring it into the workflowâ€¦
+			{:else if stage === 'error'}
 				Couldn't start
 			{:else}
 				Drop the financial document here
@@ -151,17 +275,19 @@
 			{#if stage === 'error'}
 				{error}
 			{:else}
-				PDF or photo. Invoice, receipt, PO, customer invoice â€?I'll figure out the rest.
+				PDF or photo. Invoice, receipt, PO, customer invoice ï¿½?I'll figure out the rest.
 			{/if}
 		</span>
 
 		<span class="drop-footnote">
 			{#if stage === 'idle' && !fileName}
-				Click or drop â€?real OCR + classify, then finance agent
+				Click or drop Â· client-side text extraction + AI classification
+			{:else if stage === 'parsing'}
+				Extracting text in browser (pdf.js)
 			{:else if stage === 'storing'}
 				Stashing in object storage
 			{:else if stage === 'extracting'}
-				OCR + document classification
+				Server-side OCR + document classification
 			{:else if stage === 'wiring'}
 				Handing off to financial-document-intake
 			{/if}

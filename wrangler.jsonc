@@ -39,6 +39,15 @@
 			{
 				"binding": "OCR_QUEUE",
 				"queue": "smartfin-ocr-queue"
+			},
+			// Async document-processing pipeline (Ship 2). Consumer lives in
+			// `workers/wrangler.document-processor.jsonc`. POST /api/documents
+			// pushes here after storing the artifact; the consumer runs the
+			// extract → classify → field-extract chain and lands the artifact
+			// in `ready_for_review`.
+			{
+				"binding": "DOCUMENT_QUEUE",
+				"queue": "smartfin-doc-processor-queue"
 			}
 		]
 	},

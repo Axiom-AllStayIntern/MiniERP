@@ -2,7 +2,7 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { timeFields } from '$platform/modules/schema-helpers';
 
 /**
- * Document artifacts â€?the standardized representation of any file received
+ * Document artifacts ï¿½?the standardized representation of any file received
  * by SmartFin (manual upload now, email/drive/etc. later). Owned by the
  * Document Intake module per ref_files/v4/phase0-6/04 Â§6.
  *
@@ -39,7 +39,10 @@ export const documentArtifacts = sqliteTable('document_artifacts', {
 			'ocr_completed',
 			'classification_pending',
 			'classified',
+			'fields_extraction_pending',
+			'ready_for_review',
 			'ready_for_workflow',
+			'confirmed',
 			'needs_manual_review',
 			'failed'
 		]
@@ -70,12 +73,27 @@ export const documentArtifacts = sqliteTable('document_artifacts', {
 	textExtraction: text('text_extraction'),
 	/** {@link DocumentClassificationResult} JSON */
 	classification: text('classification'),
+	/**
+	 * AI-suggested business fields ready for user review. Populated by the
+	 * background queue worker after text extraction + classification + the
+	 * extract-document-fields capability run. Shape mirrors the workflow
+	 * field_extraction step output: `{ fields: Record<string, unknown>,
+	 * confidence: Record<string, number>, evidence?: ... }`. Reset whenever
+	 * the user re-classifies via /api/documents/[id]/reclassify.
+	 */
+	suggestedFields: text('suggested_fields'),
+	/**
+	 * Default category id the worker (or the user via reclassify) used to
+	 * generate suggestedFields. Drives ConfirmStep field display + persist
+	 * routing in `category.persistTarget`.
+	 */
+	suggestedCategoryId: text('suggested_category_id'),
 	/** Free-form normalized metadata JSON */
 	normalizedMetadata: text('normalized_metadata'),
 	/** {@link DocumentSecurityFlag}[] JSON */
 	securityFlags: text('security_flags'),
 
-	/** Soft retention bytes for analytics â€?duplicated from originalFile.sizeBytes for fast filters. */
+	/** Soft retention bytes for analytics ï¿½?duplicated from originalFile.sizeBytes for fast filters. */
 	sizeBytes: integer('size_bytes'),
 
 	...timeFields

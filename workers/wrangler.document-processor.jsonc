@@ -1,0 +1,66 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	// Dedicated worker for the async document-processing queue.
+	// Deploys with `npm run deploy:document-processor`.
+	//
+	// The HTTP worker (root wrangler.jsonc) holds the queue PRODUCER binding
+	// so SvelteKit routes can push messages. This worker holds the CONSUMER
+	// configuration. They share D1/R2/KV/AI bindings.
+	"name": "smartfin-document-processor",
+	"account_id": "c09bb2823904032b6ec648b23411f2e0",
+	"compatibility_date": "2026-03-30",
+	"compatibility_flags": ["nodejs_als"],
+	"main": "document-processor.ts",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "smartfin-db",
+			"database_id": "208e1ed4-437f-4da5-93d7-7058debea5c8",
+			"migrations_dir": "../drizzle/migrations"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "R2",
+			"bucket_name": "smartfin-files"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "fd0eca3363a3444daff52d1a35af69eb"
+		}
+	],
+	"queues": {
+		"consumers": [
+			{
+				"queue": "smartfin-doc-processor-queue",
+				// One artifact per invocation — keeps retry semantics simple
+				// (no partial-batch failure to reason about) and keeps our AI
+				// inference latency budget per-invocation tractable.
+				"max_batch_size": 1,
+				// 2 parallel artifacts at a time. Workers AI free tier is
+				// rate-limited and per-invocation memory is tight; raise
+				// later if we move to paid tier and inbox throughput becomes
+				// the bottleneck.
+				"max_concurrency": 2,
+				// Network blips / D1 hiccups should auto-recover; permanent
+				// failures land in the DLQ for human follow-up.
+				"max_retries": 3,
+				// Visibility timeout: extract+classify+field-extract end to
+				// end takes ~10-30s with Workers AI. 60s gives slack for
+				// retry attempts inside one batch attempt.
+				"max_batch_timeout": 60,
+				"dead_letter_queue": "smartfin-doc-processor-dlq"
+			}
+		]
+	},
+	"vars": {
+		"LLM_PROVIDER": "heuristic",
+		"WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct",
+		"WORKERS_AI_VISION_MODEL": "@cf/meta/llama-3.2-11b-vision-instruct",
+		"OCR_PROMPT_VERSION": "v1"
+	},
+	"ai": { "binding": "AI", "remote": true },
+	"observability": { "enabled": true }
+}
