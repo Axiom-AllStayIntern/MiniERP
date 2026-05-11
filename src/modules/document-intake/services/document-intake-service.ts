@@ -379,7 +379,7 @@ export function createDocumentIntakeService(
 					fileName: artifact.originalFile.fileName,
 					mimeType: artifact.originalFile.mimeType
 				},
-				{ tenantId, userId: ctx.user?.id, useMock: true }
+				{ tenantId, userId: ctx.user?.id, env: ctx.env, useMock: false }
 			);
 			await repo.setClassification(artifact.id, classification);
 

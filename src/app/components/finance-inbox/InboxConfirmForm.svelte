@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { hashConfirmationPayload } from '$platform/workflow/payload-hash';
+	import { panel } from '$app-layer/ai-panel/workflow/panel.svelte';
 	import type { DocumentArtifactView } from '$modules/document-intake';
 
 	export interface CategoryChoice {
@@ -15,11 +16,21 @@
 
 	type FieldKind = 'text' | 'number' | 'date' | 'checkbox' | 'select' | 'textarea';
 	type Draft = Record<string, string | boolean>;
+	type ReviewStep = 'category' | 'fields' | 'project';
 
 	type ConfirmResult = {
 		entityId: string;
 		entityRoute: string;
 		categoryId: string;
+	};
+
+	type ProjectInfo = {
+		id: string;
+		name: string;
+		customerName: string | null;
+		status: string;
+		startDate: string | null;
+		endDate: string | null;
 	};
 
 	interface FieldMeta {
@@ -81,7 +92,6 @@
 		line_items: { label: 'Line items', kind: 'textarea', aliases: ['lineItems', 'invoiceLineItems'], span: 'full' },
 		reimbursement: { label: 'Reimbursement', kind: 'checkbox', defaultValue: false },
 		business_trip: { label: 'Business trip', kind: 'checkbox', aliases: ['businessTrip'], defaultValue: false },
-		project_id: { label: 'Project ID', kind: 'text', aliases: ['projectId'] },
 		date_start: { label: 'Start date', kind: 'date', aliases: ['dateStart'] },
 		date_end: { label: 'End date', kind: 'date', aliases: ['dateEnd'] },
 		days: { label: 'Days', kind: 'number' },
@@ -105,15 +115,24 @@
 	let artifact = $state<DocumentArtifactView>(getInitialArtifact());
 	const getInitialCategoryId = () => artifact.suggestedCategoryId ?? categories[0]?.id ?? '';
 	let selectedCategoryId = $state<string>(getInitialCategoryId());
+	let categoryConfirmed = $state(false);
+	let currentStep = $state<ReviewStep>('category');
 	let isReclassifying = $state(false);
 	let isConfirming = $state(false);
 	let actionError = $state<string | null>(null);
 	let successMsg = $state<string | null>(null);
+	let selectedProjectId = $state('');
+	let projectOptions = $state<ProjectInfo[]>([]);
+	let projectSearchQ = $state('');
+	let projectSearchStatus = $state('active');
+	let projectSearching = $state(false);
+	let projectError = $state<string | null>(null);
 
 	const selectedCategory = $derived(
 		categories.find((c) => c.id === selectedCategoryId) ?? null
 	);
 	const fieldKeys = $derived(uniqueFields(selectedCategory));
+	const editableFieldKeys = $derived(fieldKeys.filter((key) => key !== 'project_id' && key !== 'projectId'));
 	const persistTarget = $derived(selectedCategory?.persistTarget ?? null);
 	const isArchiveOnly = $derived(
 		Boolean(persistTarget && persistTarget !== 'expenses' && persistTarget !== 'revenue')
@@ -124,10 +143,55 @@
 	);
 	const canReclassify = $derived(artifact.processingStatus === 'ready_for_review');
 	const isConfirmed = $derived(artifact.processingStatus === 'confirmed');
+	const categorySuggestions = $derived(categorySuggestionsFor(artifact));
+	const selectedProject = $derived(projectOptions.find((p) => p.id === selectedProjectId) ?? null);
+	const projectRequired = $derived(Boolean(selectedCategory?.requiresProject || isArchiveOnly));
+	const canConfirm = $derived(
+		isReady &&
+			!isConfirmed &&
+			categoryConfirmed &&
+			currentStep === 'project' &&
+			(!projectRequired || Boolean(selectedProjectId))
+	);
 
 	function uniqueFields(category: CategoryChoice | null): string[] {
 		if (!category) return [];
 		return [...new Set([...category.llmFields, ...category.userFields])];
+	}
+
+	const CATEGORY_BY_DOCUMENT_TYPE: Record<string, string[]> = {
+		supplier_invoice: ['expense.sales_cost.invoice'],
+		customer_invoice: ['revenue.invoice_out'],
+		receipt: [
+			'expense.sales_cost.receipt',
+			'expense.opex.meal',
+			'expense.opex.transport',
+			'expense.opex.accommodation',
+			'expense.opex.ai_subscription',
+			'expense.opex.others'
+		],
+		purchase_order: ['document_only.purchase_order'],
+		contract: ['document_only.contract'],
+		quotation: ['document_only.quotation']
+	};
+
+	function categorySuggestionsFor(a: DocumentArtifactView) {
+		const seen = new Set<string>();
+		const suggestions: Array<{ category: CategoryChoice; confidence?: number }> = [];
+		const add = (id: string | undefined, confidence?: number) => {
+			if (!id || seen.has(id)) return;
+			const category = categories.find((c) => c.id === id);
+			if (!category) return;
+			seen.add(id);
+			suggestions.push({ category, confidence });
+		};
+		add(a.suggestedCategoryId, a.classification?.confidence);
+		for (const candidate of a.classification?.possibleTypes ?? []) {
+			for (const id of CATEGORY_BY_DOCUMENT_TYPE[candidate.documentType] ?? []) {
+				add(id, candidate.confidence);
+			}
+		}
+		return suggestions.slice(0, 4);
 	}
 
 	function metaFor(key: string): FieldMeta {
@@ -188,7 +252,40 @@
 	}
 
 	const getInitialDraft = () => initialDraftFor(artifact, selectedCategory);
-	let draft = $state<Draft>(getInitialDraft());
+	const initialDraft = getInitialDraft();
+	let draft = $state<Draft>(initialDraft);
+	selectedProjectId = projectValueFromDraft(initialDraft);
+
+	function stepToIndex(step: ReviewStep) {
+		if (step === 'fields') return 1;
+		if (step === 'project') return 2;
+		return 0;
+	}
+
+	function indexToStep(index: number): ReviewStep {
+		if (index === 1) return 'fields';
+		if (index === 2) return 'project';
+		return 'category';
+	}
+
+	function goToStep(step: ReviewStep) {
+		currentStep = step;
+		if (step !== 'category') categoryConfirmed = true;
+		if (step === 'project' && projectOptions.length === 0) void searchProjects();
+		if (panel.activeWorkflow?.workflowId === 'finance-inbox') {
+			panel.setStep(stepToIndex(step));
+		}
+	}
+
+	$effect(() => {
+		const wf = panel.activeWorkflow;
+		if (wf?.workflowId !== 'finance-inbox') return;
+		const next = indexToStep(wf.stepIndex);
+		if (next === currentStep) return;
+		currentStep = next;
+		if (next !== 'category') categoryConfirmed = true;
+		if (next === 'project' && projectOptions.length === 0) void searchProjects();
+	});
 
 	function confidenceClass(key: string) {
 		const c = confidenceFor(artifact, key);
@@ -219,6 +316,7 @@
 	function payloadFields(): Record<string, unknown> {
 		const fields: Record<string, unknown> = {};
 		for (const key of fieldKeys) fields[key] = coerceValue(key, draft[key] ?? '');
+		fields.project_id = selectedProjectId;
 		return fields;
 	}
 
@@ -226,6 +324,8 @@
 		if (newId === selectedCategoryId) return;
 		const previousId = selectedCategoryId;
 		selectedCategoryId = newId;
+		categoryConfirmed = false;
+		goToStep('category');
 		isReclassifying = true;
 		actionError = null;
 		try {
@@ -244,14 +344,72 @@
 				selectedCategoryId = json.data.suggestedCategoryId ?? newId;
 				const nextCategory = categories.find((c) => c.id === (json.data?.suggestedCategoryId ?? newId)) ?? null;
 				draft = initialDraftFor(json.data, nextCategory);
+				selectedProjectId = projectValueFromDraft(draft);
 			}
 		} catch (err) {
 			actionError = err instanceof Error ? err.message : 'Reclassify failed';
 			selectedCategoryId = previousId;
 			const previousCategory = categories.find((c) => c.id === previousId) ?? null;
 			draft = initialDraftFor(artifact, previousCategory);
+			selectedProjectId = projectValueFromDraft(draft);
 		} finally {
 			isReclassifying = false;
+		}
+	}
+
+	function projectValueFromDraft(nextDraft: Draft) {
+		const value = nextDraft.project_id ?? nextDraft.projectId;
+		return typeof value === 'string' ? value : '';
+	}
+
+	function confirmCategory() {
+		goToStep('fields');
+	}
+
+	function confirmFields() {
+		goToStep('project');
+	}
+
+	async function searchProjects() {
+		projectSearching = true;
+		projectError = null;
+		try {
+			const params = new URLSearchParams();
+			if (projectSearchQ.trim()) params.set('q', projectSearchQ.trim());
+			if (projectSearchStatus) params.set('status', projectSearchStatus);
+			const res = await fetch(`/api/projects?${params.toString()}`);
+			const json = (await res.json().catch(() => null)) as {
+				ok?: boolean;
+				data?: Array<{
+					project: {
+						id: string;
+						name: string;
+						status: string;
+						startDate: string | null;
+						endDate: string | null;
+					};
+					customerName: string | null;
+				}>;
+				error?: string;
+			} | null;
+			if (!res.ok || !json?.ok || !json.data) {
+				throw new Error(json?.error ?? `Project search failed (${res.status})`);
+			}
+			projectOptions = json.data.map((r) => ({
+				id: r.project.id,
+				name: r.project.name,
+				customerName: r.customerName,
+				status: r.project.status,
+				startDate: r.project.startDate,
+				endDate: r.project.endDate
+			}));
+			if (selectedProjectId && !projectOptions.some((p) => p.id === selectedProjectId)) {
+				selectedProjectId = '';
+			}
+		} catch (err) {
+			projectError = err instanceof Error ? err.message : 'Could not load projects';
+		} finally {
+			projectSearching = false;
 		}
 	}
 
@@ -267,7 +425,7 @@
 			categoryId: selectedCategoryId,
 			supplierId: null,
 			poId: null,
-			projectId: typeof fields.project_id === 'string' ? fields.project_id || null : null,
+			projectId: selectedProjectId || null,
 			fields
 		};
 
@@ -313,40 +471,6 @@
 		</div>
 	{/if}
 
-	<div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-		<div class="flex items-center justify-between gap-3">
-			<div>
-				<h3 class="text-sm font-semibold text-slate-900">Category</h3>
-				<p class="text-xs text-slate-500">
-					Changing the category re-extracts fields from the same text.
-				</p>
-			</div>
-			{#if isReclassifying}
-				<span class="text-xs text-slate-500">Re-extracting...</span>
-			{/if}
-		</div>
-		<select
-			class="mt-3 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-500"
-			style="--sf-green: #387234;"
-			value={selectedCategoryId}
-			onchange={(e) => handleCategoryChange((e.currentTarget as HTMLSelectElement).value)}
-			disabled={isReclassifying || isConfirming || isConfirmed || !canReclassify}
-		>
-			{#each ['expense', 'revenue', 'document_only'] as bucket}
-				<optgroup label={bucket === 'expense' ? 'Expense' : bucket === 'revenue' ? 'Revenue' : 'Archive only'}>
-					{#each categories.filter((c) => c.bucket === bucket) as cat}
-						<option value={cat.id}>{cat.label}{cat.sublabel ? ` - ${cat.sublabel}` : ''}</option>
-					{/each}
-				</optgroup>
-			{/each}
-		</select>
-		{#if isArchiveOnly}
-			<p class="mt-2 text-xs text-amber-700">
-				Archive-only categories do not write to expenses/revenue yet.
-			</p>
-		{/if}
-	</div>
-
 	<form
 		class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
 		onsubmit={(e) => {
@@ -354,62 +478,216 @@
 			void handleConfirm();
 		}}
 	>
-		<h3 class="text-sm font-semibold text-slate-900">Suggested fields</h3>
-		<p class="text-xs text-slate-500">
-			Fields are driven by the selected category. Low-confidence values are left blank.
-		</p>
-
-		<div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-			{#each fieldKeys as key}
-				{@const meta = metaFor(key)}
-				<label class="block text-sm {meta.span === 'full' ? 'sm:col-span-2' : ''}">
-					<span class="font-medium text-slate-700">{meta.label}</span>
-					{#if confidenceBadge(key)}
-						<span class="ml-1 text-[10px] {confidenceBadge(key)?.tone}">
-							{confidenceBadge(key)?.label}
-						</span>
+		{#if currentStep === 'category'}
+			<section>
+				<div class="flex items-center justify-between gap-3">
+					<div>
+						<h3 class="text-sm font-semibold text-slate-900">Confirm category</h3>
+						<p class="text-xs text-slate-500">
+							Start here. Suggested fields stay hidden until the document category is right.
+						</p>
+					</div>
+					{#if isReclassifying}
+						<span class="text-xs text-slate-500">Re-extracting...</span>
 					{/if}
+				</div>
 
-					{#if meta.kind === 'checkbox'}
+				{#if categorySuggestions.length > 0}
+					<div class="mt-4 grid gap-2">
+						{#each categorySuggestions as suggestion}
+							<button
+								type="button"
+								class="rounded-lg border px-3 py-2 text-left text-sm {selectedCategoryId === suggestion.category.id ? 'border-[var(--sf-green)] bg-emerald-50 text-slate-950' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}"
+								style="--sf-green: #387234;"
+								onclick={() => handleCategoryChange(suggestion.category.id)}
+								disabled={isReclassifying || isConfirming || isConfirmed || !canReclassify}
+							>
+								<span class="flex items-center justify-between gap-3">
+									<span class="font-medium">{suggestion.category.label}</span>
+									{#if suggestion.confidence != null}
+										<span class="font-mono text-[11px] text-slate-500">{(suggestion.confidence * 100).toFixed(0)}%</span>
+									{/if}
+								</span>
+								{#if suggestion.category.sublabel}
+									<span class="mt-1 block text-xs text-slate-500">{suggestion.category.sublabel}</span>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				{/if}
+
+				<label class="mt-4 block text-sm">
+					<span class="font-medium text-slate-700">Choose another category</span>
+					<select
+						class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-500"
+						style="--sf-green: #387234;"
+						value={selectedCategoryId}
+						onchange={(e) => handleCategoryChange((e.currentTarget as HTMLSelectElement).value)}
+						disabled={isReclassifying || isConfirming || isConfirmed || !canReclassify}
+					>
+						{#each ['expense', 'revenue', 'document_only'] as bucket}
+							<optgroup label={bucket === 'expense' ? 'Expense' : bucket === 'revenue' ? 'Revenue' : 'Archive only'}>
+								{#each categories.filter((c) => c.bucket === bucket) as cat}
+									<option value={cat.id}>{cat.label}{cat.sublabel ? ` - ${cat.sublabel}` : ''}</option>
+								{/each}
+							</optgroup>
+						{/each}
+					</select>
+				</label>
+
+				{#if isArchiveOnly}
+					<p class="mt-2 text-xs text-amber-700">
+						Archive-only categories do not write to expenses/revenue yet.
+					</p>
+				{/if}
+
+				<div class="mt-5 flex justify-end">
+					<button
+						type="button"
+						class="inline-flex items-center rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[var(--sf-green-dark)] disabled:opacity-50"
+						style="--sf-green: #387234; --sf-green-dark: #2e5d2a;"
+						onclick={confirmCategory}
+						disabled={!selectedCategory || isReclassifying || isConfirming || isConfirmed}
+					>
+						Category is correct
+					</button>
+				</div>
+			</section>
+		{:else if currentStep === 'fields'}
+			<section class="mt-5">
+				<h3 class="text-sm font-semibold text-slate-900">Check core fields</h3>
+				<p class="text-xs text-slate-500">
+					Fields are driven by the confirmed category. Low-confidence values are left blank.
+				</p>
+
+				<div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+					{#each editableFieldKeys as key}
+						{@const meta = metaFor(key)}
+						<label class="block text-sm {meta.span === 'full' ? 'sm:col-span-2' : ''}">
+							<span class="font-medium text-slate-700">{meta.label}</span>
+							{#if confidenceBadge(key)}
+								<span class="ml-1 text-[10px] {confidenceBadge(key)?.tone}">
+									{confidenceBadge(key)?.label}
+								</span>
+							{/if}
+
+							{#if meta.kind === 'checkbox'}
+								<input
+									type="checkbox"
+									bind:checked={draft[key] as boolean}
+									class="mt-2 h-4 w-4 rounded border-slate-300 text-[var(--sf-green)] focus:ring-[var(--sf-green)]"
+									style="--sf-green: #387234;"
+									disabled={isConfirming || isConfirmed}
+								/>
+							{:else if meta.kind === 'textarea'}
+								<textarea
+									bind:value={draft[key] as string}
+									rows="3"
+									class="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-950 placeholder:text-slate-400 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-600 {confidenceClass(key)}"
+									style="--sf-green: #387234;"
+									disabled={isConfirming || isConfirmed}
+								></textarea>
+							{:else if meta.kind === 'select'}
+								<select
+									bind:value={draft[key] as string}
+									class="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-600 {confidenceClass(key)}"
+									style="--sf-green: #387234;"
+									disabled={isConfirming || isConfirmed}
+								>
+									{#each meta.options ?? [] as option}
+										<option value={option.value}>{option.label}</option>
+									{/each}
+								</select>
+							{:else}
+								<input
+									type={meta.kind === 'number' ? 'number' : meta.kind === 'date' ? 'date' : 'text'}
+									step={meta.kind === 'number' ? '0.01' : undefined}
+									bind:value={draft[key] as string}
+									class="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-950 placeholder:text-slate-400 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-600 {confidenceClass(key)}"
+									style="--sf-green: #387234;"
+									disabled={isConfirming || isConfirmed}
+								/>
+							{/if}
+						</label>
+					{/each}
+				</div>
+
+				<div class="mt-5 flex justify-between gap-2 border-t border-slate-100 pt-4">
+					<button type="button" class="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" onclick={() => goToStep('category')}>
+						Back
+					</button>
+					<button type="button" class="inline-flex items-center rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[var(--sf-green-dark)]" style="--sf-green: #387234; --sf-green-dark: #2e5d2a;" onclick={confirmFields}>
+						Fields look right
+					</button>
+				</div>
+			</section>
+		{:else}
+			<section class="mt-5">
+				<h3 class="text-sm font-semibold text-slate-900">Link project</h3>
+				<p class="text-xs text-slate-500">
+					Choose the project by name. This replaces manual project ID entry.
+				</p>
+
+				<div class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px_auto]">
+					<label class="block text-sm">
+						<span class="font-medium text-slate-700">Search project</span>
 						<input
-							type="checkbox"
-							bind:checked={draft[key] as boolean}
-							class="mt-2 h-4 w-4 rounded border-slate-300 text-[var(--sf-green)] focus:ring-[var(--sf-green)]"
-							style="--sf-green: #387234;"
-							disabled={isConfirming || isConfirmed}
+							class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 placeholder:text-slate-400 shadow-sm"
+							placeholder="Project name, ID, or customer"
+							bind:value={projectSearchQ}
+							onkeydown={(e) => {
+								if (e.key === 'Enter') {
+									e.preventDefault();
+									void searchProjects();
+								}
+							}}
 						/>
-					{:else if meta.kind === 'textarea'}
-						<textarea
-							bind:value={draft[key] as string}
-							rows="3"
-							class="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-950 placeholder:text-slate-400 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-600 {confidenceClass(key)}"
-							style="--sf-green: #387234;"
-							disabled={isConfirming || isConfirmed}
-						></textarea>
-					{:else if meta.kind === 'select'}
+					</label>
+					<label class="block text-sm">
+						<span class="font-medium text-slate-700">Status</span>
+						<select class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm" bind:value={projectSearchStatus}>
+							<option value="">All</option>
+							<option value="active">Active</option>
+							<option value="on_hold">On hold</option>
+							<option value="completed">Completed</option>
+							<option value="archived">Archived</option>
+						</select>
+					</label>
+					<button type="button" class="self-end rounded-md border border-[var(--sf-green)] bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]" style="--sf-green: #387234;" onclick={() => void searchProjects()}>
+						{projectSearching ? 'Searching...' : 'Search'}
+					</button>
+				</div>
+
+				{#if projectError}
+					<div class="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{projectError}</div>
+				{/if}
+
+				<div class="mt-4">
+					<label class="block text-sm">
+						<span class="font-medium text-slate-700">Project</span>
 						<select
-							bind:value={draft[key] as string}
-							class="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-600 {confidenceClass(key)}"
-							style="--sf-green: #387234;"
-							disabled={isConfirming || isConfirmed}
+							class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm disabled:bg-slate-50 disabled:text-slate-500"
+							bind:value={selectedProjectId}
+							disabled={projectSearching || isConfirming || isConfirmed}
 						>
-							{#each meta.options ?? [] as option}
-								<option value={option.value}>{option.label}</option>
+							<option value="">{projectRequired ? 'Select a project' : 'No project / company-level'}</option>
+							{#each projectOptions as project (project.id)}
+								<option value={project.id}>
+									{project.name}{project.customerName ? ` - ${project.customerName}` : ''} ({project.status})
+								</option>
 							{/each}
 						</select>
-					{:else}
-						<input
-							type={meta.kind === 'number' ? 'number' : meta.kind === 'date' ? 'date' : 'text'}
-							step={meta.kind === 'number' ? '0.01' : undefined}
-							bind:value={draft[key] as string}
-							class="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-950 placeholder:text-slate-400 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-600 {confidenceClass(key)}"
-							style="--sf-green: #387234;"
-							disabled={isConfirming || isConfirmed}
-						/>
+					</label>
+					{#if selectedProject}
+						<p class="mt-2 text-xs text-slate-500">
+							Linked to <span class="font-medium text-slate-700">{selectedProject.name}</span>{selectedProject.customerName ? ` · ${selectedProject.customerName}` : ''}
+						</p>
+					{:else if projectRequired}
+						<p class="mt-2 text-xs text-amber-700">This category requires a project before confirming.</p>
 					{/if}
-				</label>
-			{/each}
-		</div>
+				</div>
+			</section>
+		{/if}
 
 		<div class="mt-6 flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
 			{#if cancelHref}
@@ -422,7 +700,7 @@
 			{/if}
 			<button
 				type="submit"
-				disabled={isConfirming || isReclassifying || !isReady || isConfirmed}
+				disabled={isConfirming || isReclassifying || !canConfirm}
 				class="inline-flex items-center gap-2 rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[var(--sf-green-dark)] disabled:opacity-50"
 				style="--sf-green: #387234; --sf-green-dark: #2e5d2a;"
 			>

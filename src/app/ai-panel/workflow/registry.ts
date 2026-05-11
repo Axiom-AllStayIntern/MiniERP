@@ -125,5 +125,9 @@ registerWorkflow({
 	description: 'Review documents processed by the async intake pipeline.',
 	entryLabel: 'Review inbox',
 	icon: 'inbox',
-	steps: [{ id: 'inbox', label: 'Review', hint: 'Ready / processing / confirmed' }]
+	steps: [
+		{ id: 'category', label: 'Category', hint: 'Confirm type' },
+		{ id: 'fields', label: 'Fields', hint: 'Check values' },
+		{ id: 'project', label: 'Project', hint: 'Link record' }
+	]
 });

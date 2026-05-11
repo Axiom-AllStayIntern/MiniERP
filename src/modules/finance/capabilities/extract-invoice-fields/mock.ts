@@ -24,7 +24,7 @@ export interface ExtractedInvoiceFields {
 	dueDate: string;
 }
 
-export type ExtractionProvider = 'mock-v1' | 'heuristic' | 'workers_ai' | 'external_api';
+export type ExtractionProvider = 'mock-v1' | 'heuristic' | 'workers_ai' | 'external_api' | 'none';
 
 export interface ExtractInvoiceFieldsOutput {
 	fields: ExtractedInvoiceFields;

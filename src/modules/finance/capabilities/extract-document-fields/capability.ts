@@ -2,10 +2,9 @@
  * extract-document-fields — generalized document field extraction (Phase 3).
  *
  * Replaces the Phase-2 `finance.extract-invoice-fields` (which hard-coded the
- * supplier-invoice shape). Same heuristic-first → LLM-fallback → fixture-mock
- * dispatch as before, but now category-aware: the `categoryDocType` decided
- * by the workflow's bucket/category step picks both the prompt + schema and
- * the heuristic branch.
+ * supplier-invoice shape). The inbox path is intentionally LLM-only for real
+ * extracted text: finance documents vary too much for regex extraction to be a
+ * safe source of user-confirmable values.
  *
  * Output is category-field oriented for the Inbox pipeline: keys match the
  * selected category's `llmFields` (`invoice_number`, `vendor`,
@@ -27,7 +26,6 @@ import {
 	type ExtractedInvoiceFields,
 	type ExtractionProvider
 } from '../extract-invoice-fields/mock';
-import { runHeuristicExtraction, type HeuristicCommonFields } from './heuristic';
 import {
 	customerInvoiceSchemaV1,
 	invoiceSchemaV1,
@@ -48,7 +46,6 @@ import {
 	RECEIPT_SYSTEM_PROMPT
 } from './prompts';
 
-const HEURISTIC_ACCEPT_THRESHOLD = 0.65;
 const MIN_TEXT_LENGTH_FOR_REAL_EXTRACT = 32;
 
 interface CapabilityContextWithEnv extends FinanceCapabilityContext {
@@ -83,36 +80,6 @@ interface CommonFields extends ExtractedInvoiceFields {
 	destination?: string | null;
 	subtotal?: number | null;
 	poNumber?: string | null;
-}
-
-// ---------------------------------------------------------------------------
-// Heuristic → common ExtractedInvoiceFields projection
-// ---------------------------------------------------------------------------
-
-function projectHeuristic(
-	fields: HeuristicCommonFields
-): CommonFields | null {
-	if (
-		!fields.documentNumber ||
-		!fields.supplierName ||
-		fields.totalAmount === null ||
-		!fields.issueDate ||
-		!fields.currency
-	) {
-		return null;
-	}
-	return {
-		documentNumber: fields.documentNumber,
-		counterpartyName: fields.supplierName,
-		currency: fields.currency.toUpperCase(),
-		totalAmount: fields.totalAmount,
-		gstAmount: fields.gstAmount ?? 0,
-		issueDate: fields.issueDate,
-		dueDate: fields.dueDate ?? fields.issueDate,
-		recipientName: fields.recipientName,
-		description: fields.description,
-		trackingNumber: fields.trackingNumber
-	};
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +220,7 @@ async function tryLlmExtraction(
 	categoryId: string,
 	documentId: string
 ): Promise<{ fields: CommonFields; confidence: number; provider: ExtractionProvider } | null> {
-	if (!ctx.env?.AI) return null;
+	if (!ctx.env) return null;
 	const cfg = configForDocType(docType);
 	if (!cfg) return null;
 
@@ -299,28 +266,6 @@ function buildEvidenceForFields(provider: ExtractionProvider, fields: Record<str
 		refId: `${provider}://${field}`,
 		summary: `Extracted ${field} via ${provider}`
 	}));
-}
-
-function withTextHints(fields: CommonFields, text: string): CommonFields {
-	const pick = (...patterns: RegExp[]) => {
-		for (const pattern of patterns) {
-			const match = text.match(pattern);
-			if (match?.[1]) return match[1].trim();
-		}
-		return null;
-	};
-	return {
-		...fields,
-		serviceName:
-			fields.serviceName ??
-			pick(/\bservice\s*(?:name)?[:\s]+([^\n]{3,80})/i, /\bsubscription[:\s]+([^\n]{3,80})/i),
-		period:
-			fields.period ??
-			pick(/\b(?:billing|service)?\s*period[:\s]+([^\n]{3,80})/i, /\bperiod[:\s]+([^\n]{3,80})/i),
-		destination:
-			fields.destination ??
-			pick(/\bdestination[:\s]+([^\n]{3,80})/i, /\blocation[:\s]+([^\n]{3,80})/i)
-	};
 }
 
 function setIfValue(output: Record<string, unknown>, key: string, value: unknown) {
@@ -430,8 +375,8 @@ export const extractDocumentFieldsCapability: FinanceCapability<
 		const ctxWithEnv = ctx as CapabilityContextWithEnv;
 		const { docType, category } = resolveDocType(input);
 
-		// 1. No usable text → fixture mock fallback (Phase 1/2 demo path).
-		if (!input.text || input.text.length < MIN_TEXT_LENGTH_FOR_REAL_EXTRACT) {
+		// 1. No usable text, or a direct unit/demo call without runtime env → fixture mock fallback.
+		if (!input.text || input.text.length < MIN_TEXT_LENGTH_FOR_REAL_EXTRACT || !ctxWithEnv.env) {
 			const fixture = pickFixture({ documentId: input.documentId, fileName: input.fileName });
 			const fields = outputFor(fixture.fields, category, input.outputShape);
 			return {
@@ -445,22 +390,7 @@ export const extractDocumentFieldsCapability: FinanceCapability<
 			};
 		}
 
-		// 2. Heuristic-first over real text, branched by docType.
-		const heuristic = runHeuristicExtraction(input.text, docType);
-		if (heuristic.confidence >= HEURISTIC_ACCEPT_THRESHOLD) {
-			const common = projectHeuristic(heuristic.fields);
-			if (common) {
-				const fields = outputFor(withTextHints(common, input.text), category, input.outputShape);
-				return {
-					fields,
-					confidence: heuristic.confidence,
-					evidence: buildEvidenceForFields('heuristic', fields),
-					provider: 'heuristic'
-				};
-			}
-		}
-
-		// 3. LLM fallback (gated on AI binding presence + per-docType schema).
+		// 2. Real extracted text always goes through the category-specific LLM schema.
 		const llm = await tryLlmExtraction(
 			input.text,
 			docType,
@@ -469,7 +399,7 @@ export const extractDocumentFieldsCapability: FinanceCapability<
 			input.documentId
 		);
 		if (llm) {
-			const fields = outputFor(withTextHints(llm.fields, input.text), category, input.outputShape);
+			const fields = outputFor(llm.fields, category, input.outputShape);
 			return {
 				fields,
 				confidence: llm.confidence,
@@ -478,29 +408,14 @@ export const extractDocumentFieldsCapability: FinanceCapability<
 			};
 		}
 
-		// 4. Below-threshold heuristic that still produced usable fields.
-		const common = projectHeuristic(heuristic.fields);
-		if (common) {
-			const fields = outputFor(withTextHints(common, input.text), category, input.outputShape);
-			return {
-				fields,
-				confidence: heuristic.confidence,
-				evidence: buildEvidenceForFields('heuristic', fields),
-				provider: 'heuristic'
-			};
-		}
-
-		// 5. Final: filename-keyed fixture.
-		const fixture = pickFixture({ documentId: input.documentId, fileName: input.fileName });
-		const fields = outputFor(fixture.fields, category, input.outputShape);
+		// 3. LLM failed or returned an unusable shape. Leave fields blank instead
+		// of falling back to regex/mock values.
+		const fields: Record<string, unknown> = {};
 		return {
 			fields,
-			confidence: fixture.confidence,
-			evidence:
-				input.outputShape === 'legacy'
-					? buildEvidence(fixture.fields)
-					: buildEvidenceForFields('mock-v1', fields),
-			provider: 'mock-v1'
+			confidence: 0,
+			evidence: [],
+			provider: 'none'
 		};
 	}
 };

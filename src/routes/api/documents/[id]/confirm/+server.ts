@@ -4,7 +4,7 @@ import { fail, ok } from '$platform/http';
 import { hashConfirmationPayload } from '$platform/workflow/payload-hash';
 import { createModuleContext } from '$platform/modules';
 import { getDb } from '../../../../../infrastructure/db';
-import { createDocumentIntakeService } from '$modules/document-intake';
+import { createDocumentIntakeApi, createDocumentIntakeService } from '$modules/document-intake';
 import {
 	createFinanceApi,
 	findCategoryById,
@@ -221,6 +221,45 @@ function buildRevenueInput(payload: ConfirmedPayload, documentId: string) {
 	};
 }
 
+function archiveDocTypeForPersistTarget(
+	persistTarget: CategoryDefinition['persistTarget']
+): 'contract' | 'quotation' | 'purchase_order' | null {
+	if (persistTarget === 'contracts') return 'contract';
+	if (persistTarget === 'quotations') return 'quotation';
+	if (persistTarget === 'purchase_orders') return 'purchase_order';
+	return null;
+}
+
+function buildArchiveExtractedFields(payload: ConfirmedPayload) {
+	const normalized = normalizeConfirmedFields(payload.fields);
+	return {
+		...payload.fields,
+		project_id: payload.projectId || readString(payload.fields, ['project_id', 'projectId']) || undefined,
+		contract_number: readString(payload.fields, ['contract_number', 'contractNumber'], normalized.documentNumber),
+		quotation_number: readString(
+			payload.fields,
+			['quotation_number', 'quotationNumber'],
+			normalized.documentNumber
+		),
+		po_number: readString(payload.fields, ['po_number', 'poNumber'], normalized.documentNumber),
+		client_name: readString(
+			payload.fields,
+			['client_name', 'customer_name', 'clientName', 'customerName'],
+			normalized.counterpartyName
+		),
+		supplier_name: readString(
+			payload.fields,
+			['supplier_name', 'vendor', 'supplierName'],
+			normalized.counterpartyName
+		),
+		date: readString(payload.fields, ['date', 'document_date', 'documentDate'], normalized.issueDate),
+		effective_date: readString(payload.fields, ['effective_date', 'effectiveDate'], normalized.issueDate),
+		expiry_date: readString(payload.fields, ['expiry_date', 'expiryDate'], normalized.dueDate),
+		amount: normalized.totalAmount,
+		currency: normalized.currency
+	};
+}
+
 export const POST: RequestHandler = async (event) => {
 	if (!event.platform) return fail('Cloudflare platform bindings are required', 500);
 	const user = event.locals.user;
@@ -286,6 +325,7 @@ export const POST: RequestHandler = async (event) => {
 	// 4. Branch persistence by category.persistTarget.
 	const ctx = await createModuleContext(event);
 	const finance = createFinanceApi(ctx);
+	const documentIntake = createDocumentIntakeApi(ctx);
 
 	let entityId: string;
 	let entityRoute: string;
@@ -335,31 +375,76 @@ export const POST: RequestHandler = async (event) => {
 		toolId = 'finance.create-revenue-record';
 		finalAction = 'revenue.created';
 	} else {
-		// Archive categories (contracts/quotations/POs). Persistence to those
-		// tables lands in a follow-up — the artifact stays in inbox until we
-		// wire the project-side write path.
-		await appendAgentAuditEntry(db, {
-			agentId: financeAgentManifest.id,
-			agentVersion: financeAgentManifest.version,
-			userId: user.id,
-			userEmail: user.email,
-			tenantId: 'default',
-			workflowId: id,
-			workflowStep: 'inbox_confirm',
-			toolId: 'finance.create-document-archive',
-			riskLevel: 'R4',
-			permissionResult: 'allowed',
-			confirmationRequired: true,
-			confirmationRef: recomputedHash,
-			outputRefs: { categoryId: category.id, persistTarget: category.persistTarget },
-			finalAction: 'inbox.archive_persist_not_implemented',
-			status: 'failed',
-			errorCode: 'archive_persist_not_implemented'
+		const docType = archiveDocTypeForPersistTarget(category.persistTarget);
+		if (!docType) {
+			return fail(`Unsupported persist target: ${category.persistTarget ?? 'none'}`, 400);
+		}
+
+		const projectId = body.payload.projectId || readString(body.payload.fields, ['project_id', 'projectId']);
+		if (!projectId) {
+			await appendAgentAuditEntry(db, {
+				agentId: financeAgentManifest.id,
+				agentVersion: financeAgentManifest.version,
+				userId: user.id,
+				userEmail: user.email,
+				tenantId: 'default',
+				workflowId: id,
+				workflowStep: 'inbox_confirm',
+				toolId: 'finance.create-document-archive',
+				riskLevel: 'R4',
+				permissionResult: 'allowed',
+				confirmationRequired: true,
+				confirmationRef: recomputedHash,
+				outputRefs: { categoryId: category.id, persistTarget: category.persistTarget },
+				finalAction: 'inbox.archive_project_required',
+				status: 'failed',
+				errorCode: 'project_required'
+			});
+			return fail('Project is required before confirming archive documents.', 400);
+		}
+
+		const saved = await documentIntake.saveDocHubUpload({
+			key: artifact.originalFile.storageRef,
+			fileName: artifact.originalFile.fileName,
+			fileType: artifact.originalFile.mimeType,
+			projectId,
+			docType,
+			status: readString(body.payload.fields, ['status']) || null,
+			notes: readString(body.payload.fields, ['notes']) || null,
+			extracted: buildArchiveExtractedFields({ ...body.payload, projectId }),
+			uploadedBy: user.id
 		});
-		return fail(
-			`Archive persistence (${category.persistTarget}) lands in a follow-up. Use the project-side flow for now.`,
-			501
-		);
+
+		if (!saved.ok || !saved.entityId) {
+			await appendAgentAuditEntry(db, {
+				agentId: financeAgentManifest.id,
+				agentVersion: financeAgentManifest.version,
+				userId: user.id,
+				userEmail: user.email,
+				tenantId: 'default',
+				workflowId: id,
+				workflowStep: 'inbox_confirm',
+				toolId: 'finance.create-document-archive',
+				riskLevel: 'R4',
+				permissionResult: 'allowed',
+				confirmationRequired: true,
+				confirmationRef: recomputedHash,
+				outputRefs: { categoryId: category.id, persistTarget: category.persistTarget },
+				finalAction: 'inbox.archive_persist_failed',
+				status: 'failed',
+				errorCode: 'archive_persist_failed'
+			});
+			const status = saved.ok ? 500 : saved.status;
+			return fail(saved.message ?? 'Archive persistence failed', status);
+		}
+
+		entityId = saved.entityId;
+		entityType = saved.entityType ?? docType;
+		entityRoute = `/projects/${encodeURIComponent(projectId)}/documents/${
+			docType === 'purchase_order' ? 'purchase-orders' : `${docType}s`
+		}/${encodeURIComponent(entityId)}`;
+		toolId = 'finance.create-document-archive';
+		finalAction = `${entityType}.created`;
 	}
 
 	// 5. Audit success.
