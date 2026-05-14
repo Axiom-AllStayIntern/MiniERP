@@ -1,9 +1,9 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { resolveSgdEquivalentForWrite } from '$modules/finance/services/fx/resolve-sgd-equivalent';
 import { parseDocumentMetadata } from '$modules/finance/schemas/document-metadata';
 import { resolveExpenseFilePreview } from '$modules/finance/services/expense-file-preview';
 import type { ModuleContext } from '$platform/modules/types';
-import { revenue } from '../../../infrastructure/db/schema';
+import { businessPartners, projects, revenue } from '../../../infrastructure/db/schema';
 import { listFinanceProjectNames } from '../adapters';
 import { RevenueRepository } from '../repositories';
 
@@ -19,6 +19,17 @@ type FinanceRevenueCreateInput = {
 	documentRef?: string | null;
 	metadata?: string | null;
 	notes?: string | null;
+};
+
+type CustomerInvoiceProjectRow = {
+	id: string;
+	name: string;
+	customerId: string | null;
+	customerName: string | null;
+	customerAddress: string | null;
+	customerContact: string | null;
+	customerCurrency: string | null;
+	customerGstRegNo: string | null;
 };
 
 function buildRevenueTotals<
@@ -112,6 +123,32 @@ export function createFinanceRevenueApi(ctx: ModuleContext) {
 		};
 	};
 
+	const getCustomerInvoiceGeneratePage = async (preselectProjectId = '') => {
+		const projectRows: CustomerInvoiceProjectRow[] = await ctx.db
+			.select({
+				id: projects.id,
+				name: projects.name,
+				customerId: projects.businessPartnerId,
+				customerName: businessPartners.name,
+				customerAddress: businessPartners.address,
+				customerContact: businessPartners.contact,
+				customerCurrency: businessPartners.currency,
+				customerGstRegNo: businessPartners.gstRegNo
+			})
+			.from(projects)
+			.leftJoin(businessPartners, eq(projects.businessPartnerId, businessPartners.id))
+			.where(isNull(projects.deletedAt))
+			.orderBy(asc(projects.name))
+			.limit(500);
+
+		return {
+			projects: projectRows,
+			preselectProjectId: projectRows.some((project) => project.id === preselectProjectId)
+				? preselectProjectId
+				: projectRows[0]?.id ?? ''
+		};
+	};
+
 	const createRevenue = async (data: FinanceRevenueCreateInput) => {
 		const currency = (data.currency ?? 'SGD').trim().toUpperCase();
 		const sgdEquivalent = await resolveSgdEquivalentForWrite({
@@ -152,6 +189,7 @@ export function createFinanceRevenueApi(ctx: ModuleContext) {
 	return {
 		getProjectRevenuePage,
 		getRevenueListPage,
+		getCustomerInvoiceGeneratePage,
 		createRevenue,
 		getProjectRevenueDocumentDetail
 	};

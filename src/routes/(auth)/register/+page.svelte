@@ -1,9 +1,19 @@
 <script lang="ts">
 	import { authClient } from '$platform/auth/client';
+	import type { AuthRole } from '$platform/auth/config';
+
+	const roleOptions: Array<{ value: AuthRole; label: string; note: string }> = [
+		{ value: 'owner', label: 'Owner', note: 'Full suite access' },
+		{ value: 'finance', label: 'Finance', note: 'Finance and document intake' },
+		{ value: 'project_manager', label: 'Project manager', note: 'Project workspace' },
+		{ value: 'hr', label: 'HR', note: 'Employee workspace' },
+		{ value: 'employee', label: 'Employee', note: 'Project entry access' }
+	];
 
 	let name = $state('');
 	let email = $state('');
 	let password = $state('');
+	let role = $state<AuthRole>('owner');
 	let loading = $state(false);
 	let error = $state('');
 	let done = $state(false);
@@ -13,12 +23,14 @@
 		loading = true;
 		error = '';
 		const callbackURL = `${window.location.origin}/login?verified=1`;
-		const { error: err } = await authClient.signUp.email({
+		const payload: Parameters<typeof authClient.signUp.email>[0] & { role: AuthRole } = {
 			name: name.trim(),
 			email: email.trim().toLowerCase(),
 			password,
+			role,
 			callbackURL
-		});
+		};
+		const { error: err } = await authClient.signUp.email(payload);
 		loading = false;
 		if (err) {
 			error = err.message || 'Registration failed.';
@@ -79,6 +91,17 @@
 					/>
 					<span class="mt-1 block text-xs text-slate-500">At least 8 characters.</span>
 				</label>
+				<label class="block text-sm font-medium text-slate-700">
+					Test identity
+					<select
+						bind:value={role}
+						class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[var(--sf-green)] focus:ring-2"
+					>
+						{#each roleOptions as option}
+							<option value={option.value}>{option.label} - {option.note}</option>
+						{/each}
+					</select>
+				</label>
 				<button
 					type="submit"
 					disabled={loading}
@@ -94,5 +117,3 @@
 		{/if}
 	</div>
 </main>
-
-

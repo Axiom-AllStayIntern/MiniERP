@@ -6,6 +6,7 @@ import { sveltekitCookies } from 'better-auth/svelte-kit';
 import { getDb, schema } from '../../infrastructure/db';
 
 import { sendTransactionalEmail } from './email';
+import { authRoleSchema } from './config';
 
 const authSchema = {
 	user: schema.users,
@@ -82,7 +83,10 @@ export function getAuth(env: Env): ReturnType<typeof betterAuth> {
 					type: 'string',
 					required: false,
 					defaultValue: 'owner',
-					input: false
+					input: true,
+					validator: {
+						input: authRoleSchema
+					}
 				}
 			}
 		},

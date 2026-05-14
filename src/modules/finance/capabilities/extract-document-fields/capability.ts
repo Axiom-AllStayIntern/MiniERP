@@ -23,26 +23,31 @@ import type { FinanceCapability, FinanceCapabilityContext } from '../types';
 import {
 	buildEvidence,
 	pickFixture,
-	type ExtractedInvoiceFields,
 	type ExtractionProvider
 } from '../extract-invoice-fields/mock';
 import {
+	contractSchemaV1,
 	customerInvoiceSchemaV1,
 	invoiceSchemaV1,
 	poSchemaV1,
+	quotationSchemaV1,
 	receiptSchemaV1,
 	EXTRACT_DOCUMENT_FIELDS_SCHEMA_VERSION,
+	type ContractLlmV1,
 	type CustomerInvoiceLlmV1,
 	type InvoiceLlmV1,
 	type PoLlmV1,
+	type QuotationLlmV1,
 	type ReceiptLlmV1
 } from './schemas';
 import {
 	buildDocumentUserPrompt,
+	CONTRACT_SYSTEM_PROMPT,
 	CUSTOMER_INVOICE_SYSTEM_PROMPT,
 	EXTRACT_DOCUMENT_FIELDS_PROMPT_VERSION,
 	INVOICE_SYSTEM_PROMPT,
 	PO_SYSTEM_PROMPT,
+	QUOTATION_SYSTEM_PROMPT,
 	RECEIPT_SYSTEM_PROMPT
 } from './prompts';
 
@@ -71,8 +76,16 @@ export interface ExtractDocumentFieldsOutput {
 	provider: ExtractionProvider;
 }
 
-interface CommonFields extends ExtractedInvoiceFields {
+type CommonFields = {
+	documentNumber?: string | null;
+	counterpartyName?: string | null;
+	currency?: string | null;
+	totalAmount?: number | null;
+	gstAmount?: number | null;
+	issueDate?: string | null;
+	dueDate?: string | null;
 	recipientName?: string | null;
+	clientName?: string | null;
 	description?: string | null;
 	trackingNumber?: string | null;
 	serviceName?: string | null;
@@ -80,7 +93,10 @@ interface CommonFields extends ExtractedInvoiceFields {
 	destination?: string | null;
 	subtotal?: number | null;
 	poNumber?: string | null;
-}
+	paymentTerms?: string | null;
+	validUntil?: string | null;
+	lineItems?: Array<Record<string, unknown>> | null;
+};
 
 // ---------------------------------------------------------------------------
 // LLM dispatch (per categoryDocType)
@@ -92,6 +108,13 @@ interface LlmConfig<T> {
 	schemaName: string;
 	mapToFields: (value: T) => CommonFields | null;
 	confidenceFromValue: (value: T) => number | undefined;
+}
+
+function hasAnyExtractedValue(fields: CommonFields): boolean {
+	return Object.values(fields).some((value) => {
+		if (Array.isArray(value)) return value.length > 0;
+		return value !== null && value !== undefined && value !== '';
+	});
 }
 
 function configForDocType(docType: CategoryDocType): LlmConfig<unknown> | null {
@@ -160,23 +183,19 @@ function configForDocType(docType: CategoryDocType): LlmConfig<unknown> | null {
 			schemaName: 'finance.po-extraction',
 			mapToFields: (raw) => {
 				const v = raw as PoLlmV1;
-				if (
-					!v.poNumber ||
-					!v.supplierName ||
-					v.totalAmount === null ||
-					!v.date ||
-					!v.currency
-				) return null;
-				return {
-					documentNumber: v.poNumber,
-					counterpartyName: v.supplierName,
-					currency: v.currency.toUpperCase(),
-					totalAmount: v.totalAmount,
+				const fields: CommonFields = {
+					documentNumber: v.poNumber ?? null,
+					counterpartyName: v.supplierName ?? null,
+					clientName: v.clientName ?? null,
+					currency: v.currency?.toUpperCase() ?? null,
+					totalAmount: v.totalAmount ?? null,
 					gstAmount: 0,
-					issueDate: v.date,
-					dueDate: v.date,
-					description: v.description ?? null
+					issueDate: v.date ?? null,
+					dueDate: v.date ?? null,
+					description: v.description ?? null,
+					lineItems: v.lineItems ?? null
 				};
+				return hasAnyExtractedValue(fields) ? fields : null;
 			},
 			confidenceFromValue: (raw) => (raw as PoLlmV1).confidence
 		};
@@ -208,6 +227,53 @@ function configForDocType(docType: CategoryDocType): LlmConfig<unknown> | null {
 				};
 			},
 			confidenceFromValue: (raw) => (raw as CustomerInvoiceLlmV1).confidence
+		};
+	}
+	if (docType === 'contract') {
+		return {
+			systemPrompt: CONTRACT_SYSTEM_PROMPT,
+			schema: contractSchemaV1 as ZodType<unknown>,
+			schemaName: 'finance.contract-extraction',
+			mapToFields: (raw) => {
+				const v = raw as ContractLlmV1;
+				const fields: CommonFields = {
+					documentNumber: v.contractNumber ?? null,
+					counterpartyName: v.clientName ?? null,
+					clientName: v.clientName ?? null,
+					currency: v.currency?.toUpperCase() ?? null,
+					totalAmount: v.amount ?? null,
+					gstAmount: 0,
+					issueDate: v.effectiveDate ?? null,
+					dueDate: v.expiryDate ?? null,
+					description: v.scope ?? null,
+					paymentTerms: v.paymentTerms ?? null
+				};
+				return hasAnyExtractedValue(fields) ? fields : null;
+			},
+			confidenceFromValue: (raw) => (raw as ContractLlmV1).confidence
+		};
+	}
+	if (docType === 'quotation') {
+		return {
+			systemPrompt: QUOTATION_SYSTEM_PROMPT,
+			schema: quotationSchemaV1 as ZodType<unknown>,
+			schemaName: 'finance.quotation-extraction',
+			mapToFields: (raw) => {
+				const v = raw as QuotationLlmV1;
+				const fields: CommonFields = {
+					documentNumber: v.quotationNumber ?? null,
+					counterpartyName: v.clientName ?? null,
+					clientName: v.clientName ?? null,
+					currency: v.currency?.toUpperCase() ?? null,
+					totalAmount: v.amount ?? null,
+					gstAmount: 0,
+					issueDate: v.date ?? null,
+					validUntil: v.validUntil ?? null,
+					lineItems: v.lineItems ?? null
+				};
+				return hasAnyExtractedValue(fields) ? fields : null;
+			},
+			confidenceFromValue: (raw) => (raw as QuotationLlmV1).confidence
 		};
 	}
 	return null;
@@ -290,14 +356,17 @@ function categoryValue(key: string, fields: CommonFields): unknown {
 			return fields.recipientName ?? fields.counterpartyName;
 		case 'customer_name':
 		case 'client_name':
-			return fields.counterpartyName;
+			return fields.clientName ?? fields.counterpartyName;
 		case 'date':
 		case 'invoice_date':
 		case 'effective_date':
 			return fields.issueDate;
+		case 'expiry_date':
 		case 'due_date':
 		case 'invoice_due_date':
 			return fields.dueDate;
+		case 'valid_until':
+			return fields.validUntil;
 		case 'amount':
 		case 'invoice_amount':
 			return fields.totalAmount;
@@ -312,6 +381,10 @@ function categoryValue(key: string, fields: CommonFields): unknown {
 		case 'description':
 		case 'scope':
 			return fields.description;
+		case 'payment_terms':
+			return fields.paymentTerms;
+		case 'line_items':
+			return fields.lineItems;
 		case 'tracking_number':
 			return fields.trackingNumber;
 		case 'service_name':
@@ -368,7 +441,7 @@ export const extractDocumentFieldsCapability: FinanceCapability<
 > = {
 	id: 'finance.extract-document-fields',
 	description:
-		'Extract structured fields from a finance document (invoice, receipt, PO, customer invoice) per the workflow-selected category.',
+		'Extract structured fields from a finance or archive document per the workflow-selected category.',
 	riskLevel: 'R2',
 
 	async execute(input, ctx) {

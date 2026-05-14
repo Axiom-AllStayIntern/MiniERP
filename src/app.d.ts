@@ -56,7 +56,7 @@ declare global {
 			user: {
 				id: string;
 				email: string;
-				role: 'owner' | 'finance' | 'project_manager' | 'employee';
+				role: 'owner' | 'finance' | 'project_manager' | 'hr' | 'employee';
 			} | null;
 		}
 		// interface PageData {}

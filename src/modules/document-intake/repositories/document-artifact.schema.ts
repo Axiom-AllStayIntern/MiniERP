@@ -43,6 +43,7 @@ export const documentArtifacts = sqliteTable('document_artifacts', {
 			'ready_for_review',
 			'ready_for_workflow',
 			'confirmed',
+			'abandoned',
 			'needs_manual_review',
 			'failed'
 		]

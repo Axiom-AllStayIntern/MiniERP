@@ -326,7 +326,7 @@ export const POST: RequestHandler = async (event) => {
 	} else if (category.persistTarget === 'revenue') {
 		const created = await finance.revenue.createRevenue(buildRevenueInput(body.payload));
 		entityId = created.id;
-		entityRoute = '/finance/doc-hub/customer-invoices';
+		entityRoute = '/finance/revenue';
 		toolId = 'finance.create-revenue-record';
 		finalAction = 'revenue.created';
 	} else {

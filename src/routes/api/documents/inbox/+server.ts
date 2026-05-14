@@ -34,6 +34,7 @@ const ALLOWED_STATUSES: DocumentProcessingStatus[] = [
 	'ready_for_review',
 	'ready_for_workflow',
 	'confirmed',
+	'abandoned',
 	'needs_manual_review',
 	'failed'
 ];

@@ -5,6 +5,11 @@ export interface ModulePathMapping {
 	moduleId: string;
 }
 
+const ENABLED_MODULE_ALIASES: Record<string, string> = {
+	employee: 'hr',
+	person: 'hr'
+};
+
 export function moduleForPath(
 	pathname: string,
 	mappings: readonly ModulePathMapping[]
@@ -25,6 +30,7 @@ export function resolveEnabledModuleIds(configured: unknown): string[] {
 			configured
 				.filter((id): id is string => typeof id === 'string')
 				.map((id) => id.trim())
+				.map((id) => ENABLED_MODULE_ALIASES[id] ?? id)
 				.filter((id) => valid.has(id))
 		)
 	];

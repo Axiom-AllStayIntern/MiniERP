@@ -16,7 +16,7 @@ export interface AgentAction {
 	entry: string;
 	api?: string;
 	layer: AgentLayer;
-	required_roles: Array<'owner' | 'finance' | 'project_manager' | 'employee'>;
+	required_roles: Array<'owner' | 'finance' | 'project_manager' | 'hr' | 'employee'>;
 	params?: AgentActionParam[];
 }
 
@@ -24,7 +24,7 @@ export interface AgentContext {
 	currentPath: string;
 	project_id?: string;
 	project_name?: string;
-	user_role?: 'owner' | 'finance' | 'project_manager' | 'employee';
+	user_role?: 'owner' | 'finance' | 'project_manager' | 'hr' | 'employee';
 	[key: string]: unknown;
 }
 

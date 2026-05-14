@@ -4,19 +4,25 @@
 	import { panel } from '$app-layer/ai-panel/workflow/panel.svelte';
 	import {
 		uploadDocument,
+		type DocumentArtifactPostResponse,
 		type DocumentProcessingStatus
 	} from '$app-layer/ai-panel/workflow/finance-workflow-api';
 
-	type Stage = 'idle' | 'parsing' | 'storing' | 'queued' | 'error';
+	type Stage = 'idle' | 'expanding' | 'parsing' | 'storing' | 'queued' | 'error';
 
 	let fileInput: HTMLInputElement | null = $state(null);
 	let dragOver = $state(false);
 	let stage = $state<Stage>('idle');
 	let fileName = $state('');
+	let batchTotal = $state(0);
+	let batchIndex = $state(0);
 	let error = $state('');
 
 	const TERMINAL_BAD: DocumentProcessingStatus[] = ['needs_manual_review', 'failed'];
 	const MIN_USEFUL_CLIENT_TEXT = 48;
+	const MAX_BATCH_FILES = 25;
+	const SUPPORTED_DOCUMENT_EXT_RE = /\.(pdf|png|jpe?g|webp)$/i;
+	const ZIP_EXT_RE = /\.zip$/i;
 
 	// ---------------------------------------------------------------------------
 	// Client-side text extraction (Ship 1 of upload pipeline redesign).
@@ -93,6 +99,77 @@
 		uploadFile: File;
 	};
 
+	function isZipFile(file: File): boolean {
+		const mime = (file.type || '').toLowerCase();
+		return (
+			mime === 'application/zip' ||
+			mime === 'application/x-zip-compressed' ||
+			ZIP_EXT_RE.test(file.name)
+		);
+	}
+
+	function inferMimeType(fileName: string, fallback = 'application/octet-stream'): string {
+		if (/\.pdf$/i.test(fileName)) return 'application/pdf';
+		if (/\.png$/i.test(fileName)) return 'image/png';
+		if (/\.jpe?g$/i.test(fileName)) return 'image/jpeg';
+		if (/\.webp$/i.test(fileName)) return 'image/webp';
+		return fallback;
+	}
+
+	function isSupportedDocument(file: File): boolean {
+		const mime = (file.type || '').toLowerCase();
+		return (
+			mime === 'application/pdf' ||
+			mime === 'image/png' ||
+			mime === 'image/jpeg' ||
+			mime === 'image/webp' ||
+			SUPPORTED_DOCUMENT_EXT_RE.test(file.name)
+		);
+	}
+
+	function displayNameForBatch(files: File[]): string {
+		if (files.length === 0) return '';
+		if (files.length === 1) return files[0].name;
+		return `${files.length} files`;
+	}
+
+	async function expandInputFiles(files: File[]): Promise<File[]> {
+		const expanded: File[] = [];
+
+		for (const file of files) {
+			if (!isZipFile(file)) {
+				if (isSupportedDocument(file)) expanded.push(file);
+				continue;
+			}
+
+			const { unzipSync } = await import('fflate');
+			const entries = unzipSync(new Uint8Array(await file.arrayBuffer()));
+			for (const [entryName, entryBytes] of Object.entries(entries)) {
+				if (entryName.endsWith('/') || entryName.startsWith('__MACOSX/')) continue;
+				if (!SUPPORTED_DOCUMENT_EXT_RE.test(entryName)) continue;
+
+				const cleanName =
+					entryName
+						.split(/[\\/]/)
+						.filter(Boolean)
+						.pop() ?? entryName;
+				const bytes = entryBytes.slice();
+				const body = bytes.buffer.slice(
+					bytes.byteOffset,
+					bytes.byteOffset + bytes.byteLength
+				) as ArrayBuffer;
+				expanded.push(
+					new File([body], cleanName, {
+						type: inferMimeType(cleanName),
+						lastModified: file.lastModified
+					})
+				);
+			}
+		}
+
+		return expanded.slice(0, MAX_BATCH_FILES);
+	}
+
 	async function buildClientExtraction(file: File): Promise<ClientExtraction> {
 		const mime = (file.type || '').toLowerCase();
 		const name = file.name.toLowerCase();
@@ -123,44 +200,76 @@
 		return { text: '', method: 'manual', uploadFile: file };
 	}
 
-	async function onFile(file: File) {
-		if (!file) return;
+	async function uploadOne(file: File): Promise<DocumentArtifactPostResponse> {
 		fileName = file.name;
-		error = '';
 		stage = 'parsing';
 
+		const extraction = await buildClientExtraction(file);
+
+		stage = 'storing';
+		return await uploadDocument(extraction.uploadFile, {
+			uploadedFrom: 'ai_panel',
+			clientExtractedText: extraction.text || undefined,
+			clientExtractionMethod: extraction.method
+		});
+	}
+
+	async function onFiles(inputFiles: File[]) {
+		if (inputFiles.length === 0) return;
+		fileName = displayNameForBatch(inputFiles);
+		batchIndex = 0;
+		batchTotal = inputFiles.length;
+		error = '';
+		stage = 'expanding';
+
 		try {
-			const extraction = await buildClientExtraction(file);
-
-			stage = 'storing';
-			const artifact = await uploadDocument(extraction.uploadFile, {
-				uploadedFrom: 'ai_panel',
-				clientExtractedText: extraction.text || undefined,
-				clientExtractionMethod: extraction.method
-			});
-
-			if (TERMINAL_BAD.includes(artifact.processingStatus)) {
-				error =
-					artifact.textExtraction?.error?.message ??
-					(artifact.processingStatus === 'needs_manual_review'
-						? "I could read the file but the text was too thin to use confidently."
-						: 'Something went wrong while reading the file.');
-				stage = 'error';
-				return;
+			const files = await expandInputFiles(inputFiles);
+			if (files.length === 0) {
+				throw new Error('No supported PDF or image files were found.');
 			}
+
+			batchTotal = files.length;
+			const artifacts: DocumentArtifactPostResponse[] = [];
+			const uploadErrors: string[] = [];
+
+			for (const [index, file] of files.entries()) {
+				batchIndex = index + 1;
+				try {
+					artifacts.push(await uploadOne(file));
+				} catch (err) {
+					uploadErrors.push(
+						`${file.name}: ${err instanceof Error ? err.message : 'Upload failed'}`
+					);
+				}
+			}
+
+			if (artifacts.length === 0) {
+				throw new Error(uploadErrors[0] ?? 'No files could be added to Inbox.');
+			}
+
+			const preferred =
+				artifacts.find((a) => a.processingStatus === 'ready_for_review') ??
+				artifacts.find((a) => !TERMINAL_BAD.includes(a.processingStatus)) ??
+				artifacts[0];
+			const initialTab = TERMINAL_BAD.includes(preferred.processingStatus)
+				? 'failed'
+				: preferred.processingStatus === 'ready_for_review'
+					? 'review'
+					: 'processing';
 
 			stage = 'queued';
 			panel.startWorkflow('finance-inbox');
 			panel.patchState({
-				initialTab: artifact.processingStatus === 'ready_for_review' ? 'review' : 'processing',
-				justUploadedDocumentId: artifact.id,
-				documentId: artifact.id,
-				documentArtifactId: artifact.id,
-				documentArtifactStatus: artifact.processingStatus,
-				documentClassification: artifact.classification,
-				suggestedDocumentType: artifact.documentType,
-				fileName: file.name,
-				fileSize: file.size
+				initialTab,
+				justUploadedDocumentId: preferred.id,
+				batchDocumentIds: artifacts.map((a) => a.id),
+				documentId: preferred.id,
+				documentArtifactId: preferred.id,
+				documentArtifactStatus: preferred.processingStatus,
+				documentClassification: preferred.classification,
+				suggestedDocumentType: preferred.documentType,
+				fileName: artifacts.length === 1 ? preferred.originalFile.fileName : `${artifacts.length} files`,
+				fileSize: artifacts.reduce((sum, a) => sum + a.originalFile.sizeBytes, 0)
 			});
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not start the workflow.';
@@ -170,15 +279,16 @@
 
 	function onInputChange(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		if (file) void onFile(file);
+		const files = Array.from(input.files ?? []);
+		input.value = '';
+		if (files.length > 0) void onFiles(files);
 	}
 
 	function onDrop(e: DragEvent) {
 		e.preventDefault();
 		dragOver = false;
-		const file = e.dataTransfer?.files?.[0];
-		if (file) void onFile(file);
+		const files = Array.from(e.dataTransfer?.files ?? []);
+		if (files.length > 0) void onFiles(files);
 	}
 
 	function onDragOver(e: DragEvent) {
@@ -198,6 +308,8 @@
 		stage = 'idle';
 		error = '';
 		fileName = '';
+		batchIndex = 0;
+		batchTotal = 0;
 	}
 </script>
 
@@ -206,7 +318,8 @@
 		type="button"
 		class="drop-area"
 		class:is-dragging={dragOver}
-		class:is-busy={stage === 'parsing' ||
+		class:is-busy={stage === 'expanding' ||
+			stage === 'parsing' ||
 			stage === 'storing' ||
 			stage === 'queued'}
 		class:is-error={stage === 'error'}
@@ -214,14 +327,15 @@
 		ondragleave={onDragLeave}
 		ondrop={onDrop}
 		onclick={stage === 'error' ? onRetry : onBrowseClick}
-		disabled={stage === 'parsing' ||
+		disabled={stage === 'expanding' ||
+			stage === 'parsing' ||
 			stage === 'storing' ||
 			stage === 'queued'}
 	>
 		<span class="drop-glow" aria-hidden="true"></span>
 
 		<span class="drop-icon">
-			{#if stage === 'parsing' || stage === 'storing' || stage === 'queued'}
+			{#if stage === 'expanding' || stage === 'parsing' || stage === 'storing' || stage === 'queued'}
 				<Loader2 size={30} strokeWidth={1.6} />
 			{:else if stage === 'error'}
 				<AlertTriangle size={30} strokeWidth={1.6} />
@@ -233,16 +347,18 @@
 		</span>
 
 		<span class="drop-heading">
-			{#if stage === 'parsing'}
-				Reading {fileName} locally…
+			{#if stage === 'expanding'}
+				Preparing {fileName}…
+			{:else if stage === 'parsing'}
+				Reading {fileName} locally{batchTotal > 1 ? ` (${batchIndex}/${batchTotal})` : ''}…
 			{:else if stage === 'storing'}
-				Storing {fileName}…
+				Storing {fileName}{batchTotal > 1 ? ` (${batchIndex}/${batchTotal})` : ''}…
 			{:else if stage === 'queued'}
-				Adding {fileName} to Inbox…
+				Added {batchTotal > 1 ? `${batchTotal} files` : fileName} to Inbox…
 			{:else if stage === 'error'}
 				Couldn't start
 			{:else}
-				Drop the financial document here
+				Drop financial documents here
 			{/if}
 		</span>
 
@@ -250,17 +366,19 @@
 			{#if stage === 'error'}
 				{error}
 			{:else}
-				PDF or photo. Invoice, receipt, PO, customer invoice - I'll figure out the rest.
+				PDF, photo, or ZIP. Invoice, receipt, PO, customer invoice - I'll figure out the rest.
 			{/if}
 		</span>
 
 		<span class="drop-footnote">
 			{#if stage === 'idle' && !fileName}
-				Click or drop · client-side text extraction + AI classification
+				Click or drop multiple files · each document becomes one Inbox item
+			{:else if stage === 'expanding'}
+				Expanding archives and filtering supported document files
 			{:else if stage === 'parsing'}
 				Extracting text in browser (pdf.js)
 			{:else if stage === 'storing'}
-				Stashing in object storage
+				Stashing each file in object storage
 			{:else if stage === 'queued'}
 				The async worker will extract, classify, and prefill fields
 			{/if}
@@ -270,7 +388,8 @@
 	<input
 		bind:this={fileInput}
 		type="file"
-		accept="application/pdf,image/png,image/jpeg,image/webp"
+		accept="application/pdf,image/png,image/jpeg,image/webp,application/zip,.zip"
+		multiple
 		onchange={onInputChange}
 		hidden
 	/>

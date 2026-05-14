@@ -28,6 +28,11 @@
 		setTimeout(() => goto('/finance/inbox'), 800);
 	}
 
+	async function handleAbandoned() {
+		await invalidateAll();
+		setTimeout(() => goto('/finance/inbox'), 800);
+	}
+
 	const formatDate = (iso: string) => {
 		try {
 			return new Date(iso).toLocaleString('en-SG', {
@@ -60,6 +65,7 @@
 			artifact.processingStatus === 'ready_for_workflow'
 	);
 	const isConfirmed = $derived(artifact.processingStatus === 'confirmed');
+	const isAbandoned = $derived(artifact.processingStatus === 'abandoned');
 </script>
 
 <PageShell
@@ -80,6 +86,11 @@
 		<div class="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
 			This document was confirmed and persisted. It stays in the Recently
 			Confirmed tab for 30 days.
+		</div>
+	{:else if isAbandoned}
+		<div class="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+			This intake was abandoned. No expense, revenue, or archive record was created.
+			The uploaded file is retained for audit cleanup.
 		</div>
 	{:else if !isReady}
 		<div class="rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
@@ -141,7 +152,13 @@
 				{#if data.canViewDiagnostics}
 					<DocumentIntakeDiagnostics {artifact} />
 				{/if}
-				<InboxConfirmForm {artifact} {categories} cancelHref="/finance/inbox" onConfirmed={handleConfirmed} />
+				<InboxConfirmForm
+					{artifact}
+					{categories}
+					cancelHref="/finance/inbox"
+					onConfirmed={handleConfirmed}
+					onAbandoned={handleAbandoned}
+				/>
 			</div>
 		</div>
 	</div>

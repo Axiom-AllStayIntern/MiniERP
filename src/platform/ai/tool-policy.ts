@@ -33,7 +33,12 @@ export interface PolicyCheckInput {
 const PERMISSION_TO_ROLES: Record<string, readonly AuthRole[]> = {
 	'finance:view': ['owner', 'finance', 'project_manager', 'employee'],
 	'finance:edit': ['owner', 'finance'],
-	'finance:tax': ['owner', 'finance']
+	'finance:tax': ['owner', 'finance'],
+	'project:view': ['owner', 'project_manager', 'employee'],
+	'project:edit': ['owner', 'project_manager'],
+	'project:staff': ['owner', 'project_manager'],
+	'hr:view': ['owner', 'hr'],
+	'hr:edit': ['owner', 'hr']
 };
 
 function roleHasPermission(role: AuthRole | null | undefined, permission: string): boolean {
@@ -114,4 +119,3 @@ export function checkToolPolicy(input: PolicyCheckInput): PolicyDecision {
 		blockedBy
 	};
 }
-

@@ -371,7 +371,7 @@ export const POST: RequestHandler = async (event) => {
 		const created = await finance.revenue.createRevenue(buildRevenueInput(body.payload, artifact.id));
 		entityId = created.id;
 		entityType = 'revenue';
-		entityRoute = '/finance/doc-hub/customer-invoices';
+		entityRoute = '/finance/revenue';
 		toolId = 'finance.create-revenue-record';
 		finalAction = 'revenue.created';
 	} else {

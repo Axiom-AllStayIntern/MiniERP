@@ -202,7 +202,7 @@
 				>
 					Net {money(data.profit)}
 				</p>
-				<p class="mt-0.5 text-xs text-[var(--sf-green)]">Net = Gross �?OpEx expenses</p>
+				<p class="mt-0.5 text-xs text-[var(--sf-green)]">Net = Gross - OpEx expenses</p>
 			</div>
 			<div class="px-5 py-3.5" style="background: var(--sf-green-soft);">
 				<p class="text-[11px] font-medium uppercase tracking-wide text-[var(--sf-green)] opacity-80">
@@ -390,5 +390,4 @@
 		</div>
 	</div>
 {/if}
-
 

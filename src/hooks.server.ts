@@ -6,9 +6,13 @@ import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { getAuth } from '$platform/auth/better-auth';
 import { resolveWorkerAuthEnv } from '$platform/auth/resolve-worker-env';
 import type { AuthRole } from '$platform/auth/config';
-import { isRouteAllowed } from '$platform/auth/permissions';
+import { defaultPathForRole, isRouteAllowed } from '$platform/auth/permissions';
 import { getDb } from './infrastructure/db';
-import { getEnabledModuleIds, isPathEnabled } from '$app-layer/bootstrap/module-access';
+import {
+	getEnabledModuleIds,
+	isPathAllowedForRole,
+	isPathEnabled
+} from '$app-layer/bootstrap/module-access';
 
 // Register all modules at app startup (side-effect import)
 import '$app-layer/bootstrap/register-modules';
@@ -81,7 +85,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		(event.url.pathname === '/login' || event.url.pathname === '/register') &&
 		event.locals.user
 	) {
-		throw redirect(303, '/finance/dashboard');
+		throw redirect(303, defaultPathForRole(event.locals.user.role));
 	}
 
 	const path = event.url.pathname;
@@ -96,11 +100,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 			throw redirect(303, '/login');
 		}
 
-		if (!isRouteAllowed(path, event.locals.user.role)) {
+		if (
+			!isRouteAllowed(path, event.locals.user.role) ||
+			!isPathAllowedForRole(path, event.locals.user.role, event.request.method)
+		) {
 			if (wantApiAuth) {
 				return new Response(JSON.stringify({ ok: false, error: 'Forbidden' }), { status: 403 });
 			}
-			throw redirect(303, '/finance/dashboard');
+			const fallback = defaultPathForRole(event.locals.user.role);
+			if (fallback === path) {
+				return new Response('Forbidden', { status: 403 });
+			}
+			throw redirect(303, fallback);
 		}
 
 		if (event.platform) {

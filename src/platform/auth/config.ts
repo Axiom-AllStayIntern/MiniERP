@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-export const authRoles = ['owner', 'finance', 'project_manager', 'employee'] as const;
+export const authRoles = ['owner', 'finance', 'project_manager', 'hr', 'employee'] as const;
+export const authRoleSchema = z.enum(authRoles);
 
 export const authEnvSchema = z.object({
 	BETTER_AUTH_SECRET: z.string().min(1),

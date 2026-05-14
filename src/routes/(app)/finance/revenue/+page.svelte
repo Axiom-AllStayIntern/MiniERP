@@ -87,6 +87,12 @@
 
 		<div class="flex items-center gap-2">
 			<a
+				class="rounded-md bg-[var(--sf-green)] px-3 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]"
+				href="/finance/revenue/generate"
+			>
+				Generate customer invoice
+			</a>
+			<a
 				class="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
 				href="/finance/inbox"
 			>

@@ -20,6 +20,12 @@ import type {
 export const DOCUMENT_INTAKE_AGENT_ID = 'document-intake';
 const DOCUMENT_INTAKE_VERSION = '0.1.0';
 const MIN_CLASSIFICATION_CONFIDENCE = 0.5;
+const ABANDONABLE_STATUSES: DocumentProcessingStatus[] = [
+	'ready_for_review',
+	'ready_for_workflow',
+	'needs_manual_review',
+	'failed'
+];
 
 const SUPPORTED_MIME_PATTERNS = [
 	/^application\/pdf$/i,
@@ -176,6 +182,19 @@ export interface DocumentIntakeService {
 		entityId?: string;
 		categoryId?: string;
 	}): Promise<DocumentArtifact | null>;
+	abandonIntake(input: {
+		tenantId?: string;
+		documentId: string;
+		reason?: string | null;
+	}): Promise<
+		| { ok: true; artifact: DocumentArtifact }
+		| {
+				ok: false;
+				status: 'not_found' | 'not_abandonable';
+				message: string;
+				artifact?: DocumentArtifact;
+		  }
+	>;
 	replaceSuggestedFields(input: {
 		tenantId?: string;
 		documentId: string;
@@ -495,6 +514,60 @@ export function createDocumentIntakeService(
 	}
 
 	/**
+	 * Abandon the current inbox intake without deleting the uploaded R2 object.
+	 * This is distinct from UI "Cancel": it is a terminal artifact state meaning
+	 * no expense, revenue, or archive record should be created from this upload.
+	 */
+	async function abandonIntake(input: {
+		tenantId?: string;
+		documentId: string;
+		reason?: string | null;
+	}): Promise<
+		| { ok: true; artifact: DocumentArtifact }
+		| {
+				ok: false;
+				status: 'not_found' | 'not_abandonable';
+				message: string;
+				artifact?: DocumentArtifact;
+		  }
+	> {
+		const tenantId = input.tenantId ?? 'default';
+		const artifact = await repo.findById(input.documentId, tenantId);
+		if (!artifact) {
+			return { ok: false, status: 'not_found', message: 'Document artifact not found.' };
+		}
+		if (!ABANDONABLE_STATUSES.includes(artifact.processingStatus)) {
+			return {
+				ok: false,
+				status: 'not_abandonable',
+				message: `Artifact is in '${artifact.processingStatus}' state and cannot be abandoned.`,
+				artifact
+			};
+		}
+
+		const reason = input.reason?.trim() || null;
+		const metadata = {
+			...(artifact.normalizedMetadata ?? {}),
+			abandonedAt: new Date().toISOString(),
+			abandonedBy: ctx.user?.id ?? null,
+			abandonReason: reason,
+			previousStatus: artifact.processingStatus,
+			fileRetention: 'retained_for_audit_cleanup'
+		};
+
+		await repo.abandon(artifact.id, metadata);
+		const updated = await repo.findById(artifact.id, tenantId);
+		await audit(updated!, 'inbox.intake_abandoned', 'ok', {
+			outputRefs: {
+				previousStatus: artifact.processingStatus,
+				reason,
+				storageRef: artifact.originalFile.storageRef
+			}
+		});
+		return { ok: true, artifact: updated! };
+	}
+
+	/**
 	 * Replace `suggestedFields` and `suggestedCategoryId` after the user
 	 * picks a different category in the inbox. Called by POST
 	 * /api/documents/[id]/reclassify; the route runs the finance-side
@@ -537,6 +610,7 @@ export function createDocumentIntakeService(
 		processDocument,
 		getDocumentArtifact,
 		markConfirmed,
+		abandonIntake,
 		replaceSuggestedFields,
 		toView
 	};

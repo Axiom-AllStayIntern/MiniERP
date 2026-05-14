@@ -6,7 +6,7 @@ export const businessPartnerModule: ModuleDefinition = {
 		id: 'business-partner',
 		name: 'Business Partner',
 		layer: 'base',
-		dependencies: ['core', 'person']
+		dependencies: ['core']
 	},
 	registerHandlers: registerBPHandlers
 };

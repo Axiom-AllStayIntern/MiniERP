@@ -19,12 +19,6 @@ export const projectManifestV2: ModuleManifestV2 = {
 			failurePolicy: 'block'
 		},
 		{
-			moduleId: 'person',
-			strength: 'weak',
-			description: 'Project enriches membership and staffing context with people data',
-			failurePolicy: 'degrade'
-		},
-		{
 			moduleId: 'business-partner',
 			strength: 'strong',
 			description: 'Project records need customer and partner references',

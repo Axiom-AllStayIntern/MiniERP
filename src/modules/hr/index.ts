@@ -42,7 +42,7 @@ export type { HrDirectorySource, HrLegacySources, HrPeopleSource } from './contr
 export const employeeActions: AgentAction[] = [
 	{
 		id: 'view_employees',
-		module: 'employee',
+		module: 'hr',
 		description: 'View the employee directory',
 		keywords: ['employees', 'staff list', 'HR roster'],
 		entry: '/hr/employees',
@@ -51,7 +51,7 @@ export const employeeActions: AgentAction[] = [
 	},
 	{
 		id: 'create_employee',
-		module: 'employee',
+		module: 'hr',
 		description: 'Create an employee record',
 		keywords: ['new employee', 'create staff', 'hire', 'add employee'],
 		entry: '/hr/employees/new',

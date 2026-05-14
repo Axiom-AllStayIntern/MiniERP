@@ -134,6 +134,20 @@ export class DocumentArtifactRepository {
 			.where(eq(documentArtifacts.id, id));
 	}
 
+	async abandon(
+		id: string,
+		metadata: Record<string, unknown>
+	): Promise<void> {
+		await this.db
+			.update(documentArtifacts)
+			.set({
+				processingStatus: 'abandoned',
+				normalizedMetadata: JSON.stringify(metadata),
+				updatedAt: nowIso()
+			})
+			.where(eq(documentArtifacts.id, id));
+	}
+
 	async setTextExtraction(id: string, result: TextExtractionResult): Promise<void> {
 		await this.db
 			.update(documentArtifacts)

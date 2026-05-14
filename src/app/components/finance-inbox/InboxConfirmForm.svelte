@@ -46,12 +46,14 @@
 		artifact: initialArtifact,
 		categories,
 		cancelHref = '/finance/inbox',
-		onConfirmed
+		onConfirmed,
+		onAbandoned
 	}: {
 		artifact: DocumentArtifactView;
 		categories: CategoryChoice[];
 		cancelHref?: string | null;
 		onConfirmed?: (result: ConfirmResult) => void | Promise<void>;
+		onAbandoned?: (artifact: DocumentArtifactView) => void | Promise<void>;
 	} = $props();
 
 	const FIELD_META: Record<string, FieldMeta> = {
@@ -119,6 +121,7 @@
 	let currentStep = $state<ReviewStep>('category');
 	let isReclassifying = $state(false);
 	let isConfirming = $state(false);
+	let isAbandoning = $state(false);
 	let actionError = $state<string | null>(null);
 	let successMsg = $state<string | null>(null);
 	let selectedProjectId = $state('');
@@ -143,12 +146,23 @@
 	);
 	const canReclassify = $derived(artifact.processingStatus === 'ready_for_review');
 	const isConfirmed = $derived(artifact.processingStatus === 'confirmed');
+	const isAbandoned = $derived(artifact.processingStatus === 'abandoned');
+	const isClosed = $derived(isConfirmed || isAbandoned);
+	const canAbandon = $derived(
+		!isClosed &&
+			[
+				'ready_for_review',
+				'ready_for_workflow',
+				'needs_manual_review',
+				'failed'
+			].includes(artifact.processingStatus)
+	);
 	const categorySuggestions = $derived(categorySuggestionsFor(artifact));
 	const selectedProject = $derived(projectOptions.find((p) => p.id === selectedProjectId) ?? null);
 	const projectRequired = $derived(Boolean(selectedCategory?.requiresProject || isArchiveOnly));
 	const canConfirm = $derived(
 		isReady &&
-			!isConfirmed &&
+			!isClosed &&
 			categoryConfirmed &&
 			currentStep === 'project' &&
 			(!projectRequired || Boolean(selectedProjectId))
@@ -457,6 +471,39 @@
 			isConfirming = false;
 		}
 	}
+
+	async function handleAbandon() {
+		if (!canAbandon) return;
+		const confirmed = window.confirm(
+			'Abandon this intake?\n\nThis will remove the document from the active inbox.\nNo expense, revenue, or archive record will be created.\nThe uploaded file will be kept for retention and audit cleanup.'
+		);
+		if (!confirmed) return;
+
+		actionError = null;
+		successMsg = null;
+		isAbandoning = true;
+		try {
+			const res = await fetch(`/api/documents/${encodeURIComponent(artifact.id)}/abandon`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ reason: 'User abandoned from inbox review.' })
+			});
+			if (!res.ok) {
+				const err = (await res.json().catch(() => null)) as { error?: string } | null;
+				throw new Error(err?.error ?? `Abandon failed (${res.status})`);
+			}
+			const json = (await res.json()) as { data?: DocumentArtifactView };
+			if (json.data) {
+				artifact = json.data;
+				successMsg = 'Intake abandoned. No financial or archive record was created.';
+				await onAbandoned?.(json.data);
+			}
+		} catch (err) {
+			actionError = err instanceof Error ? err.message : 'Abandon failed';
+		} finally {
+			isAbandoning = false;
+		}
+	}
 </script>
 
 <div class="space-y-4">
@@ -500,7 +547,7 @@
 								class="rounded-lg border px-3 py-2 text-left text-sm {selectedCategoryId === suggestion.category.id ? 'border-[var(--sf-green)] bg-emerald-50 text-slate-950' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}"
 								style="--sf-green: #387234;"
 								onclick={() => handleCategoryChange(suggestion.category.id)}
-								disabled={isReclassifying || isConfirming || isConfirmed || !canReclassify}
+								disabled={isReclassifying || isConfirming || isAbandoning || isClosed || !canReclassify}
 							>
 								<span class="flex items-center justify-between gap-3">
 									<span class="font-medium">{suggestion.category.label}</span>
@@ -523,7 +570,7 @@
 						style="--sf-green: #387234;"
 						value={selectedCategoryId}
 						onchange={(e) => handleCategoryChange((e.currentTarget as HTMLSelectElement).value)}
-						disabled={isReclassifying || isConfirming || isConfirmed || !canReclassify}
+						disabled={isReclassifying || isConfirming || isAbandoning || isClosed || !canReclassify}
 					>
 						{#each ['expense', 'revenue', 'document_only'] as bucket}
 							<optgroup label={bucket === 'expense' ? 'Expense' : bucket === 'revenue' ? 'Revenue' : 'Archive only'}>
@@ -547,7 +594,7 @@
 						class="inline-flex items-center rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[var(--sf-green-dark)] disabled:opacity-50"
 						style="--sf-green: #387234; --sf-green-dark: #2e5d2a;"
 						onclick={confirmCategory}
-						disabled={!selectedCategory || isReclassifying || isConfirming || isConfirmed}
+						disabled={!selectedCategory || isReclassifying || isConfirming || isAbandoning || isClosed}
 					>
 						Category is correct
 					</button>
@@ -577,7 +624,7 @@
 									bind:checked={draft[key] as boolean}
 									class="mt-2 h-4 w-4 rounded border-slate-300 text-[var(--sf-green)] focus:ring-[var(--sf-green)]"
 									style="--sf-green: #387234;"
-									disabled={isConfirming || isConfirmed}
+									disabled={isConfirming || isAbandoning || isClosed}
 								/>
 							{:else if meta.kind === 'textarea'}
 								<textarea
@@ -585,14 +632,14 @@
 									rows="3"
 									class="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-950 placeholder:text-slate-400 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-600 {confidenceClass(key)}"
 									style="--sf-green: #387234;"
-									disabled={isConfirming || isConfirmed}
+									disabled={isConfirming || isAbandoning || isClosed}
 								></textarea>
 							{:else if meta.kind === 'select'}
 								<select
 									bind:value={draft[key] as string}
 									class="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-600 {confidenceClass(key)}"
 									style="--sf-green: #387234;"
-									disabled={isConfirming || isConfirmed}
+									disabled={isConfirming || isAbandoning || isClosed}
 								>
 									{#each meta.options ?? [] as option}
 										<option value={option.value}>{option.label}</option>
@@ -605,7 +652,7 @@
 									bind:value={draft[key] as string}
 									class="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-950 placeholder:text-slate-400 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-600 {confidenceClass(key)}"
 									style="--sf-green: #387234;"
-									disabled={isConfirming || isConfirmed}
+									disabled={isConfirming || isAbandoning || isClosed}
 								/>
 							{/if}
 						</label>
@@ -668,7 +715,7 @@
 						<select
 							class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm disabled:bg-slate-50 disabled:text-slate-500"
 							bind:value={selectedProjectId}
-							disabled={projectSearching || isConfirming || isConfirmed}
+							disabled={projectSearching || isConfirming || isAbandoning || isClosed}
 						>
 							<option value="">{projectRequired ? 'Select a project' : 'No project / company-level'}</option>
 							{#each projectOptions as project (project.id)}
@@ -689,31 +736,41 @@
 			</section>
 		{/if}
 
-		<div class="mt-6 flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
-			{#if cancelHref}
-				<a
-					href={cancelHref}
-					class="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-				>
-					Cancel
-				</a>
-			{/if}
+		<div class="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4">
 			<button
-				type="submit"
-				disabled={isConfirming || isReclassifying || !canConfirm}
-				class="inline-flex items-center gap-2 rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[var(--sf-green-dark)] disabled:opacity-50"
-				style="--sf-green: #387234; --sf-green-dark: #2e5d2a;"
+				type="button"
+				disabled={!canAbandon || isConfirming || isReclassifying || isAbandoning}
+				class="inline-flex items-center rounded-md border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+				onclick={() => void handleAbandon()}
 			>
-				{#if isConfirming}
-					Confirming...
-				{:else if persistTarget === 'expenses'}
-					Confirm & create expense
-				{:else if persistTarget === 'revenue'}
-					Confirm & create revenue
-				{:else}
-					Confirm
-				{/if}
+				{isAbandoning ? 'Abandoning...' : 'Abandon this intake'}
 			</button>
+			<div class="flex items-center justify-end gap-2">
+				{#if cancelHref}
+					<a
+						href={cancelHref}
+						class="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+					>
+						Cancel
+					</a>
+				{/if}
+				<button
+					type="submit"
+					disabled={isConfirming || isReclassifying || isAbandoning || !canConfirm}
+					class="inline-flex items-center gap-2 rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[var(--sf-green-dark)] disabled:opacity-50"
+					style="--sf-green: #387234; --sf-green-dark: #2e5d2a;"
+				>
+					{#if isConfirming}
+						Confirming...
+					{:else if persistTarget === 'expenses'}
+						Confirm & create expense
+					{:else if persistTarget === 'revenue'}
+						Confirm & create revenue
+					{:else}
+						Confirm
+					{/if}
+				</button>
+			</div>
 		</div>
 	</form>
 </div>

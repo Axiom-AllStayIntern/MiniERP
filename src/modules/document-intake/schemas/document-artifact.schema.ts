@@ -42,6 +42,7 @@ export const documentProcessingStatusSchema = z.enum([
 	'ready_for_review',
 	'ready_for_workflow',
 	'confirmed',
+	'abandoned',
 	'needs_manual_review',
 	'failed'
 ]);

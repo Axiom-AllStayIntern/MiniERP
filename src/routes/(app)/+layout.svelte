@@ -26,9 +26,9 @@
 		label: string;
 		moduleId: string | null;
 	}> = [
-		{ id: 'finance', href: '/finance/dashboard', label: 'Finance', moduleId: null },
+		{ id: 'finance', href: '/finance/dashboard', label: 'Finance', moduleId: 'finance' },
 		{ id: 'project', href: '/projects', label: 'Project', moduleId: 'project' },
-		{ id: 'hr', href: '/hr/employees', label: 'HR', moduleId: 'employee' },
+		{ id: 'hr', href: '/hr/employees', label: 'HR', moduleId: 'hr' },
 		{ id: 'business-partner', href: '/business-partners/customers', label: 'Business Partner', moduleId: 'business-partner' },
 		{ id: 'settings', href: '/settings', label: 'Setting', moduleId: 'core' }
 	];
@@ -38,7 +38,7 @@
 	const financeGroups: SideGroup[] = [
 		{
 			title: 'Overview',
-			items: [{ href: '/finance/dashboard', label: 'Dashboard', moduleId: null, icon: 'D' }]
+			items: [{ href: '/finance/dashboard', label: 'Dashboard', moduleId: 'finance', icon: 'D' }]
 		},
 		{
 			title: 'Tax',
@@ -86,8 +86,8 @@
 		{
 			title: 'HR',
 			items: [
-				{ href: '/hr/employees', label: 'All Employees', moduleId: 'employee', icon: 'H' },
-				{ href: '/hr/employees/new', label: 'New Employee', moduleId: 'employee', icon: '+' }
+				{ href: '/hr/employees', label: 'All Employees', moduleId: 'hr', icon: 'H' },
+				{ href: '/hr/employees/new', label: 'New Employee', moduleId: 'hr', icon: '+' }
 			]
 		}
 	];
@@ -111,6 +111,7 @@
 
 	let { children, data } = $props();
 	const enabledModules = $derived(new Set((data.enabledModules as string[] | undefined) ?? []));
+	const homeHref = $derived((data.defaultHome as string | undefined) ?? '/finance/dashboard');
 
 	const projectListGroups = $derived.by((): SideGroup[] => {
 		const c = data.projectListCounts;
@@ -254,7 +255,7 @@
 		<div class="flex h-14 items-center justify-between px-4 lg:px-6">
 			<!-- Logo and primary nav -->
 			<div class="flex items-center gap-6">
-				<a class="flex items-center gap-2 text-lg font-semibold text-[var(--sf-green)]" href="/finance/dashboard">
+				<a class="flex items-center gap-2 text-lg font-semibold text-[var(--sf-green)]" href={homeHref}>
 					<span class="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--sf-green)] text-white text-sm">SF</span>
 					SmartFin
 				</a>

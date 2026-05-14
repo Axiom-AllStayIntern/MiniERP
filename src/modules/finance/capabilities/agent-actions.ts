@@ -6,7 +6,7 @@ const arActions: AgentAction[] = [
 		module: 'ar',
 		description: 'Create a customer invoice draft; can prefill project, customer, and amount',
 		keywords: ['invoice', 'create invoice', 'customer invoice', 'sales invoice', 'AR invoice'],
-		entry: '/finance/doc-hub/customer-invoices/generate',
+		entry: '/finance/revenue/generate',
 		api: 'POST /api/invoices/out',
 		layer: 3,
 		required_roles: ['owner', 'finance'],
@@ -54,7 +54,7 @@ const arActions: AgentAction[] = [
 		module: 'ar',
 		description: 'View customer (sales) invoices',
 		keywords: ['customer invoices', 'outgoing invoices', 'AR list', 'invoices'],
-		entry: '/finance/doc-hub/customer-invoices',
+		entry: '/finance/revenue',
 		layer: 1,
 		required_roles: ['owner', 'finance', 'project_manager']
 	},
@@ -63,7 +63,7 @@ const arActions: AgentAction[] = [
 		module: 'ar',
 		description: 'View supplier (purchase) invoices',
 		keywords: ['supplier invoice', 'AP invoice', 'vendor bill', 'incoming invoice'],
-		entry: '/finance/doc-hub/supplier-invoices',
+		entry: '/finance/expenses',
 		layer: 1,
 		required_roles: ['owner', 'finance', 'project_manager']
 	},

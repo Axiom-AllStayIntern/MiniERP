@@ -8,7 +8,7 @@
  * corresponding schema in `schemas.ts` expects.
  */
 
-export const EXTRACT_DOCUMENT_FIELDS_PROMPT_VERSION = 'v2';
+export const EXTRACT_DOCUMENT_FIELDS_PROMPT_VERSION = 'v3';
 
 const SECURITY_FOOTER = `
 SECURITY:
@@ -51,6 +51,14 @@ REFERENCE RULES:
 - invoiceNumber must be the invoice number/reference, not a PO number, quotation number, account number, customer number, UEN, GST registration number, phone number, or payment reference.
 - poNumber must be extracted only from a clear PO label such as "PO No", "Purchase Order", "Customer PO", "Your PO", or "Buyer PO".
 - If no clearly labelled PO number exists, poNumber must be null. Do not reuse invoiceNumber, quote number, project number, customer number, or random alphanumeric strings as poNumber.`;
+
+const ARCHIVE_RULES = `
+ARCHIVE DOCUMENT RULES:
+- These documents are archived business records, not expenses or revenue records. Extract only what is printed in the document.
+- amount means the contract value, quotation total, or order total, not a paid amount unless the document explicitly says it is the total value.
+- currency must be an ISO code when present. Map S$/SGD to SGD, US$/USD to USD, RMB/CNY/¥ to CNY, RM/MYR to MYR, and EUR/€ to EUR.
+- lineItems must be null if no clear item table is visible. When visible, keep each item compact with description, qty, unitPrice, and amount.
+- Use null for unknown fields. Do not infer missing project, status, or accounting treatment.`;
 
 export const INVOICE_SYSTEM_PROMPT = `You extract structured fields from a supplier invoice OCR transcription.
 
@@ -99,16 +107,19 @@ Return ONLY a single JSON object, no markdown, no preamble, no commentary.
 
 Required keys:
 - supplierName: supplier the PO is issued to (string or null).
+- clientName: buyer / customer issuing the PO (string or null).
 - poNumber: PO number / reference (string or null).
 - date: ISO YYYY-MM-DD (string or null).
 - totalAmount: numeric total order amount (number or null).
 - currency: ISO currency code (string or null).
 - description: short item / line summary if available (string or null).
+- lineItems: array of { description, qty, unitPrice, amount } objects, or null.
 - confidence: number between 0 and 1.
 
 Use null for any field you cannot confidently extract.
 ${EXTRACTION_RULES}
 ${REFERENCE_RULES}
+${ARCHIVE_RULES}
 ${SECURITY_FOOTER}`;
 
 export const CUSTOMER_INVOICE_SYSTEM_PROMPT = `You extract structured fields from a customer-facing invoice (one we issued to a customer).
@@ -130,6 +141,43 @@ Required keys:
 Use null for any field you cannot confidently extract.
 ${EXTRACTION_RULES}
 ${REFERENCE_RULES}
+${SECURITY_FOOTER}`;
+
+export const CONTRACT_SYSTEM_PROMPT = `You extract structured fields from a business contract OCR transcription.
+
+Return ONLY a single JSON object, no markdown, no preamble, no commentary.
+
+Required keys:
+- contractNumber: contract number / agreement reference (string or null).
+- clientName: customer/client/counterparty named in the contract (string or null).
+- effectiveDate: contract start/effective date as ISO YYYY-MM-DD (string or null).
+- expiryDate: contract end/expiry/termination date as ISO YYYY-MM-DD (string or null).
+- amount: numeric contract value / total contract amount (number or null).
+- currency: ISO currency code if present, otherwise null.
+- paymentTerms: payment terms text if present, otherwise null.
+- scope: brief contract scope / subject summary from the document, otherwise null.
+- confidence: number between 0 and 1.
+
+Use null for any field you cannot confidently extract.
+${ARCHIVE_RULES}
+${SECURITY_FOOTER}`;
+
+export const QUOTATION_SYSTEM_PROMPT = `You extract structured fields from a business quotation, quote, or proposal OCR transcription.
+
+Return ONLY a single JSON object, no markdown, no preamble, no commentary.
+
+Required keys:
+- quotationNumber: quotation / quote / proposal reference (string or null).
+- clientName: customer/client receiving the quotation (string or null).
+- date: quotation issue date as ISO YYYY-MM-DD (string or null).
+- validUntil: quotation expiry / valid-until date as ISO YYYY-MM-DD (string or null).
+- amount: numeric quotation grand total (number or null).
+- currency: ISO currency code if present, otherwise null.
+- lineItems: array of { description, qty, unitPrice, amount } objects, or null.
+- confidence: number between 0 and 1.
+
+Use null for any field you cannot confidently extract.
+${ARCHIVE_RULES}
 ${SECURITY_FOOTER}`;
 
 export function buildDocumentUserPrompt(rawText: string): string {

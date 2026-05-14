@@ -18,9 +18,9 @@
 		</a>
 		<a
 			class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-			href="/finance/doc-hub/supplier-invoices"
+			href="/finance/expenses"
 		>
-			Supplier invoices
+			Supplier invoice expenses
 		</a>
 	</div>
 
@@ -76,7 +76,7 @@
 							No suppliers yet.
 							<a class="font-medium text-[var(--sf-green)] hover:underline" href="/business-partners/suppliers/new">Add your first supplier</a>
 							or open
-							<a class="font-medium text-[var(--sf-green)] hover:underline" href="/finance/doc-hub/supplier-invoices">supplier invoices</a>.
+							<a class="font-medium text-[var(--sf-green)] hover:underline" href="/finance/expenses">supplier invoice expenses</a>.
 						</td>
 					</tr>
 				{:else}
@@ -114,5 +114,4 @@
 		</table>
 	</div>
 </PageShell>
-
 

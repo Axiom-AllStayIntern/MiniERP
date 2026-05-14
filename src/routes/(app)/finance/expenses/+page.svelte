@@ -68,7 +68,7 @@
 <PageShell
 	eyebrow="Finance"
 	title="Company Expenses"
-	description="Manage all expenses �?operating costs and sales costs."
+	description="Manage all expenses: operating costs and sales costs."
 >
 	<!-- Summary cards -->
 	<div class="grid grid-cols-2 gap-4 md:grid-cols-3">
@@ -368,5 +368,4 @@
 		</div>
 	</div>
 {/if}
-
 

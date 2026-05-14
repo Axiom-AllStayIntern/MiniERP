@@ -2,9 +2,12 @@ import type { DBClient } from '$infrastructure/db';
 import { CompanySettingsRepository } from '$platform/config/company-settings-repository';
 import {
 	isPathEnabled as isMappedPathEnabled,
+	moduleForPath,
 	resolveEnabledModuleIds,
 	type ModulePathMapping
 } from '$platform/config';
+import type { AuthRole } from '$platform/auth/config';
+import { canRoleAccessModule } from '$platform/auth/permissions';
 
 // Wave 3.4 + 3.5 terminal mappings — only the 5 v4 target business modules + core.
 // Routes are consolidated under /<module>/<sub> so each business domain owns a
@@ -47,4 +50,21 @@ export async function getEnabledModuleIds(db: DBClient): Promise<string[]> {
 
 export function isPathEnabled(pathname: string, enabledModuleIds: readonly string[]): boolean {
 	return isMappedPathEnabled(pathname, enabledModuleIds, MODULE_PATH_MAPPINGS);
+}
+
+export function moduleIdForPath(pathname: string): string | null {
+	return moduleForPath(pathname, MODULE_PATH_MAPPINGS);
+}
+
+export function isPathAllowedForRole(pathname: string, role: AuthRole, method = 'GET'): boolean {
+	if (role === 'finance' && method === 'GET' && pathname.startsWith('/api/projects')) {
+		return true;
+	}
+	const moduleId = moduleIdForPath(pathname);
+	if (!moduleId) return true;
+	return canRoleAccessModule(role, moduleId);
+}
+
+export function filterModuleIdsForRole(moduleIds: readonly string[], role: AuthRole): string[] {
+	return moduleIds.filter((moduleId) => canRoleAccessModule(role, moduleId));
 }

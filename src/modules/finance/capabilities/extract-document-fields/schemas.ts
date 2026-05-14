@@ -50,13 +50,22 @@ export type ReceiptLlmV1 = z.infer<typeof receiptSchemaV1>;
 // ---------------------------------------------------------------------------
 // Purchase order (opex.purchase, document_only.purchase_order)
 // ---------------------------------------------------------------------------
+const lineItemSchemaV1 = z.object({
+	description: z.string().nullable(),
+	qty: z.number().finite().nullable(),
+	unitPrice: z.number().finite().nullable(),
+	amount: z.number().finite().nullable()
+});
+
 export const poSchemaV1 = z.object({
 	supplierName: z.string().nullable(),
+	clientName: z.string().nullable().optional(),
 	poNumber: z.string().nullable(),
 	date: z.string().nullable(),
 	totalAmount: z.number().finite().nullable(),
 	currency: z.string().nullable(),
 	description: z.string().nullable(),
+	lineItems: z.array(lineItemSchemaV1).nullable().optional(),
 	confidence: z.number().min(0).max(1).optional()
 });
 export type PoLlmV1 = z.infer<typeof poSchemaV1>;
@@ -78,4 +87,32 @@ export const customerInvoiceSchemaV1 = z.object({
 });
 export type CustomerInvoiceLlmV1 = z.infer<typeof customerInvoiceSchemaV1>;
 
-export const EXTRACT_DOCUMENT_FIELDS_SCHEMA_VERSION = 'v1';
+// ---------------------------------------------------------------------------
+// Archive documents (document_only.contract / document_only.quotation)
+// ---------------------------------------------------------------------------
+export const contractSchemaV1 = z.object({
+	contractNumber: z.string().nullable(),
+	clientName: z.string().nullable(),
+	effectiveDate: z.string().nullable(),
+	expiryDate: z.string().nullable(),
+	amount: z.number().finite().nullable(),
+	currency: z.string().nullable(),
+	paymentTerms: z.string().nullable(),
+	scope: z.string().nullable(),
+	confidence: z.number().min(0).max(1).optional()
+});
+export type ContractLlmV1 = z.infer<typeof contractSchemaV1>;
+
+export const quotationSchemaV1 = z.object({
+	quotationNumber: z.string().nullable(),
+	clientName: z.string().nullable(),
+	date: z.string().nullable(),
+	validUntil: z.string().nullable(),
+	amount: z.number().finite().nullable(),
+	currency: z.string().nullable(),
+	lineItems: z.array(lineItemSchemaV1).nullable(),
+	confidence: z.number().min(0).max(1).optional()
+});
+export type QuotationLlmV1 = z.infer<typeof quotationSchemaV1>;
+
+export const EXTRACT_DOCUMENT_FIELDS_SCHEMA_VERSION = 'v2';
