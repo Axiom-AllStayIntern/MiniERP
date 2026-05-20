@@ -22,7 +22,6 @@ import type {
 	ModelHint
 } from './ai-runtime.types';
 
-// test
 export interface RunStructuredOutputInput<T> {
 	task: string;
 	messages: AIMessage[];
