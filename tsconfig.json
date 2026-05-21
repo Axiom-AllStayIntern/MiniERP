@@ -18,7 +18,8 @@
 	"exclude": [
 		".svelte-kit/output/**",
 		".svelte-kit/generated/**",
-		".svelte-kit/cloudflare/**"
+		".svelte-kit/cloudflare/**",
+		"src/test/integration/**"
 	],
 	"include": [
 		"src/**/*.d.ts",

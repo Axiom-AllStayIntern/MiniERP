@@ -65,7 +65,7 @@ describe('GST quarterly report end-to-end', () => {
 			date: '2025-04-15',
 			invoiceType: 'standard',
 			currency: 'SGD',
-			description: 'Test invoice',
+			notes: 'Test invoice',
 			createdAt: now,
 			updatedAt: now
 		});
