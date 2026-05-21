@@ -36,7 +36,7 @@ jobs:
         run: npm run lint
 
       - name: Svelte type check
-        run: svelte-kit sync && npx svelte-check --tsconfig ./tsconfig.json
+        run: npx svelte-kit sync && npx svelte-check --tsconfig ./tsconfig.json
 
       # ── 3. Boundary ───────────────────────────────────────────────────────────
       - name: Architecture boundary check

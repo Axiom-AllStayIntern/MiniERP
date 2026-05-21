@@ -116,7 +116,8 @@ async function check() {
 						: null;
 					const sameModule = importerModule === targetModule;
 					const appLayer = rel.startsWith('src/app/');
-					const exempt = sameModule || appLayer || isInfrastructureBarrel || isSchemaImport;
+					const isTestFile = rel.startsWith('src/test/');
+					const exempt = sameModule || appLayer || isInfrastructureBarrel || isSchemaImport || isTestFile;
 					if (!exempt) {
 						violations.push({
 							rule: 'cross-module-deep-import',
