@@ -155,6 +155,7 @@ async function processOne(
 				fields: result.fields as unknown as Record<string, unknown>,
 				confidence: perFieldConfidence,
 				evidence: result.evidence,
+				sourceQuotes: result.sourceQuotes,
 				categoryId
 			};
 		}

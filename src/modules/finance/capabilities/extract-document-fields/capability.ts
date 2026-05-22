@@ -73,6 +73,10 @@ export interface ExtractDocumentFieldsOutput {
 	fields: Record<string, unknown>;
 	confidence: number;
 	evidence: FinanceEvidence[];
+	/** Verbatim text excerpts keyed by the LLM's camelCase field name (e.g. supplierName, totalAmount).
+	 *  Used in the review UI to highlight the source sentence in the raw-text panel when the user
+	 *  focuses a field. Only present when the LLM path was taken; undefined for mock/fixture runs. */
+	sourceQuotes?: Record<string, string>;
 	provider: ExtractionProvider;
 }
 
@@ -285,7 +289,7 @@ async function tryLlmExtraction(
 	ctx: CapabilityContextWithEnv,
 	categoryId: string,
 	documentId: string
-): Promise<{ fields: CommonFields; confidence: number; provider: ExtractionProvider } | null> {
+): Promise<{ fields: CommonFields; confidence: number; provider: ExtractionProvider; quotes: Record<string, string> } | null> {
 	if (!ctx.env) return null;
 	const cfg = configForDocType(docType);
 	if (!cfg) return null;
@@ -313,12 +317,23 @@ async function tryLlmExtraction(
 	});
 
 	if (result.status !== 'success') return null;
-	const fields = cfg.mapToFields(result.result.value);
+	const raw = result.result.value;
+	const fields = cfg.mapToFields(raw);
 	if (!fields) return null;
-	const confidence = cfg.confidenceFromValue(result.result.value) ?? 0.8;
+	const confidence = cfg.confidenceFromValue(raw) ?? 0.8;
 	const provider: ExtractionProvider =
 		result.result.meta.providerId === 'workers_ai' ? 'workers_ai' : 'external_api';
-	return { fields, confidence, provider };
+
+	// Extract verbatim source quotes from the optional _quotes key.
+	const rawQuotes = (raw as Record<string, unknown>)._quotes;
+	const quotes: Record<string, string> = {};
+	if (rawQuotes && typeof rawQuotes === 'object' && !Array.isArray(rawQuotes)) {
+		for (const [k, v] of Object.entries(rawQuotes as Record<string, unknown>)) {
+			if (typeof v === 'string' && v.trim().length > 0) quotes[k] = v.trim();
+		}
+	}
+
+	return { fields, confidence, provider, quotes };
 }
 
 // ---------------------------------------------------------------------------
@@ -477,6 +492,7 @@ export const extractDocumentFieldsCapability: FinanceCapability<
 				fields,
 				confidence: llm.confidence,
 				evidence: buildEvidenceForFields(llm.provider, fields),
+				sourceQuotes: Object.keys(llm.quotes).length > 0 ? llm.quotes : undefined,
 				provider: llm.provider
 			};
 		}
