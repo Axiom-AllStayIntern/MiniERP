@@ -11,7 +11,8 @@
 	async function fetchBriefItems(): Promise<BriefApiResponse> {
 		const res = await fetch('/api/finance/today-brief');
 		if (!res.ok) throw new Error('failed');
-		return res.json() as Promise<BriefApiResponse>;
+		const json = (await res.json()) as { ok: boolean; data: BriefApiResponse };
+		return json.data;
 	}
 
 	let briefPromise = $state(fetchBriefItems());

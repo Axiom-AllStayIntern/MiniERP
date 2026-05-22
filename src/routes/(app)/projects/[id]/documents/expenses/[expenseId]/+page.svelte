@@ -24,6 +24,32 @@
 	};
 
 	const categoryLabel = (c: string) => (CATEGORY_LABELS as Record<string, string>)[c] ?? c;
+
+	// Confirmation dialog state
+	type ConfirmAction = 'save' | 'delete' | null;
+	let confirmAction = $state<ConfirmAction>(null);
+	let editFormEl = $state<HTMLFormElement | undefined>(undefined);
+	let deleteFormEl = $state<HTMLFormElement | undefined>(undefined);
+
+	function requestSave(e: Event) {
+		e.preventDefault();
+		confirmAction = 'save';
+	}
+
+	function requestDelete(e: Event) {
+		e.preventDefault();
+		confirmAction = 'delete';
+	}
+
+	function confirmAndSubmit() {
+		if (confirmAction === 'save') editFormEl?.submit();
+		else if (confirmAction === 'delete') deleteFormEl?.submit();
+		confirmAction = null;
+	}
+
+	function cancelConfirm() {
+		confirmAction = null;
+	}
 </script>
 
 <div class="space-y-5">
@@ -181,7 +207,7 @@
 		<summary class="cursor-pointer border-b border-slate-200 px-5 py-4 text-[13px] font-medium text-slate-900">
 			Edit fields
 		</summary>
-		<form class="space-y-4 p-5" method="POST" action="?/update">
+		<form bind:this={editFormEl} class="p-5" method="POST" action="?/update" onsubmit={requestSave}>
 			<div class="grid gap-3 sm:grid-cols-2">
 				<label class="block space-y-1 text-xs font-medium text-slate-700">
 					Expense Type
@@ -267,15 +293,10 @@
 					/>
 				</label>
 			</div>
-			<button
-				class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]"
-				type="submit"
-			>
-				Save changes
-			</button>
 		</form>
-		<div class="border-t border-slate-200 px-5 py-4">
-			<form method="POST" action="?/delete">
+		<!-- Action bar: both buttons right-aligned at the bottom -->
+		<div class="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
+			<form bind:this={deleteFormEl} method="POST" action="?/delete" onsubmit={requestDelete}>
 				<button
 					class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 hover:bg-rose-100"
 					type="submit"
@@ -283,8 +304,64 @@
 					Delete record
 				</button>
 			</form>
+			<button
+				class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]"
+				type="button"
+				onclick={() => editFormEl?.requestSubmit()}
+			>
+				Save changes
+			</button>
 		</div>
 	</details>
 </div>
+
+<!-- Confirmation dialog -->
+{#if confirmAction !== null}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+	>
+		<div class="mx-4 w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+			{#if confirmAction === 'save'}
+				<div class="border-b border-slate-200 px-6 py-4">
+					<p class="text-[11px] font-semibold uppercase tracking-wide text-amber-600">Confirm changes</p>
+					<h3 class="mt-1 text-base font-semibold text-slate-900">Save expense record?</h3>
+				</div>
+				<div class="px-6 py-4 text-sm text-slate-600">
+					<p>You are about to update this financial expense record. This action will be logged and relevant team members will be notified.</p>
+					<p class="mt-2 text-xs text-slate-400">Record: <span class="font-mono">{data.expense.id}</span></p>
+				</div>
+			{:else}
+				<div class="border-b border-rose-100 bg-rose-50 px-6 py-4">
+					<p class="text-[11px] font-semibold uppercase tracking-wide text-rose-600">Destructive action</p>
+					<h3 class="mt-1 text-base font-semibold text-rose-900">Delete this record?</h3>
+				</div>
+				<div class="px-6 py-4 text-sm text-slate-600">
+					<p>This expense record will be permanently removed from the project. <strong class="text-slate-800">This cannot be undone.</strong> Relevant team members will be notified.</p>
+					<p class="mt-2 text-xs text-slate-400">Record: <span class="font-mono">{data.expense.id}</span></p>
+				</div>
+			{/if}
+			<div class="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+				<button
+					class="rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+					type="button"
+					onclick={cancelConfirm}
+				>
+					Cancel
+				</button>
+				<button
+					class={confirmAction === 'delete'
+						? 'rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700'
+						: 'rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]'}
+					type="button"
+					onclick={confirmAndSubmit}
+				>
+					{confirmAction === 'delete' ? 'Yes, delete' : 'Yes, save changes'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 
