@@ -47,7 +47,13 @@ export {
 	FINANCE_CATEGORY_CATALOG
 } from './workflows/financial-document-intake/categories';
 export type { CategoryDefinition } from './workflows/financial-document-intake/categories';
-export { createFinanceTaskService, type FinanceTaskService } from './services/finance-task-service';
+export {
+	createFinanceTaskService,
+	type FinanceTaskService,
+	getTodayBriefItems,
+	type TodayBriefItem,
+	type TodayBriefData
+} from './services/finance-task-service';
 export { financeManifestV2 };
 export {
 	financeAgentManifest,

@@ -19,6 +19,8 @@ function readSetCookie(headers: Headers): string {
 	return cookiePairs(headers.get('set-cookie') ?? h.map?.['set-cookie'] ?? null);
 }
 
+// test
+
 export class SmartFinApi {
 	private baseUrl: string;
 	private cookie = '';

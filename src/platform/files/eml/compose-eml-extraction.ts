@@ -1,0 +1,246 @@
+/**
+ * Smart EML text composition for AI extraction.
+ *
+ * Treats email structure as two layers:
+ *   - Navigation layer: cleaned email body — provides context, names the
+ *     relevant attachments, may contain inline financial figures.
+ *   - Data layer: the one or two most financially-relevant attachments —
+ *     the actual invoice / receipt / PO / contract PDF or image.
+ *
+ * Output is: [email context header + truncated body] + [attachment text(s)].
+ * If no relevant attachment can be extracted, falls back to the full
+ * body-only output (same as emlToPlainText).
+ */
+
+import type { EmlStructuredResult, EmlAttachment } from './parse-eml';
+import { extractTextFromBytesRaw } from '../../ai/text-extraction';
+import { routeEmlAttachmentsViaLlm } from './route-eml-attachments';
+
+// ---------------------------------------------------------------------------
+// Attachment relevance scoring
+// ---------------------------------------------------------------------------
+
+const FINANCIAL_FILENAME_KEYWORDS = [
+	'invoice', 'inv', 'receipt', 'payment', 'purchase', 'order',
+	'quotation', 'quote', 'contract', 'statement', 'remittance',
+	'proforma', 'delivery', 'bill', 'tax', 'po', 'do'
+];
+
+/** Minimum score to consider an attachment worth extracting. */
+const MIN_RELEVANCE_SCORE = 3;
+
+/** Documents (PDF/DOCX) fill these slots first. */
+const MAX_DOCUMENT_ATTACHMENTS = 3;
+/** Images fill whatever slots remain after documents, up to this cap.
+ *  Images are supplementary — they can contain payment details, receipts,
+ *  or other financial content that complements the main document. */
+const MAX_IMAGE_ATTACHMENTS = 1;
+/** Hard total cap across all types to prevent token explosion. */
+const MAX_TOTAL_ATTACHMENTS = 3;
+
+/**
+ * Resolve the effective MIME type for an attachment.
+ * Outlook frequently sends PDFs as application/octet-stream — we detect
+ * the true type from the filename extension.
+ */
+function effectiveMime(att: EmlAttachment): string {
+	if (att.mimeType !== 'application/octet-stream') return att.mimeType;
+	const lower = att.filename.toLowerCase();
+	if (lower.endsWith('.pdf')) return 'application/pdf';
+	if (lower.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+	if (lower.endsWith('.doc')) return 'application/msword';
+	return att.mimeType;
+}
+
+/**
+ * Score an attachment's financial relevance.
+ *
+ * Criteria:
+ *  - Right MIME type (PDF / image / DOCX) → base score
+ *  - Filename contains financial keywords → strong signal
+ *  - Email body or subject mentions the filename (without extension) → strong signal
+ *  - Email body contains financial keywords → weak signal (context confirmation)
+ */
+/** True for PDF / DOCX / DOC — the actual financial document. False for images. */
+function isDocumentMime(mime: string): boolean {
+	return (
+		mime === 'application/pdf' ||
+		mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+		mime === 'application/msword'
+	);
+}
+
+function scoreAttachment(
+	att: EmlAttachment,
+	bodyText: string,
+	subject: string
+): number {
+	// Skip Outlook-generated inline CID images (logos, icons, social badges).
+	// These are structural email decoration, not financial documents.
+	if (/^Outlook-[A-Za-z0-9]/i.test(att.filename)) return 0;
+
+	const mime = effectiveMime(att);
+	let score = 0;
+
+	// Extractable MIME type — necessary but not sufficient
+	if (mime === 'application/pdf') score += 3;
+	else if (mime.startsWith('image/')) score += 2;  // lower base for images
+	else if (mime.includes('wordprocessingml')) score += 2;
+	else return 0; // non-extractable type, skip immediately
+
+	const name = att.filename.toLowerCase();
+	const context = (bodyText + ' ' + subject).toLowerCase();
+
+	// Filename contains financial keywords
+	for (const kw of FINANCIAL_FILENAME_KEYWORDS) {
+		if (name.includes(kw)) {
+			score += 5;
+			break;
+		}
+	}
+
+	// Body / subject explicitly mentions this file (min 6 chars to avoid
+	// generic names like "image", "photo", "doc" matching too broadly).
+	const nameNoExt = name.replace(/\.[^.]+$/, '');
+	if (nameNoExt.length >= 6 && context.includes(nameNoExt)) score += 4;
+
+	// Body contains at least one financial keyword (contextual confirmation)
+	if (FINANCIAL_FILENAME_KEYWORDS.some((kw) => context.includes(kw))) score += 1;
+
+	return score;
+}
+
+// ---------------------------------------------------------------------------
+// Per-format text extraction from raw bytes
+// ---------------------------------------------------------------------------
+
+const MIN_USEFUL_TEXT = 48;
+
+async function extractFromBytes(
+	att: EmlAttachment,
+	env?: Env
+): Promise<string | null> {
+	const bytes = att.bytes;
+	if (!bytes || bytes.byteLength === 0) return null;
+	if (!env) return null;
+
+	// Delegate to the canonical extraction path used for directly-uploaded files.
+	// EML attachments are just files wrapped inside an email envelope.
+	const mime = effectiveMime(att);
+	const result = await extractTextFromBytesRaw(bytes, mime, att.filename, env);
+	return result.text && result.text.length >= MIN_USEFUL_TEXT ? result.text : null;
+}
+
+// ---------------------------------------------------------------------------
+// Public composition function
+// ---------------------------------------------------------------------------
+
+/**
+ * Compose the final text fed to AI classification + field extraction.
+ *
+ * Structure:
+ *   [Email header: From / Subject]
+ *   [Cleaned body, capped at EMAIL_BODY_CAP chars]
+ *
+ *   --- Attachment: filename.pdf ---
+ *   [extracted attachment text]
+ *
+ * Falls back to body-only + attachment name list when no attachment
+ * yields extractable text.
+ */
+const EMAIL_BODY_CAP = 1_000;
+
+/**
+ * Sanitize a single email header value or filename before including it in
+ * LLM input. Strips control characters (potential prompt injection vectors),
+ * collapses whitespace, and truncates to a safe length.
+ */
+function sanitizeHeader(value: string, maxLength = 200): string {
+	return value
+		.replace(/[\x00-\x1f\x7f]/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.slice(0, maxLength);
+}
+
+export async function composeEmlText(
+	structured: EmlStructuredResult,
+	env?: Env
+): Promise<string> {
+	const { subject, from, to, date, bodyText, attachments } = structured;
+
+	// --- Attachment selection ---
+	// Stage 1: try LLM routing (understands email context, explicit filename
+	//          mentions, thread structure). Falls back to keyword scoring if
+	//          the AI binding is absent or the call fails.
+	let selected: Array<{ att: EmlAttachment; mime: string }> = [];
+
+	const routedFilenames = env ? await routeEmlAttachmentsViaLlm(structured, env) : null;
+
+	if (routedFilenames) {
+		// LLM returned a validated filename list — use it directly.
+		// Still apply effectiveMime so extractFromBytes works correctly.
+		const nameIndex = new Map(attachments.map((a) => [a.filename.toLowerCase(), a]));
+		selected = routedFilenames
+			.map((f) => nameIndex.get(f.toLowerCase()))
+			.filter((att): att is EmlAttachment => att !== undefined && att.bytes !== undefined)
+			.map((att) => ({ att, mime: effectiveMime(att) }))
+			.slice(0, MAX_TOTAL_ATTACHMENTS);
+	} else {
+		// Fallback: keyword scoring with tiered document-first selection.
+		const scored = attachments
+			.filter((a) => a.bytes)
+			.map((att) => ({ att, mime: effectiveMime(att), score: scoreAttachment(att, bodyText, subject) }))
+			.filter(({ score }) => score >= MIN_RELEVANCE_SCORE)
+			.sort((a, b) => b.score - a.score);
+
+		const docCandidates = scored.filter(({ mime }) => isDocumentMime(mime));
+		const imageCandidates = scored.filter(({ mime }) => mime.startsWith('image/'));
+		const docs = docCandidates.slice(0, MAX_DOCUMENT_ATTACHMENTS);
+		const remainingSlots = Math.max(0, MAX_TOTAL_ATTACHMENTS - docs.length);
+		const images = imageCandidates.slice(0, Math.min(MAX_IMAGE_ATTACHMENTS, remainingSlots));
+		selected = [...docs, ...images];
+	}
+
+	// Extract text from selected attachments.
+	const extractedParts: Array<{ filename: string; text: string }> = [];
+	for (const { att } of selected) {
+		const text = await extractFromBytes(att, env);
+		if (text && text.length >= MIN_USEFUL_TEXT) {
+			extractedParts.push({ filename: att.filename, text });
+		}
+	}
+
+	// Build output.
+	const parts: string[] = [];
+
+	// Email context header — sanitized before inclusion in LLM input.
+	const headerLines: string[] = [];
+	if (from) headerLines.push(`From: ${sanitizeHeader(from)}`);
+	if (to) headerLines.push(`To: ${sanitizeHeader(to)}`);
+	if (subject) headerLines.push(`Subject: ${sanitizeHeader(subject)}`);
+	if (date) headerLines.push(`Date: ${sanitizeHeader(date, 80)}`);
+	if (headerLines.length) parts.push(headerLines.join('\n'));
+
+	// Truncated body — context layer, not the primary data source.
+	if (bodyText) {
+		parts.push(bodyText.length > EMAIL_BODY_CAP ? bodyText.slice(0, EMAIL_BODY_CAP) + '[...]' : bodyText);
+	}
+
+	// Always list all attachment filenames — the LLM needs filename hints even
+	// when text extraction fails (e.g. compressed PDFs via byte heuristic).
+	const nameList = attachments.map((a) => {
+		const mime = effectiveMime(a);
+		return `- ${sanitizeHeader(a.filename, 120)} (${sanitizeHeader(mime, 80)})`;
+	});
+	if (nameList.length > 0) {
+		parts.push('Attachments:\n' + nameList.join('\n'));
+	}
+
+	// Data layer: extracted attachment content (additive, not replacing the list).
+	for (const { filename, text } of extractedParts) {
+		parts.push(`--- Attachment: ${sanitizeHeader(filename, 120)} ---\n${text}`);
+	}
+
+	return parts.filter(Boolean).join('\n\n').trim();
+}

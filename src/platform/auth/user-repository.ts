@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { DBClient } from '$infrastructure/db';
 import { BaseRepository } from '$platform/modules/base-repository';
 import { users } from './users.schema';
@@ -15,5 +15,12 @@ export class UserRepository extends BaseRepository<typeof users> {
 			.where(and(eq(users.email, email), isNull(users.deletedAt)))
 			.limit(1);
 		return rows[0] ?? null;
+	}
+
+	async findByRoles(roles: Array<typeof users.$inferSelect['role']>) {
+		return this.db
+			.select({ id: users.id, email: users.email, name: users.name, role: users.role })
+			.from(users)
+			.where(and(inArray(users.role, roles), isNull(users.deletedAt)));
 	}
 }

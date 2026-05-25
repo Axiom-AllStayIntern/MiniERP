@@ -165,6 +165,9 @@ export const suggestedFieldsResultSchema = z.object({
 	fields: z.record(z.string(), z.unknown()),
 	confidence: z.record(z.string(), z.number().min(0).max(1)).optional(),
 	evidence: z.unknown().optional(),
+	/** Verbatim text excerpts keyed by LLM camelCase field name. Used by the review UI
+	 *  to highlight the source sentence in the raw-text panel when the user focuses a field. */
+	sourceQuotes: z.record(z.string(), z.string()).optional(),
 	categoryId: z.string(),
 	extractedAt: z.string()
 });

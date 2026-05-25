@@ -27,7 +27,7 @@ const MANUAL_GST_BOX_KEYS = [
 
 type ManualGstBoxKey = (typeof MANUAL_GST_BOX_KEYS)[number];
 
-function getQuarterRange(year: string, quarter: string) {
+export function getQuarterRange(year: string, quarter: string) {
 	const y = Number.parseInt(year, 10);
 	const q = Number.parseInt(quarter, 10);
 	if (!Number.isFinite(y) || ![1, 2, 3, 4].includes(q)) {
@@ -44,7 +44,7 @@ function getQuarterRange(year: string, quarter: string) {
 	};
 }
 
-function calcCorporateTax(taxableIncome: number) {
+export function calcCorporateTax(taxableIncome: number) {
 	const firstBand = Math.min(taxableIncome, 10000) * 0.0425;
 	const secondBand = Math.min(Math.max(taxableIncome - 10000, 0), 190000) * 0.085;
 	const thirdBand = Math.max(taxableIncome - 200000, 0) * 0.17;

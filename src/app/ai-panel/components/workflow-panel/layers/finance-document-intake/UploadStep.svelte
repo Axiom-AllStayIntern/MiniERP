@@ -7,6 +7,7 @@
 		type DocumentArtifactPostResponse,
 		type DocumentProcessingStatus
 	} from '$app-layer/ai-panel/workflow/finance-workflow-api';
+	import { extractEmlClientText } from '$app-layer/ai-panel/workflow/extract-eml-client';
 
 	type Stage = 'idle' | 'expanding' | 'parsing' | 'storing' | 'queued' | 'error';
 
@@ -21,7 +22,7 @@
 	const TERMINAL_BAD: DocumentProcessingStatus[] = ['needs_manual_review', 'failed'];
 	const MIN_USEFUL_CLIENT_TEXT = 48;
 	const MAX_BATCH_FILES = 25;
-	const SUPPORTED_DOCUMENT_EXT_RE = /\.(pdf|png|jpe?g|webp)$/i;
+	const SUPPORTED_DOCUMENT_EXT_RE = /\.(pdf|docx|doc|eml|png|jpe?g|webp)$/i;
 	const ZIP_EXT_RE = /\.zip$/i;
 
 	// ---------------------------------------------------------------------------
@@ -110,6 +111,10 @@
 
 	function inferMimeType(fileName: string, fallback = 'application/octet-stream'): string {
 		if (/\.pdf$/i.test(fileName)) return 'application/pdf';
+		if (/\.docx$/i.test(fileName))
+			return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+		if (/\.doc$/i.test(fileName)) return 'application/msword';
+		if (/\.eml$/i.test(fileName)) return 'message/rfc822';
 		if (/\.png$/i.test(fileName)) return 'image/png';
 		if (/\.jpe?g$/i.test(fileName)) return 'image/jpeg';
 		if (/\.webp$/i.test(fileName)) return 'image/webp';
@@ -120,6 +125,9 @@
 		const mime = (file.type || '').toLowerCase();
 		return (
 			mime === 'application/pdf' ||
+			mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+			mime === 'application/msword' ||
+			mime === 'message/rfc822' ||
 			mime === 'image/png' ||
 			mime === 'image/jpeg' ||
 			mime === 'image/webp' ||
@@ -170,15 +178,84 @@
 		return expanded.slice(0, MAX_BATCH_FILES);
 	}
 
+	async function extractDocxTextClient(file: File): Promise<string> {
+		try {
+			const { unzipSync, strFromU8 } = await import('fflate');
+			const bytes = new Uint8Array(await file.arrayBuffer());
+			const files = unzipSync(bytes);
+			const docXmlBytes = files['word/document.xml'];
+			if (!docXmlBytes) return '';
+			const xml = strFromU8(docXmlBytes, false);
+			const parts: string[] = [];
+			const pRe = /<w:p\b[^>]*>[\s\S]*?<\/w:p>/g;
+			let m: RegExpExecArray | null;
+			while ((m = pRe.exec(xml)) !== null) {
+				const tRe = /<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g;
+				const ts: string[] = [];
+				let tm: RegExpExecArray | null;
+				while ((tm = tRe.exec(m[0])) !== null) {
+					ts.push(
+						tm[1]
+							.replace(/&amp;/g, '&')
+							.replace(/&lt;/g, '<')
+							.replace(/&gt;/g, '>')
+							.replace(/&quot;/g, '"')
+							.replace(/&apos;/g, "'")
+					);
+				}
+				const line = ts.join('').replace(/\s+/g, ' ').trim();
+				if (line) parts.push(line);
+			}
+			return parts.join('\n');
+		} catch {
+			return '';
+		}
+	}
+
 	async function buildClientExtraction(file: File): Promise<ClientExtraction> {
 		const mime = (file.type || '').toLowerCase();
 		const name = file.name.toLowerCase();
 		const isPdf = mime === 'application/pdf' || name.endsWith('.pdf');
 		const isImage =
 			mime.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(name);
+		const isDocx =
+			mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+			name.endsWith('.docx');
 
 		if (isImage) {
 			// Server-side vision OCR will handle this; nothing to extract on client.
+			return { text: '', method: 'manual', uploadFile: file };
+		}
+
+		if (isDocx) {
+			const text = await extractDocxTextClient(file).catch(() => '');
+			if (text.length >= MIN_USEFUL_CLIENT_TEXT) {
+				return { text, method: 'manual', uploadFile: file };
+			}
+			// Extraction failed (e.g. scanned/image DOCX); server will handle.
+			return { text: '', method: 'manual', uploadFile: file };
+		}
+
+		// EML: parse client-side, extract text from the financial attachment inside
+		// (PDF via pdfjs, DOCX via XML parse). The email body is just context.
+		if (mime === 'message/rfc822' || name.endsWith('.eml')) {
+			const result = await extractEmlClientText(file, {
+				pdf: extractPdfText,
+				pdfPageRender: renderPdfFirstPageJpeg,
+				docx: extractDocxTextClient
+			}).catch(() => null);
+			if (result && result.text.length >= MIN_USEFUL_CLIENT_TEXT) {
+				return {
+					text: result.text,
+					method: result.method,
+					uploadFile: result.overrideUploadFile ?? file
+				};
+			}
+			return { text: '', method: 'manual', uploadFile: file };
+		}
+
+		// Legacy .doc: server handles extraction.
+		if (mime === 'application/msword' || name.endsWith('.doc')) {
 			return { text: '', method: 'manual', uploadFile: file };
 		}
 
@@ -225,7 +302,7 @@
 		try {
 			const files = await expandInputFiles(inputFiles);
 			if (files.length === 0) {
-				throw new Error('No supported PDF or image files were found.');
+				throw new Error('No supported files were found. Accepted: PDF, Word (.docx), email (.eml), and images.');
 			}
 
 			batchTotal = files.length;
@@ -366,7 +443,7 @@
 			{#if stage === 'error'}
 				{error}
 			{:else}
-				PDF, photo, or ZIP. Invoice, receipt, PO, customer invoice - I'll figure out the rest.
+				PDF, Word, email (.eml), photo, or ZIP. Invoice, receipt, PO, customer invoice - I'll figure out the rest.
 			{/if}
 		</span>
 
@@ -388,7 +465,7 @@
 	<input
 		bind:this={fileInput}
 		type="file"
-		accept="application/pdf,image/png,image/jpeg,image/webp,application/zip,.zip"
+		accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,message/rfc822,image/png,image/jpeg,image/webp,application/zip,.pdf,.docx,.doc,.eml,.zip"
 		multiple
 		onchange={onInputChange}
 		hidden

@@ -13,6 +13,7 @@
  */
 import type { ZodType } from 'zod';
 import { runStructuredOutput } from '../../../../platform/ai/ai-runtime';
+import { normalizeDocumentText, smartTruncate } from '../../../../platform/ai/text-preprocessing';
 import {
 	findCategoryById,
 	type CategoryDefinition,
@@ -53,6 +54,21 @@ import {
 
 const MIN_TEXT_LENGTH_FOR_REAL_EXTRACT = 32;
 
+/**
+ * Front-heavy truncation for POs and other documents where the critical
+ * structured fields (PO number, vendor, buyer, date, items, totals) are
+ * concentrated in the first few pages. The trailing pages are usually
+ * boilerplate T&C that the LLM doesn't need for field extraction.
+ *
+ * Strategy: allocate the full budget to the beginning of the document.
+ * If the first pass produces low confidence, the caller retries with a
+ * larger budget or the full text (see LOW_CONFIDENCE_THRESHOLD below).
+ */
+function truncateFrontHeavy(text: string, budget: number): string {
+	if (text.length <= budget) return text;
+	return text.slice(0, budget) + '\n\n[... remainder truncated ...]';
+}
+
 interface CapabilityContextWithEnv extends FinanceCapabilityContext {
 	env?: Env;
 }
@@ -73,6 +89,10 @@ export interface ExtractDocumentFieldsOutput {
 	fields: Record<string, unknown>;
 	confidence: number;
 	evidence: FinanceEvidence[];
+	/** Verbatim text excerpts keyed by the LLM's camelCase field name (e.g. supplierName, totalAmount).
+	 *  Used in the review UI to highlight the source sentence in the raw-text panel when the user
+	 *  focuses a field. Only present when the LLM path was taken; undefined for mock/fixture runs. */
+	sourceQuotes?: Record<string, string>;
 	provider: ExtractionProvider;
 }
 
@@ -285,7 +305,7 @@ async function tryLlmExtraction(
 	ctx: CapabilityContextWithEnv,
 	categoryId: string,
 	documentId: string
-): Promise<{ fields: CommonFields; confidence: number; provider: ExtractionProvider } | null> {
+): Promise<{ fields: CommonFields; confidence: number; provider: ExtractionProvider; quotes: Record<string, string> } | null> {
 	if (!ctx.env) return null;
 	const cfg = configForDocType(docType);
 	if (!cfg) return null;
@@ -312,13 +332,29 @@ async function tryLlmExtraction(
 		env: ctx.env
 	});
 
-	if (result.status !== 'success') return null;
-	const fields = cfg.mapToFields(result.result.value);
+	if (result.status !== 'success') {
+		console.warn(
+			`[extract-document-fields] LLM call failed for ${docType}/${documentId}: status=${result.status} error=${result.error}`
+		);
+		return null;
+	}
+	const raw = result.result.value;
+	const fields = cfg.mapToFields(raw);
 	if (!fields) return null;
-	const confidence = cfg.confidenceFromValue(result.result.value) ?? 0.8;
+	const confidence = cfg.confidenceFromValue(raw) ?? 0.8;
 	const provider: ExtractionProvider =
 		result.result.meta.providerId === 'workers_ai' ? 'workers_ai' : 'external_api';
-	return { fields, confidence, provider };
+
+	// Extract verbatim source quotes from the optional _quotes key.
+	const rawQuotes = (raw as Record<string, unknown>)._quotes;
+	const quotes: Record<string, string> = {};
+	if (rawQuotes && typeof rawQuotes === 'object' && !Array.isArray(rawQuotes)) {
+		for (const [k, v] of Object.entries(rawQuotes as Record<string, unknown>)) {
+			if (typeof v === 'string' && v.trim().length > 0) quotes[k] = v.trim();
+		}
+	}
+
+	return { fields, confidence, provider, quotes };
 }
 
 // ---------------------------------------------------------------------------
@@ -464,25 +500,67 @@ export const extractDocumentFieldsCapability: FinanceCapability<
 		}
 
 		// 2. Real extracted text always goes through the category-specific LLM schema.
-		const llm = await tryLlmExtraction(
-			input.text,
-			docType,
-			ctxWithEnv,
-			category?.id ?? input.categoryId ?? 'unknown',
-			input.documentId
-		);
+		// Normalize and truncate per doc-type budget before sending to the LLM.
+		// Contracts/quotations get more budget (key data can appear on the last page);
+		// receipts and invoices are almost always single-page.
+		const TEXT_BUDGET: Partial<Record<NonNullable<CategoryDocType>, number>> = {
+			invoice: 10_000,
+			receipt: 6_000,
+			po: 15_000,
+			invoice_out: 10_000,
+			contract: 16_000,
+			quotation: 12_000,
+			purchase_order_doc: 15_000
+		};
+		const EXPANDED_BUDGET: Partial<Record<NonNullable<CategoryDocType>, number>> = {
+			po: 20_000,
+			purchase_order_doc: 20_000
+		};
+		const LOW_CONFIDENCE_THRESHOLD = 0.4;
+
+		const normalized = normalizeDocumentText(input.text);
+		const isPo = docType === 'po' || docType === 'purchase_order_doc';
+		const budget = docType ? TEXT_BUDGET[docType] ?? 12_000 : 12_000;
+
+		// POs and multi-page documents: allocate the full budget to the front.
+		// Most structured fields (PO number, vendor, date, items, totals) appear
+		// in the first few pages; trailing pages are T&C boilerplate.
+		const processedText = isPo
+			? truncateFrontHeavy(normalized, budget)
+			: smartTruncate(normalized, budget);
+
+		const categoryIdRef = category?.id ?? input.categoryId ?? 'unknown';
+		let llm = await tryLlmExtraction(processedText, docType, ctxWithEnv, categoryIdRef, input.documentId);
+
+		// Retry with expanded budget or full text when confidence is very low.
+		if (isPo && (!llm || llm.confidence < LOW_CONFIDENCE_THRESHOLD) && normalized.length > budget) {
+			const expandedBudget = docType ? EXPANDED_BUDGET[docType] ?? normalized.length : normalized.length;
+			const expandedText = expandedBudget >= normalized.length
+				? normalized
+				: truncateFrontHeavy(normalized, expandedBudget);
+			console.log(
+				`[extract-document-fields] PO low confidence (${llm?.confidence ?? 0}), retrying with ${expandedText.length} chars (was ${processedText.length})`
+			);
+			const retry = await tryLlmExtraction(expandedText, docType, ctxWithEnv, categoryIdRef, input.documentId);
+			if (retry && (!llm || retry.confidence > llm.confidence)) llm = retry;
+		}
+
 		if (llm) {
 			const fields = outputFor(llm.fields, category, input.outputShape);
 			return {
 				fields,
 				confidence: llm.confidence,
 				evidence: buildEvidenceForFields(llm.provider, fields),
+				sourceQuotes: Object.keys(llm.quotes).length > 0 ? llm.quotes : undefined,
 				provider: llm.provider
 			};
 		}
 
 		// 3. LLM failed or returned an unusable shape. Leave fields blank instead
 		// of falling back to regex/mock values.
+		console.warn(
+			`[extract-document-fields] extraction produced no usable fields for ${docType}/${input.documentId} (categoryId=${input.categoryId})`
+		);
 		const fields: Record<string, unknown> = {};
 		return {
 			fields,

@@ -1,6 +1,7 @@
 import type { DocumentClassificationResult } from '../../schemas/document-artifact.schema';
 import { buildClassification } from './mock';
 import { callAiJsonWithSource } from '$platform/ai/json-provider';
+import { normalizeDocumentText, smartTruncate } from '$platform/ai/text-preprocessing';
 
 export interface ClassifyDocumentInput {
 	text: string;
@@ -108,7 +109,7 @@ Definitions:
 - unknown: too ambiguous.
 
 For invoices, decide by economic direction and party roles, not by the words "Tax Invoice" alone.`,
-		user: `${filenameHint(input.fileName)}\n\n${input.text.slice(0, 12000)}`
+		user: `${filenameHint(input.fileName)}\n\n${smartTruncate(normalizeDocumentText(input.text), 12000)}`
 	});
 
 	if (!result.json || typeof result.json !== 'object' || Array.isArray(result.json)) return null;

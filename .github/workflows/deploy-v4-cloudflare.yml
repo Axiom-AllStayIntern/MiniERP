@@ -15,6 +15,7 @@ jobs:
       url: https://smartfin-v4.aki-wang.workers.dev
 
     steps:
+      # ── 1. Push ──────────────────────────────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -30,14 +31,26 @@ jobs:
       - name: Generate Cloudflare worker types
         run: npm run gen
 
-      - name: CI checks (type + static analysis)
-        run: npm run check
+      # ── 2. Lint + Types ───────────────────────────────────────────────────────
+      - name: Lint (tsc --noEmit)
+        run: npm run lint
 
+      - name: Svelte type check
+        run: npx svelte-kit sync && npx svelte-check --tsconfig ./tsconfig.json
+
+      # ── 3. Boundary ───────────────────────────────────────────────────────────
+      - name: Architecture boundary check
+        run: npm run check:modular-boundary
+
+      # ── 4. Unit Tests ─────────────────────────────────────────────────────────
+      - name: Unit tests (vitest run)
+        run: npm run test
+
+      # ── 5. Build ──────────────────────────────────────────────────────────────
       - name: Build
         run: npm run build
 
-      # 方案 A：沿用你现在的 secret put 方式
-      # 注意：secret put 会立即部署 worker
+      # ── 6. Deploy ─────────────────────────────────────────────────────────────
       - name: Sync v4 Worker secrets
         run: |
           test -n "$BETTER_AUTH_SECRET"

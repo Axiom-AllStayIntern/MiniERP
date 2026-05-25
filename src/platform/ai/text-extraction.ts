@@ -12,6 +12,13 @@
 import { runWorkersVisionOcr } from './ocr/workers-vision-ocr';
 import type { FileServiceContract } from '../files/file.types';
 import { pickMockFixtureText } from './text-extraction-fixtures';
+import {
+	tryExtractDocxPlainText,
+	looksLikeLegacyWordDoc,
+	looksLikeZip
+} from '../files/docx/extract-plain-text';
+import { parseEmlStructured } from '../files/eml/parse-eml';
+import { composeEmlText } from '../files/eml/compose-eml-extraction';
 
 export interface PlatformTextExtractionResult {
 	method: 'pdf_text' | 'vision_model' | 'manual';
@@ -67,6 +74,23 @@ function isImageMime(mime: string, fileName?: string): boolean {
 	return Boolean(fileName && /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(fileName));
 }
 
+function isDocxOrDocMime(mime: string, fileName?: string): boolean {
+	const m = mime.toLowerCase();
+	const n = (fileName || '').toLowerCase();
+	return (
+		m.includes('wordprocessingml.document') ||
+		m === 'application/msword' ||
+		/\.docx$/i.test(n) ||
+		(/\.doc$/i.test(n) && !/\.docx$/i.test(n))
+	);
+}
+
+function isEmlMime(mime: string, fileName?: string): boolean {
+	const m = mime.toLowerCase();
+	const n = (fileName || '').toLowerCase();
+	return m === 'message/rfc822' || n.endsWith('.eml');
+}
+
 function buildMockResult(input: ExtractTextInput): PlatformTextExtractionResult {
 	const fixture = pickMockFixtureText({
 		fileName: input.fileRef.fileName,
@@ -95,26 +119,21 @@ function buildFailure(
 }
 
 /**
- * Run text extraction. Phase 2 supports three paths:
- *  - PDF with a text layer (heuristic byte decode 鈥?same approach as the
- *    existing `$platform/ai/ocr/pipeline.ts:extractPdfText`).
- *  - Image (Workers AI vision via `runWorkersVisionOcr`).
- *  - Mock fixture (filename keyword lookup) when caller opts in or when the
- *    AI binding is missing.
+ * Core byte-level text extraction — the canonical single implementation.
  *
- * Scanned PDFs fall through to `needs_manual_review` in Phase 2; rasterized
- * page-1 vision fallback lands in Phase 4 alongside async processing.
+ * Called by both `extractTextFromBlob` (R2-backed files) and the EML pipeline
+ * (in-memory attachment bytes). Any new format support belongs here.
+ *
+ * Does NOT handle EML — that format wraps other documents and is handled a
+ * level up in `extractTextFromBlob` / `composeEmlText`.
  */
-export async function extractTextFromBlob(
-	input: ExtractTextInput
+export async function extractTextFromBytesRaw(
+	bytes: Uint8Array,
+	mimeType: string,
+	fileName: string | undefined,
+	env: Env
 ): Promise<PlatformTextExtractionResult> {
-	const { fileRef, fileService, env } = input;
-
-	if (input.useMock) {
-		return buildMockResult(input);
-	}
-
-	if (isPdfMime(fileRef.mimeType, fileRef.fileName)) {
+	if (isPdfMime(mimeType, fileName)) {
 		// DEPRECATED Ship 1: this byte-heuristic only "works" on PDFs whose text
 		// streams are uncompressed plain ASCII (extremely rare). For modern PDFs
 		// the bytes are mostly compressed Flate streams + structural keywords,
@@ -128,8 +147,6 @@ export async function extractTextFromBlob(
 		// Kept here as a last-resort fallback so non-AI-Panel upload sources
 		// (e.g. future email intake) don't crash, but it will mark the artifact
 		// as needs_manual_review for any non-trivial PDF.
-		const bytes = await fileService.getBytes(fileRef.key);
-		if (!bytes) return buildFailure('blob_not_found', `No object at ${fileRef.key}`, 'pdf_text');
 		const text = decodePdfHeuristicBytes(bytes);
 		const hasWordLikeAscii = /[A-Za-z]{4,}/.test(
 			text.replace(/\bobj\b|\bendobj\b|\bstream\b|\bendstream\b|\bxref\b/g, '')
@@ -157,17 +174,11 @@ export async function extractTextFromBlob(
 		};
 	}
 
-	if (isImageMime(fileRef.mimeType, fileRef.fileName)) {
+	if (isImageMime(mimeType, fileName)) {
 		if (!env.AI) {
-			// No AI binding 鈥?fall back to mock fixture so local dev still works.
-			return buildMockResult(input);
+			return buildFailure('no_ai_binding', 'Workers AI binding not available for image extraction.', 'vision_model');
 		}
-		const bytes = await fileService.getBytes(fileRef.key);
-		if (!bytes) return buildFailure('blob_not_found', `No object at ${fileRef.key}`, 'vision_model');
-		const result = await runWorkersVisionOcr(env, {
-			imageBytes: bytes,
-			mimeType: fileRef.mimeType
-		});
+		const result = await runWorkersVisionOcr(env, { imageBytes: bytes, mimeType });
 		if (!result.ok) {
 			return buildFailure('vision_failed', result.error, 'vision_model');
 		}
@@ -181,10 +192,107 @@ export async function extractTextFromBlob(
 		};
 	}
 
+	if (isDocxOrDocMime(mimeType, fileName)) {
+		const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+
+		// Legacy Word 97–2003 binary compound document — cannot parse without OLE library
+		if (looksLikeLegacyWordDoc(ab) && !looksLikeZip(ab)) {
+			return {
+				method: 'manual',
+				status: 'partial',
+				confidence: 0,
+				provider: 'docx_xml_parse',
+				error: {
+					code: 'legacy_doc_unsupported',
+					message:
+						'Legacy .doc (Word 97–2003) binary format cannot be parsed automatically. Please save as .docx and re-upload.'
+				}
+			};
+		}
+
+		const text = tryExtractDocxPlainText(ab);
+		if (text && text.length >= MIN_USEFUL_PDF_TEXT) {
+			return {
+				method: 'manual',
+				status: 'success',
+				text,
+				confidence: 0.9,
+				provider: 'docx_xml_parse'
+			};
+		}
+		return {
+			method: 'manual',
+			status: 'partial',
+			text: text ?? '',
+			confidence: 0.1,
+			provider: 'docx_xml_parse',
+			error: {
+				code: 'low_text_yield',
+				message: 'Could not extract usable text from this Word document.'
+			}
+		};
+	}
+
 	return buildFailure(
 		'unsupported_format',
-		`MIME type ${fileRef.mimeType || 'unknown'} is not supported by Phase 2 extraction.`,
+		`MIME type ${mimeType || 'unknown'} is not supported by Phase 2 extraction.`,
 		'manual'
 	);
+}
+
+/**
+ * Run text extraction. Phase 2 supports three paths:
+ *  - PDF with a text layer (heuristic byte decode — same approach as the
+ *    existing `$platform/ai/ocr/pipeline.ts:extractPdfText`).
+ *  - Image (Workers AI vision via `runWorkersVisionOcr`).
+ *  - Mock fixture (filename keyword lookup) when caller opts in or when the
+ *    AI binding is missing.
+ *
+ * Scanned PDFs fall through to `needs_manual_review` in Phase 2; rasterized
+ * page-1 vision fallback lands in Phase 4 alongside async processing.
+ */
+export async function extractTextFromBlob(
+	input: ExtractTextInput
+): Promise<PlatformTextExtractionResult> {
+	const { fileRef, fileService, env } = input;
+
+	if (input.useMock) {
+		return buildMockResult(input);
+	}
+
+	if (isEmlMime(fileRef.mimeType, fileRef.fileName)) {
+		const bytes = await fileService.getBytes(fileRef.key);
+		if (!bytes) return buildFailure('blob_not_found', `No object at ${fileRef.key}`, 'manual');
+		const raw = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+		const structured = parseEmlStructured(raw);
+		// composeEmlText routes attachments via LLM (falling back to keyword
+		// scoring), extracts each selected attachment via extractTextFromBytesRaw,
+		// and prepends the cleaned email body as navigation context.
+		const text = await composeEmlText(structured, env);
+		if (text.length >= MIN_USEFUL_PDF_TEXT) {
+			return {
+				method: 'manual',
+				status: 'success',
+				text,
+				confidence: 0.85,
+				provider: 'eml_mime_parse'
+			};
+		}
+		return buildFailure(
+			'low_text_yield',
+			'EML file appears to be empty or has no readable text content.',
+			'manual'
+		);
+	}
+
+	// Image path: fall back to mock when AI binding is absent (local dev).
+	if (isImageMime(fileRef.mimeType, fileRef.fileName) && !env.AI) {
+		return buildMockResult(input);
+	}
+
+	const bytes = await fileService.getBytes(fileRef.key);
+	if (!bytes) return buildFailure('blob_not_found', `No object at ${fileRef.key}`, 'pdf_text');
+
+	return extractTextFromBytesRaw(bytes, fileRef.mimeType, fileRef.fileName, env);
 }
 

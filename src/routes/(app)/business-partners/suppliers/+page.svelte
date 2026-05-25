@@ -1,7 +1,10 @@
 <script lang="ts">
 	import PageShell from '$app-layer/components/PageShell.svelte';
+	import { enhance } from '$app/forms';
 
 	let { data } = $props();
+
+	let pendingDeleteId = $state<string | null>(null);
 </script>
 
 <PageShell
@@ -67,12 +70,13 @@
 					<th class="px-4 py-3">Project Related</th>
 					<th class="px-4 py-3">Address</th>
 					<th class="px-4 py-3">Contacts</th>
+					<th class="px-4 py-3"></th>
 				</tr>
 			</thead>
 			<tbody class="divide-y divide-slate-100">
 				{#if data.suppliers.length === 0}
 					<tr>
-						<td colspan="7" class="px-4 py-8 text-center text-slate-500">
+						<td colspan="8" class="px-4 py-8 text-center text-slate-500">
 							No suppliers yet.
 							<a class="font-medium text-[var(--sf-green)] hover:underline" href="/business-partners/suppliers/new">Add your first supplier</a>
 							or open
@@ -81,37 +85,79 @@
 					</tr>
 				{:else}
 					{#each data.suppliers as s}
-						<tr class="hover:bg-slate-50/80">
-							<td class="px-4 py-3 font-medium text-slate-900">
-								<a class="hover:text-[var(--sf-green)] hover:underline" href={`/business-partners/suppliers/${s.id}`}>{s.name}</a>
-							</td>
-							<td class="px-4 py-3 text-slate-600">{s.contact ?? '-'}</td>
-							<td class="px-4 py-3 text-slate-600">{s.itemDescription ?? '-'}</td>
-							<td class="px-4 py-3 text-slate-600">{s.dateCreate ?? '-'}</td>
-							<td class="px-4 py-3 text-slate-600">{s.projectRelated ?? '-'}</td>
-							<td class="max-w-md truncate px-4 py-3 text-slate-600" title={s.address ?? ''}>{s.address ?? '-'}</td>
-							<td class="px-4 py-3 text-slate-600">
-								{#if s.contacts.length === 0}
-									�?
-								{:else}
-									{#each s.contacts as c, i}
-										<div class="text-xs">
-											<span class="font-medium text-slate-800">{c.name}</span>
-											{#if c.position}<span class="text-slate-500"> ({c.position})</span>{/if}
-											{#if c.phoneEmail}<span class="text-slate-500"> · {c.phoneEmail}</span>{/if}
-											{#if c.wechat}<span class="text-slate-500"> · WeChat: {c.wechat}</span>{/if}
-										</div>
-										{#if i < s.contacts.length - 1}
-											<div class="my-1 h-px w-full bg-slate-100"></div>
-										{/if}
-									{/each}
-								{/if}
-							</td>
-						</tr>
+						{#if pendingDeleteId === s.id}
+							<tr class="bg-red-50">
+								<td colspan="7" class="px-4 py-3 text-sm font-medium text-red-700">
+									Delete <span class="font-semibold">{s.name}</span>? This cannot be undone.
+								</td>
+								<td class="px-4 py-3">
+									<div class="flex items-center gap-2 justify-end">
+										<form
+											method="POST"
+											action="?/delete"
+											use:enhance={() => {
+												return ({ update }) => update({ reset: false });
+											}}
+										>
+											<input type="hidden" name="id" value={s.id} />
+											<button
+												type="submit"
+												class="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+											>
+												Confirm delete
+											</button>
+										</form>
+										<button
+											type="button"
+											class="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+											onclick={() => (pendingDeleteId = null)}
+										>
+											Cancel
+										</button>
+									</div>
+								</td>
+							</tr>
+						{:else}
+							<tr class="hover:bg-slate-50/80">
+								<td class="px-4 py-3 font-medium text-slate-900">
+									<a class="hover:text-[var(--sf-green)] hover:underline" href={`/business-partners/suppliers/${s.id}`}>{s.name}</a>
+								</td>
+								<td class="px-4 py-3 text-slate-600">{s.contact ?? '-'}</td>
+								<td class="px-4 py-3 text-slate-600">{s.itemDescription ?? '-'}</td>
+								<td class="px-4 py-3 text-slate-600">{s.dateCreate ?? '-'}</td>
+								<td class="px-4 py-3 text-slate-600">{s.projectRelated ?? '-'}</td>
+								<td class="max-w-md truncate px-4 py-3 text-slate-600" title={s.address ?? ''}>{s.address ?? '-'}</td>
+								<td class="px-4 py-3 text-slate-600">
+									{#if s.contacts.length === 0}
+										–
+									{:else}
+										{#each s.contacts as c, i}
+											<div class="text-xs">
+												<span class="font-medium text-slate-800">{c.name}</span>
+												{#if c.position}<span class="text-slate-500"> ({c.position})</span>{/if}
+												{#if c.phoneEmail}<span class="text-slate-500"> · {c.phoneEmail}</span>{/if}
+												{#if c.wechat}<span class="text-slate-500"> · WeChat: {c.wechat}</span>{/if}
+											</div>
+											{#if i < s.contacts.length - 1}
+												<div class="my-1 h-px w-full bg-slate-100"></div>
+											{/if}
+										{/each}
+									{/if}
+								</td>
+								<td class="px-4 py-3 text-right">
+									<button
+										type="button"
+										class="rounded-md px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
+										onclick={() => (pendingDeleteId = s.id)}
+									>
+										Delete
+									</button>
+								</td>
+							</tr>
+						{/if}
 					{/each}
 				{/if}
 			</tbody>
 		</table>
 	</div>
 </PageShell>
-

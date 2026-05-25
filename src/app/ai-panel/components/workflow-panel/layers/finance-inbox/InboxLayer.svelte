@@ -68,6 +68,30 @@
 	let isLoadingDiagnostics = $state(false);
 	let loadError = $state<string | null>(null);
 	let diagnosticsError = $state<string | null>(null);
+	let activeQuote = $state<string | null>(null);
+	let markEl = $state<HTMLElement | null>(null);
+
+	type HighlightSegments = { before: string; match: string; after: string } | null;
+
+	const highlightSegments = $derived(
+		(() => {
+			const rawText = diagnostics?.textExtraction?.rawText;
+			if (!rawText || !activeQuote) return null as HighlightSegments;
+			// Try exact match first, then case-insensitive.
+			let idx = rawText.indexOf(activeQuote);
+			if (idx === -1) idx = rawText.toLowerCase().indexOf(activeQuote.toLowerCase());
+			if (idx === -1) return null as HighlightSegments;
+			return {
+				before: rawText.slice(0, idx),
+				match: rawText.slice(idx, idx + activeQuote.length),
+				after: rawText.slice(idx + activeQuote.length)
+			} satisfies Exclude<HighlightSegments, null>;
+		})()
+	);
+
+	$effect(() => {
+		if (markEl) markEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	});
 
 	const TAB_LABELS: Record<Tab, string> = {
 		review: 'Ready',
@@ -303,6 +327,7 @@
 							{categories}
 							cancelHref={null}
 							onConfirmed={handleConfirmed}
+							onFieldHighlight={(q) => { activeQuote = q; }}
 						/>
 					</div>
 					<aside class="review-side">
@@ -360,7 +385,17 @@
 									<h3>Raw text</h3>
 									<span>{diagnostics.textExtraction?.textLength ?? 0} chars</span>
 								</div>
-								<pre class="raw-text">{diagnostics.textExtraction?.rawText || 'No raw text available.'}</pre>
+								<div class="raw-text" role="region" aria-label="Raw extracted text">
+									{#if diagnostics.textExtraction?.rawText}
+										{#if highlightSegments}
+											{highlightSegments.before}<mark bind:this={markEl} class="raw-text-mark">{highlightSegments.match}</mark>{highlightSegments.after}
+										{:else}
+											{diagnostics.textExtraction.rawText}
+										{/if}
+									{:else}
+										No raw text available.
+									{/if}
+								</div>
 							{:else}
 								<div class="review-message">Open a document to load review data.</div>
 							{/if}
@@ -797,13 +832,24 @@
 		max-height: 260px;
 		margin: 8px 0 0;
 		white-space: pre-wrap;
-		border: 1px solid #cbd5e1;
+		word-break: break-word;
+		border: 1px solid #e2e8f0;
 		border-radius: 10px;
-		background: #0f172a;
+		background: #f8fafc;
 		padding: 12px;
-		color: #f8fafc;
+		color: #334155;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 		font-size: 11.5px;
 		line-height: 1.55;
+		scroll-behavior: smooth;
+	}
+	.raw-text-mark {
+		background: #fef08a;
+		color: #1e293b;
+		border-radius: 3px;
+		padding: 1px 0;
+		outline: 2px solid #facc15;
+		outline-offset: 1px;
 	}
 	@media (min-width: 980px) {
 		.review-grid {

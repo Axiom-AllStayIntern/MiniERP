@@ -15,6 +15,7 @@ export function createBusinessPartnerApi(ctx: ModuleContext) {
 		search: svc.search.bind(svc),
 		create: svc.create.bind(svc),
 		update: svc.update.bind(svc),
+		deleteById: svc.softDelete.bind(svc),
 		createSupplier: svc.createSupplier.bind(svc),
 		updateSupplierWithContacts: svc.updateSupplierWithContacts.bind(svc),
 		// Legacy

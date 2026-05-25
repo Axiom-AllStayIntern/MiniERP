@@ -70,6 +70,12 @@ export class BusinessPartnerService {
 		return this.bpRepo.update(id, data);
 	}
 
+	async softDelete(id: string) {
+		const bp = await this.bpRepo.findById(id);
+		if (!bp) throw new NotFoundError('BusinessPartner', id);
+		await this.bpRepo.softDelete(id);
+	}
+
 	// Legacy customer access
 	async getCustomerById(id: string) {
 		return this.legacyCustomerRepo.findById(id);

@@ -31,7 +31,10 @@ const ABANDONABLE_STATUSES: DocumentProcessingStatus[] = [
 const SUPPORTED_MIME_PATTERNS = [
 	/^application\/pdf$/i,
 	/^image\//i,
-	/^application\/zip$/i // tolerate, but extraction will mark it failed
+	/^application\/zip$/i, // tolerate; ZIP expanded client-side into individual files
+	/^application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document$/i, // .docx
+	/^application\/msword$/i, // .doc (legacy; extraction returns partial)
+	/^message\/rfc822$/i // .eml
 ];
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
@@ -72,6 +75,9 @@ export interface FieldExtractorResult {
 	fields: Record<string, unknown>;
 	confidence: Record<string, number> | undefined;
 	evidence?: unknown;
+	/** Verbatim source quotes keyed by LLM camelCase field name. Passed through
+	 *  to suggestedFields so the review UI can highlight the source sentence. */
+	sourceQuotes?: Record<string, string>;
 	categoryId: string;
 }
 
@@ -444,6 +450,7 @@ export function createDocumentIntakeService(
 							fields: extracted.fields,
 							confidence: extracted.confidence,
 							evidence: extracted.evidence,
+							sourceQuotes: extracted.sourceQuotes,
 							categoryId: extracted.categoryId,
 							extractedAt: new Date().toISOString()
 						};
@@ -587,6 +594,7 @@ export function createDocumentIntakeService(
 		fields: Record<string, unknown>;
 		confidence?: Record<string, number>;
 		evidence?: unknown;
+		sourceQuotes?: Record<string, string>;
 		categoryId: string;
 	}): Promise<DocumentArtifact | null> {
 		const tenantId = input.tenantId ?? 'default';
@@ -596,6 +604,7 @@ export function createDocumentIntakeService(
 			fields: input.fields,
 			confidence: input.confidence,
 			evidence: input.evidence,
+			sourceQuotes: input.sourceQuotes,
 			categoryId: input.categoryId,
 			extractedAt: new Date().toISOString()
 		};

@@ -47,13 +47,18 @@
 		categories,
 		cancelHref = '/finance/inbox',
 		onConfirmed,
-		onAbandoned
+		onAbandoned,
+		onFieldHighlight
 	}: {
 		artifact: DocumentArtifactView;
 		categories: CategoryChoice[];
 		cancelHref?: string | null;
 		onConfirmed?: (result: ConfirmResult) => void | Promise<void>;
 		onAbandoned?: (artifact: DocumentArtifactView) => void | Promise<void>;
+		/** Called when a field input gains or loses focus. Provides the verbatim
+		 *  source quote from the LLM (if available) so the parent can highlight
+		 *  the matching text in the raw-text panel. Pass null on blur. */
+		onFieldHighlight?: (quote: string | null) => void;
 	} = $props();
 
 	const FIELD_META: Record<string, FieldMeta> = {
@@ -171,6 +176,22 @@
 	function uniqueFields(category: CategoryChoice | null): string[] {
 		if (!category) return [];
 		return [...new Set([...category.llmFields, ...category.userFields])];
+	}
+
+	/** Return the verbatim source quote for a given category field key, or null if unavailable.
+	 *  Resolves via FIELD_META aliases (e.g. supplier_name → supplierName / counterpartyName). */
+	function getFieldQuote(key: string): string | null {
+		const quotes = (artifact.suggestedFields as Record<string, unknown> | null)?.sourceQuotes as
+			| Record<string, string>
+			| undefined;
+		if (!quotes) return null;
+		const meta = FIELD_META[key];
+		const searchKeys = [key, ...(meta?.aliases ?? [])];
+		for (const alias of searchKeys) {
+			const q = quotes[alias];
+			if (q) return q;
+		}
+		return null;
 	}
 
 	const CATEGORY_BY_DOCUMENT_TYPE: Record<string, string[]> = {
@@ -625,6 +646,8 @@
 									class="mt-2 h-4 w-4 rounded border-slate-300 text-[var(--sf-green)] focus:ring-[var(--sf-green)]"
 									style="--sf-green: #387234;"
 									disabled={isConfirming || isAbandoning || isClosed}
+									onfocus={() => onFieldHighlight?.(getFieldQuote(key))}
+									onblur={() => onFieldHighlight?.(null)}
 								/>
 							{:else if meta.kind === 'textarea'}
 								<textarea
@@ -633,6 +656,8 @@
 									class="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-950 placeholder:text-slate-400 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-600 {confidenceClass(key)}"
 									style="--sf-green: #387234;"
 									disabled={isConfirming || isAbandoning || isClosed}
+									onfocus={() => onFieldHighlight?.(getFieldQuote(key))}
+									onblur={() => onFieldHighlight?.(null)}
 								></textarea>
 							{:else if meta.kind === 'select'}
 								<select
@@ -640,6 +665,8 @@
 									class="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-950 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-600 {confidenceClass(key)}"
 									style="--sf-green: #387234;"
 									disabled={isConfirming || isAbandoning || isClosed}
+									onfocus={() => onFieldHighlight?.(getFieldQuote(key))}
+									onblur={() => onFieldHighlight?.(null)}
 								>
 									{#each meta.options ?? [] as option}
 										<option value={option.value}>{option.label}</option>
@@ -653,6 +680,8 @@
 									class="mt-1 w-full rounded-md border px-3 py-2 text-sm text-slate-950 placeholder:text-slate-400 shadow-sm focus:border-[var(--sf-green)] focus:outline-none focus:ring-1 focus:ring-[var(--sf-green)] disabled:bg-slate-50 disabled:text-slate-600 {confidenceClass(key)}"
 									style="--sf-green: #387234;"
 									disabled={isConfirming || isAbandoning || isClosed}
+									onfocus={() => onFieldHighlight?.(getFieldQuote(key))}
+									onblur={() => onFieldHighlight?.(null)}
 								/>
 							{/if}
 						</label>

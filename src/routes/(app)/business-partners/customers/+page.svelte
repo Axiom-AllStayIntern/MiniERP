@@ -1,7 +1,10 @@
 <script lang="ts">
 	import PageShell from '$app-layer/components/PageShell.svelte';
+	import { enhance } from '$app/forms';
 
 	let { data } = $props();
+
+	let pendingDeleteId = $state<string | null>(null);
 </script>
 
 <PageShell
@@ -28,12 +31,13 @@
 					<th class="px-4 py-3">Name</th>
 					<th class="px-4 py-3">Contact</th>
 					<th class="px-4 py-3">Address</th>
+					<th class="px-4 py-3"></th>
 				</tr>
 			</thead>
 			<tbody class="divide-y divide-slate-100">
 				{#if data.customers.length === 0}
 					<tr>
-						<td colspan="3" class="px-4 py-8 text-center text-slate-500">
+						<td colspan="4" class="px-4 py-8 text-center text-slate-500">
 							No customers yet.
 							<a class="font-medium text-[var(--sf-green)] hover:underline" href="/business-partners/customers/new">Add your first customer</a>
 							then create a project.
@@ -41,16 +45,57 @@
 					</tr>
 				{:else}
 					{#each data.customers as c}
-						<tr class="hover:bg-slate-50/80">
-							<td class="px-4 py-3 font-medium text-slate-900">{c.name}</td>
-							<td class="px-4 py-3 text-slate-600">{c.contact ?? '-'}</td>
-							<td class="max-w-md truncate px-4 py-3 text-slate-600" title={c.address ?? ''}>{c.address ?? '-'}</td>
-						</tr>
+						{#if pendingDeleteId === c.id}
+							<tr class="bg-red-50">
+								<td colspan="3" class="px-4 py-3 text-sm font-medium text-red-700">
+									Delete <span class="font-semibold">{c.name}</span>? This cannot be undone.
+								</td>
+								<td class="px-4 py-3">
+									<div class="flex items-center gap-2 justify-end">
+										<form
+											method="POST"
+											action="?/delete"
+											use:enhance={() => {
+												return ({ update }) => update({ reset: false });
+											}}
+										>
+											<input type="hidden" name="id" value={c.id} />
+											<button
+												type="submit"
+												class="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+											>
+												Confirm delete
+											</button>
+										</form>
+										<button
+											type="button"
+											class="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+											onclick={() => (pendingDeleteId = null)}
+										>
+											Cancel
+										</button>
+									</div>
+								</td>
+							</tr>
+						{:else}
+							<tr class="hover:bg-slate-50/80">
+								<td class="px-4 py-3 font-medium text-slate-900">{c.name}</td>
+								<td class="px-4 py-3 text-slate-600">{c.contact ?? '-'}</td>
+								<td class="max-w-md truncate px-4 py-3 text-slate-600" title={c.address ?? ''}>{c.address ?? '-'}</td>
+								<td class="px-4 py-3 text-right">
+									<button
+										type="button"
+										class="rounded-md px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
+										onclick={() => (pendingDeleteId = c.id)}
+									>
+										Delete
+									</button>
+								</td>
+							</tr>
+						{/if}
 					{/each}
 				{/if}
 			</tbody>
 		</table>
 	</div>
 </PageShell>
-
-
