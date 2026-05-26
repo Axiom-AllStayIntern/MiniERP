@@ -186,7 +186,7 @@ export async function extractTextFromBytesRaw(
 			method: 'vision_model',
 			status: 'success',
 			text: result.text,
-			confidence: result.hadRepetition ? 0.55 : 0.85,
+			confidence: 0.85,
 			provider: 'workers_ai',
 			providerJobId: result.model
 		};
