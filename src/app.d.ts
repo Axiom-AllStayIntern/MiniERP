@@ -19,7 +19,7 @@ declare global {
 		 */
 		DOCUMENT_QUEUE?: Queue;
 		AI?: Ai;
-		/** Workers AI vision model for document image OCR (default @cf/google/gemma-3-12b-it, fallback @cf/meta/llama-3.2-11b-vision-instruct). */
+		/** Workers AI vision model for document image OCR (default @cf/meta/llama-3.2-11b-vision-instruct). */
 		WORKERS_AI_VISION_MODEL?: string;
 		/** Local PaddleOCR HTTP service base or full `/ocr` URL (e.g. http://127.0.0.1:8765). When set, tried before Workers AI. */
 		PADDLE_OCR_URL?: string;

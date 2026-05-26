@@ -154,8 +154,8 @@ function deduplicateVisionText(raw: string): { text: string; hadRepetition: bool
 	return { text: raw, hadRepetition: false };
 }
 
-const DEFAULT_PRIMARY_MODEL = '@cf/google/gemma-3-12b-it';
-const DEFAULT_FALLBACK_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
+const DEFAULT_PRIMARY_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
+const DEFAULT_FALLBACK_MODEL = '';
 
 async function callVisionModel(
 	env: Env,
@@ -204,7 +204,7 @@ export async function runWorkersVisionOcr(
 
 	const envModel = readEnv(env, 'WORKERS_AI_VISION_MODEL');
 	const primaryModel = envModel || DEFAULT_PRIMARY_MODEL;
-	const fallbackModel = envModel ? null : DEFAULT_FALLBACK_MODEL;
+	const fallbackModel = (!envModel && DEFAULT_FALLBACK_MODEL) ? DEFAULT_FALLBACK_MODEL : null;
 
 	const mime = normalizeMime(input.mimeType);
 	const dataUri = `data:${mime};base64,${uint8ToBase64(input.imageBytes)}`;

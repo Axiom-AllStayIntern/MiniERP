@@ -280,7 +280,7 @@ Optional (external OCR/LLM): `OCR_API_URL`, `OCR_API_KEY`, `LLM_API_URL`, `LLM_A
 | Variable | Description |
 |----------|-------------|
 | `WORKERS_AI_MODEL` | Text LLM model (default `@cf/meta/llama-3.1-8b-instruct`) |
-| `WORKERS_AI_VISION_MODEL` | Vision OCR model (default `@cf/google/gemma-3-12b-it`, fallback `@cf/meta/llama-3.2-11b-vision-instruct`) |
+| `WORKERS_AI_VISION_MODEL` | Vision OCR model (default `@cf/meta/llama-3.2-11b-vision-instruct`) |
 | `PADDLE_OCR_URL` | Local PaddleOCR HTTP service URL (e.g. `http://127.0.0.1:8765`) |
 | `OCR_PADDLE_ONLY` | If `true`, use PaddleOCR only without Workers AI fallback |
 
