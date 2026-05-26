@@ -1,7 +1,6 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
-import { getDb } from '$infrastructure/db';
-import { resolveWorkerAuthEnv } from '$platform/auth/resolve-worker-env';
+import { createModuleContext } from '$platform/modules';
 import { UserRepository } from '$platform/auth/user-repository';
 import { AuditRepository } from '$platform/audit/audit-repository';
 import { parseRoles, authRoles, type AuthRole } from '$platform/auth/config';
@@ -12,11 +11,8 @@ export const load: PageServerLoad = async (event) => {
 		throw redirect(303, '/settings');
 	}
 
-	const env = resolveWorkerAuthEnv(event);
-	if (!env) return { users: [], allRoles: [...authRoles] };
-
-	const db = getDb(env);
-	const repo = new UserRepository(db);
+	const ctx = await createModuleContext(event);
+	const repo = new UserRepository(ctx.db);
 	const rawUsers = await repo.listAllUsers();
 
 	const users = rawUsers.map((u) => ({
@@ -35,9 +31,6 @@ export const actions: Actions = {
 			return fail(403, { message: 'Forbidden' });
 		}
 
-		const env = resolveWorkerAuthEnv(event);
-		if (!env) return fail(500, { message: 'Server not configured' });
-
 		const form = await event.request.formData();
 		const targetUserId = form.get('userId') as string;
 		const selectedRoles = form.getAll('role').filter((v): v is string => typeof v === 'string') as AuthRole[];
@@ -52,15 +45,15 @@ export const actions: Actions = {
 			return fail(400, { message: 'Cannot remove your own owner role' });
 		}
 
-		const db = getDb(env);
-		const repo = new UserRepository(db);
+		const ctx = await createModuleContext(event);
+		const repo = new UserRepository(ctx.db);
 		const targetUser = await repo.findById(targetUserId);
 		if (!targetUser) return fail(404, { message: 'User not found' });
 
 		const oldRoles = parseRoles(targetUser.role);
 		await repo.updateRoles(targetUserId, selectedRoles);
 
-		const audit = new AuditRepository(db);
+		const audit = new AuditRepository(ctx.db);
 		await audit.writeLog(user, {
 			action: 'user.roles_changed',
 			entityType: 'user',
@@ -77,19 +70,16 @@ export const actions: Actions = {
 			return fail(403, { message: 'Forbidden' });
 		}
 
-		const env = resolveWorkerAuthEnv(event);
-		if (!env) return fail(500, { message: 'Server not configured' });
-
 		const form = await event.request.formData();
 		const targetUserId = form.get('userId') as string;
 		if (!targetUserId) return fail(400, { message: 'User ID required' });
 		if (targetUserId === user.id) return fail(400, { message: 'Cannot deactivate yourself' });
 
-		const db = getDb(env);
-		const repo = new UserRepository(db);
+		const ctx = await createModuleContext(event);
+		const repo = new UserRepository(ctx.db);
 		await repo.deactivate(targetUserId);
 
-		const audit = new AuditRepository(db);
+		const audit = new AuditRepository(ctx.db);
 		await audit.writeLog(user, {
 			action: 'user.deactivated',
 			entityType: 'user',
@@ -105,18 +95,15 @@ export const actions: Actions = {
 			return fail(403, { message: 'Forbidden' });
 		}
 
-		const env = resolveWorkerAuthEnv(event);
-		if (!env) return fail(500, { message: 'Server not configured' });
-
 		const form = await event.request.formData();
 		const targetUserId = form.get('userId') as string;
 		if (!targetUserId) return fail(400, { message: 'User ID required' });
 
-		const db = getDb(env);
-		const repo = new UserRepository(db);
+		const ctx = await createModuleContext(event);
+		const repo = new UserRepository(ctx.db);
 		await repo.reactivate(targetUserId);
 
-		const audit = new AuditRepository(db);
+		const audit = new AuditRepository(ctx.db);
 		await audit.writeLog(user, {
 			action: 'user.reactivated',
 			entityType: 'user',

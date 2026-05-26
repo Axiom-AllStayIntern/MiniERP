@@ -1,11 +1,11 @@
 import type { RequestHandler } from './$types';
 import { getAuth } from '$platform/auth/better-auth';
 import { resolveWorkerAuthEnv } from '$platform/auth/resolve-worker-env';
-import { authRoles, parseRoles, type AuthRole } from '$platform/auth/config';
+import { parseRoles, type AuthRole } from '$platform/auth/config';
 import { UserRepository } from '$platform/auth/user-repository';
 import { InviteCodeRepository } from '$platform/auth/invite-code-repository';
 import { AuditRepository } from '$platform/audit/audit-repository';
-import { getDb } from '$infrastructure/db';
+import { createWorkerContext } from '$platform/modules';
 import { ok, fail } from '$platform/http';
 
 export const POST: RequestHandler = async (event) => {
@@ -31,10 +31,10 @@ export const POST: RequestHandler = async (event) => {
 		return fail('Password must be at least 8 characters', 400);
 	}
 
-	const db = getDb(env);
-	const userRepo = new UserRepository(db);
-	const inviteRepo = new InviteCodeRepository(db);
-	const auditRepo = new AuditRepository(db);
+	const ctx = await createWorkerContext(env);
+	const userRepo = new UserRepository(ctx.db);
+	const inviteRepo = new InviteCodeRepository(ctx.db);
+	const auditRepo = new AuditRepository(ctx.db);
 
 	const activeCount = await userRepo.countActive();
 	let roles: AuthRole[];
@@ -108,8 +108,8 @@ export const GET: RequestHandler = async (event) => {
 	const env = resolveWorkerAuthEnv(event);
 	if (!env) return fail('Server not configured', 500);
 
-	const db = getDb(env);
-	const userRepo = new UserRepository(db);
+	const ctx = await createWorkerContext(env);
+	const userRepo = new UserRepository(ctx.db);
 	const count = await userRepo.countActive();
 
 	return ok({ isFirstUser: count === 0 });

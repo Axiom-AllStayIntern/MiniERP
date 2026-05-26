@@ -1,9 +1,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
-import { getDb } from '$infrastructure/db';
-import { resolveWorkerAuthEnv } from '$platform/auth/resolve-worker-env';
+import { createModuleContext } from '$platform/modules';
 import { InviteCodeRepository } from '$platform/auth/invite-code-repository';
-import { UserRepository } from '$platform/auth/user-repository';
 import { AuditRepository } from '$platform/audit/audit-repository';
 import { parseRoles, authRoles, type AuthRole } from '$platform/auth/config';
 
@@ -20,11 +18,8 @@ export const load: PageServerLoad = async (event) => {
 		throw redirect(303, '/settings');
 	}
 
-	const env = resolveWorkerAuthEnv(event);
-	if (!env) return { invites: [], allRoles: [...authRoles] };
-
-	const db = getDb(env);
-	const repo = new InviteCodeRepository(db);
+	const ctx = await createModuleContext(event);
+	const repo = new InviteCodeRepository(ctx.db);
 	const rawInvites = await repo.listAll();
 
 	const now = new Date().toISOString();
@@ -45,9 +40,6 @@ export const actions: Actions = {
 			return fail(403, { message: 'Forbidden' });
 		}
 
-		const env = resolveWorkerAuthEnv(event);
-		if (!env) return fail(500, { message: 'Server not configured' });
-
 		const form = await event.request.formData();
 		const selectedRoles = form
 			.getAll('role')
@@ -60,9 +52,9 @@ export const actions: Actions = {
 		const invalid = selectedRoles.filter((r) => !authRoles.includes(r as AuthRole));
 		if (invalid.length > 0) return fail(400, { message: `Invalid roles: ${invalid.join(', ')}` });
 
-		const db = getDb(env);
-		const repo = new InviteCodeRepository(db);
-		const audit = new AuditRepository(db);
+		const ctx = await createModuleContext(event);
+		const repo = new InviteCodeRepository(ctx.db);
+		const audit = new AuditRepository(ctx.db);
 
 		const now = new Date();
 		const expiresAt = new Date(now.getTime() + expiresInDays * 24 * 60 * 60 * 1000);
@@ -96,18 +88,15 @@ export const actions: Actions = {
 			return fail(403, { message: 'Forbidden' });
 		}
 
-		const env = resolveWorkerAuthEnv(event);
-		if (!env) return fail(500, { message: 'Server not configured' });
-
 		const form = await event.request.formData();
 		const codeId = form.get('codeId') as string;
 		if (!codeId) return fail(400, { message: 'Code ID required' });
 
-		const db = getDb(env);
-		const repo = new InviteCodeRepository(db);
+		const ctx = await createModuleContext(event);
+		const repo = new InviteCodeRepository(ctx.db);
 		await repo.softDelete(codeId);
 
-		const audit = new AuditRepository(db);
+		const audit = new AuditRepository(ctx.db);
 		await audit.writeLog(user, {
 			action: 'invite_code.revoked',
 			entityType: 'invite_code',
