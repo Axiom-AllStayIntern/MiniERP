@@ -3786,7 +3786,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'[\"owner\"]'"
+          "default": "'owner'"
         },
         "created_at": {
           "name": "created_at",
