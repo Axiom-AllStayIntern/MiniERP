@@ -14,7 +14,7 @@
 		try {
 			const res = await fetch('/api/auth/register');
 			if (res.ok) {
-				const data = await res.json();
+				const data = (await res.json()) as { isFirstUser?: boolean };
 				isFirstUser = data.isFirstUser ?? false;
 			} else {
 				isFirstUser = false;
@@ -45,7 +45,7 @@
 				body: JSON.stringify(payload)
 			});
 
-			const data = await res.json();
+			const data = (await res.json()) as { error?: string };
 			if (!res.ok) {
 				error = data.error || 'Registration failed.';
 				loading = false;

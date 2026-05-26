@@ -57,7 +57,7 @@
 		exportingF5 = true;
 		try {
 			const response = await fetch(`/api/finance/tax/gst/${data.year}/${data.quarter}/f5`);
-			const result = await response.json();
+			const result = (await response.json()) as { ok: boolean; data?: unknown };
 			if (result.ok) {
 				const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
 				const url = URL.createObjectURL(blob);

@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ fetch, params }) => {
 		box: number;
 		invoices?: Array<Record<string, unknown>>;
 		records?: Array<Record<string, unknown>>;
-		breakdown?: { box6: number; box7: number; net: number };
+		breakdown?: { box6: number; box7: number; net: number; box9?: number; box10?: number; box11?: number; box12?: number };
 		manualValue?: number;
 		source?: string;
 		key?: string;

@@ -27,6 +27,7 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 		quarter: string;
 		range: { start: string; end: string };
 		boxes: Record<string, number>;
+		gstRate?: number;
 		meta?: { notes?: string[] };
 	}>;
 	const corporateJson = (await corporateResponse.json()) as ApiResult<{
