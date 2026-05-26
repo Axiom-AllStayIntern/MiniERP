@@ -19,7 +19,7 @@ export const PATCH: RequestHandler = async (event) => {
 	try {
 		const ctx = await createModuleContext(event);
 		const { categories } = createFinanceApi(ctx);
-		const body = await event.request.json();
+		const body = await event.request.json() as Record<string, unknown>;
 
 		if (body.action === 'deactivate') {
 			const result = await categories.deactivate(event.params.id);
@@ -34,8 +34,8 @@ export const PATCH: RequestHandler = async (event) => {
 		}
 
 		const updated = await categories.update(event.params.id, {
-			name: body.name,
-			parentId: body.parentId
+			name: body.name as string | undefined,
+			parentId: body.parentId as string | null | undefined
 		});
 		if (!updated) return fail('Category not found', 404);
 		return ok({ updated: true });

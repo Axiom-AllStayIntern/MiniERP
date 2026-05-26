@@ -31,7 +31,7 @@ export const POST: RequestHandler = async (event) => {
 	try {
 		const ctx = await createModuleContext(event);
 		const { categories } = createFinanceApi(ctx);
-		const body = await event.request.json();
+		const body = await event.request.json() as Record<string, unknown>;
 
 		if (body.action === 'sync') {
 			const result = await categories.syncFromCatalog();
@@ -43,8 +43,8 @@ export const POST: RequestHandler = async (event) => {
 		}
 
 		const row = await categories.create({
-			name: body.name,
-			parentId: body.parentId ?? null,
+			name: body.name as string,
+			parentId: (body.parentId as string) ?? null,
 			isSystem: false
 		});
 		return ok(row, 201);
