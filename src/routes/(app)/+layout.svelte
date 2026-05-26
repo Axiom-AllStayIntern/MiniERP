@@ -106,6 +106,13 @@
 		{
 			title: 'Configuration',
 			items: [{ href: '/settings', label: 'Workspace Settings', moduleId: 'core', icon: '*' }]
+		},
+		{
+			title: 'Team',
+			items: [
+				{ href: '/settings/users', label: 'Team Members', moduleId: 'core', icon: 'U' },
+				{ href: '/settings/invites', label: 'Invite Codes', moduleId: 'core', icon: '+' }
+			]
 		}
 	];
 
@@ -272,7 +279,7 @@
 				{#if data.user}
 					<div class="hidden items-center gap-2 text-xs sm:flex">
 						<span class="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">{data.user.email}</span>
-						<span class="rounded-full bg-[var(--sf-green-soft)] px-2.5 py-1 font-medium text-[var(--sf-green)]">{data.user.role}</span>
+						<span class="rounded-full bg-[var(--sf-green-soft)] px-2.5 py-1 font-medium text-[var(--sf-green)]">{data.user.roles.join(', ')}</span>
 					</div>
 					<button
 						type="button"

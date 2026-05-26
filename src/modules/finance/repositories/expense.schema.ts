@@ -78,6 +78,7 @@ export const expenses = sqliteTable('expenses', {
 	currency: text('currency').notNull().default('SGD'),
 	sgdEquivalent: real('sgd_equivalent'),
 	gstAmount: real('gst_amount').default(0),
+	gstCode: text('gst_code', { enum: ['SR', 'ZR', 'ES', 'OP'] }),
 
 	// Parties
 	vendorOrSupplier: text('vendor_or_supplier'),
@@ -104,7 +105,7 @@ export const revenue = sqliteTable('revenue', {
 	id: text('id').primaryKey(),
 
 	invoiceType: text('invoice_type', {
-		enum: ['standard', 'zero_rate', 'tax_invoice']
+		enum: ['standard', 'zero_rate', 'tax_invoice', 'exempt', 'out_of_scope']
 	}).notNull(),
 	invoiceNumber: text('invoice_number'),
 
@@ -116,6 +117,7 @@ export const revenue = sqliteTable('revenue', {
 	currency: text('currency').notNull().default('SGD'),
 	sgdEquivalent: real('sgd_equivalent'),
 	gstAmount: real('gst_amount').default(0),
+	gstCode: text('gst_code', { enum: ['SR', 'ZR', 'ES', 'OP'] }),
 
 	documentRef: text('document_ref'),
 	metadata: text('metadata'),

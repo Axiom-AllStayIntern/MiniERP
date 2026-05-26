@@ -7,7 +7,7 @@ import {
 	type ModulePathMapping
 } from '$platform/config';
 import type { AuthRole } from '$platform/auth/config';
-import { canRoleAccessModule } from '$platform/auth/permissions';
+import { canRolesAccessModule } from '$platform/auth/permissions';
 
 // Wave 3.4 + 3.5 terminal mappings — only the 5 v4 target business modules + core.
 // Routes are consolidated under /<module>/<sub> so each business domain owns a
@@ -56,15 +56,15 @@ export function moduleIdForPath(pathname: string): string | null {
 	return moduleForPath(pathname, MODULE_PATH_MAPPINGS);
 }
 
-export function isPathAllowedForRole(pathname: string, role: AuthRole, method = 'GET'): boolean {
-	if (role === 'finance' && method === 'GET' && pathname.startsWith('/api/projects')) {
+export function isPathAllowedForRole(pathname: string, roles: AuthRole[], method = 'GET'): boolean {
+	if (roles.some((r) => r === 'finance') && method === 'GET' && pathname.startsWith('/api/projects')) {
 		return true;
 	}
 	const moduleId = moduleIdForPath(pathname);
 	if (!moduleId) return true;
-	return canRoleAccessModule(role, moduleId);
+	return canRolesAccessModule(roles, moduleId);
 }
 
-export function filterModuleIdsForRole(moduleIds: readonly string[], role: AuthRole): string[] {
-	return moduleIds.filter((moduleId) => canRoleAccessModule(role, moduleId));
+export function filterModuleIdsForRole(moduleIds: readonly string[], roles: AuthRole[]): string[] {
+	return moduleIds.filter((moduleId) => canRolesAccessModule(roles, moduleId));
 }

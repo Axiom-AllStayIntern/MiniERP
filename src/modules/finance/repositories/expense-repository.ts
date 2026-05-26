@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, like, sql, type SQL } from 'drizzle-orm';
 import type { DBClient } from '../../../infrastructure/db';
 import { expenseCategories, expenses } from '../../../infrastructure/db/schema';
 
@@ -70,5 +70,197 @@ export class ExpenseRepository {
 
 	async listCategories() {
 		return this.db.select().from(expenseCategories).where(isNull(expenseCategories.deletedAt));
+	}
+
+	async getCategoryBreakdown(opts: { from?: string; to?: string } = {}) {
+		const conditions = [isNull(expenses.deletedAt)];
+		if (opts.from && opts.to) {
+			conditions.push(sql`${expenses.date} between ${opts.from} and ${opts.to}`);
+		}
+
+		return this.db
+			.select({
+				category: expenses.category,
+				expenseType: expenses.expenseType,
+				total: sql<number>`coalesce(sum(${expenseSgdAmountExpr()}), 0)`,
+				count: sql<number>`count(*)`
+			})
+			.from(expenses)
+			.where(and(...conditions))
+			.groupBy(expenses.category, expenses.expenseType)
+			.orderBy(sql`total desc`);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ExpenseCategoryRepository — hierarchy-aware CRUD for the expense_categories table
+// ---------------------------------------------------------------------------
+
+export type CategoryRow = typeof expenseCategories.$inferSelect;
+
+export type CreateCategoryInput = {
+	id?: string;
+	name: string;
+	parentId?: string | null;
+	isSystem?: boolean;
+};
+
+export type UpdateCategoryInput = {
+	name?: string;
+	parentId?: string | null;
+};
+
+export class ExpenseCategoryRepository {
+	constructor(private db: DBClient) {}
+
+	async findById(id: string): Promise<CategoryRow | null> {
+		const rows = await this.db
+			.select()
+			.from(expenseCategories)
+			.where(and(eq(expenseCategories.id, id), isNull(expenseCategories.deletedAt)))
+			.limit(1);
+		return rows[0] ?? null;
+	}
+
+	async listAll(): Promise<CategoryRow[]> {
+		return this.db
+			.select()
+			.from(expenseCategories)
+			.where(isNull(expenseCategories.deletedAt))
+			.orderBy(asc(expenseCategories.name));
+	}
+
+	async listRoots(): Promise<CategoryRow[]> {
+		return this.db
+			.select()
+			.from(expenseCategories)
+			.where(and(isNull(expenseCategories.parentId), isNull(expenseCategories.deletedAt)))
+			.orderBy(asc(expenseCategories.name));
+	}
+
+	async listChildren(parentId: string): Promise<CategoryRow[]> {
+		return this.db
+			.select()
+			.from(expenseCategories)
+			.where(and(eq(expenseCategories.parentId, parentId), isNull(expenseCategories.deletedAt)))
+			.orderBy(asc(expenseCategories.name));
+	}
+
+	async search(query: string): Promise<CategoryRow[]> {
+		return this.db
+			.select()
+			.from(expenseCategories)
+			.where(and(like(expenseCategories.name, `%${query}%`), isNull(expenseCategories.deletedAt)))
+			.orderBy(asc(expenseCategories.name));
+	}
+
+	async create(input: CreateCategoryInput): Promise<CategoryRow> {
+		const now = new Date().toISOString();
+		const id = input.id ?? crypto.randomUUID();
+		const row = {
+			id,
+			name: input.name,
+			parentId: input.parentId ?? null,
+			isSystem: input.isSystem ? 'true' : 'false',
+			createdAt: now,
+			updatedAt: now
+		};
+		await this.db.insert(expenseCategories).values(row);
+		return { ...row, deletedAt: null };
+	}
+
+	async update(id: string, input: UpdateCategoryInput): Promise<boolean> {
+		const existing = await this.findById(id);
+		if (!existing) return false;
+
+		const now = new Date().toISOString();
+		const sets: Record<string, unknown> = { updatedAt: now };
+		if (input.name !== undefined) sets.name = input.name;
+		if (input.parentId !== undefined) sets.parentId = input.parentId;
+
+		await this.db
+			.update(expenseCategories)
+			.set(sets)
+			.where(and(eq(expenseCategories.id, id), isNull(expenseCategories.deletedAt)));
+		return true;
+	}
+
+	async deactivate(id: string): Promise<boolean> {
+		const existing = await this.findById(id);
+		if (!existing) return false;
+
+		const now = new Date().toISOString();
+		await this.db
+			.update(expenseCategories)
+			.set({ deletedAt: now, updatedAt: now })
+			.where(and(eq(expenseCategories.id, id), isNull(expenseCategories.deletedAt)));
+		return true;
+	}
+
+	async reactivate(id: string): Promise<boolean> {
+		const now = new Date().toISOString();
+		await this.db
+			.update(expenseCategories)
+			.set({ deletedAt: null, updatedAt: now })
+			.where(eq(expenseCategories.id, id));
+		return true;
+	}
+
+	async getHierarchy(): Promise<Array<CategoryRow & { children: CategoryRow[] }>> {
+		const all = await this.listAll();
+		const childrenMap = new Map<string | null, CategoryRow[]>();
+		for (const cat of all) {
+			const key = cat.parentId ?? null;
+			if (!childrenMap.has(key)) childrenMap.set(key, []);
+			childrenMap.get(key)!.push(cat);
+		}
+		const roots = childrenMap.get(null) ?? [];
+		return roots.map((root) => ({
+			...root,
+			children: childrenMap.get(root.id) ?? []
+		}));
+	}
+
+	async syncFromCatalog(
+		catalog: Array<{ id: string; name: string; parentId?: string | null; isSystem?: boolean }>
+	): Promise<{ created: number; updated: number }> {
+		let created = 0;
+		let updated = 0;
+		const now = new Date().toISOString();
+
+		for (const entry of catalog) {
+			const [existing] = await this.db
+				.select()
+				.from(expenseCategories)
+				.where(eq(expenseCategories.id, entry.id))
+				.limit(1);
+
+			if (existing) {
+				if (existing.name !== entry.name || existing.parentId !== (entry.parentId ?? null)) {
+					await this.db
+						.update(expenseCategories)
+						.set({
+							name: entry.name,
+							parentId: entry.parentId ?? null,
+							deletedAt: null,
+							updatedAt: now
+						})
+						.where(eq(expenseCategories.id, entry.id));
+					updated++;
+				}
+			} else {
+				await this.db.insert(expenseCategories).values({
+					id: entry.id,
+					name: entry.name,
+					parentId: entry.parentId ?? null,
+					isSystem: entry.isSystem !== false ? 'true' : 'false',
+					createdAt: now,
+					updatedAt: now
+				});
+				created++;
+			}
+		}
+
+		return { created, updated };
 	}
 }

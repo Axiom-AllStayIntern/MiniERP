@@ -1,7 +1,9 @@
 import type { ModuleContext } from '$platform/modules/types';
 import type { FinanceInboundContract } from '../contracts/inbound';
 import { createFinanceBillingApi } from './billing-service';
+import { createCategoryService } from './category-service';
 import { createFinanceDocumentApi } from './document-service';
+import { createFinanceEInvoiceApi } from './einvoice-service';
 import { createFinanceExpenseApi } from './expense-service';
 import { createFinanceInsightApi } from './insight-service';
 import { createFinanceRevenueApi } from './revenue-service';
@@ -16,6 +18,8 @@ export function createFinanceApi(ctx: ModuleContext): FinanceApi {
 		expenses: createFinanceExpenseApi(ctx),
 		revenue: createFinanceRevenueApi(ctx),
 		taxes: createFinanceTaxApi(ctx),
-		insights: createFinanceInsightApi(ctx)
+		insights: createFinanceInsightApi(ctx),
+		categories: createCategoryService(ctx),
+		einvoice: createFinanceEInvoiceApi(ctx)
 	};
 }

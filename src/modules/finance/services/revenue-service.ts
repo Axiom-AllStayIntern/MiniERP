@@ -3,19 +3,21 @@ import { resolveSgdEquivalentForWrite } from '$modules/finance/services/fx/resol
 import { parseDocumentMetadata } from '$modules/finance/schemas/document-metadata';
 import { resolveExpenseFilePreview } from '$modules/finance/services/expense-file-preview';
 import type { ModuleContext } from '$platform/modules/types';
+import { AuditService } from '$platform/audit/audit-service';
 import { businessPartners, projects, revenue } from '../../../infrastructure/db/schema';
 import { listFinanceProjectNames } from '../adapters';
 import { RevenueRepository } from '../repositories';
 
 type FinanceRevenueCreateInput = {
 	projectId?: string | null;
-	invoiceType: 'standard' | 'zero_rate' | 'tax_invoice';
+	invoiceType: 'standard' | 'zero_rate' | 'tax_invoice' | 'exempt' | 'out_of_scope';
 	invoiceNumber?: string | null;
 	clientName?: string | null;
 	date: string;
 	amount: number;
 	currency?: string;
 	gstAmount?: number;
+	gstCode?: 'SR' | 'ZR' | 'ES' | 'OP' | null;
 	documentRef?: string | null;
 	metadata?: string | null;
 	notes?: string | null;
@@ -53,6 +55,7 @@ function hasRevenueAttachment(documentRef: string | null) {
 
 export function createFinanceRevenueApi(ctx: ModuleContext) {
 	const revenueRepository = new RevenueRepository(ctx.db);
+	const audit = new AuditService(ctx);
 
 	const getProjectRevenuePage = async (projectId: string) => {
 		const revenueRecords = await revenueRepository.findByProject(projectId);
@@ -157,12 +160,28 @@ export function createFinanceRevenueApi(ctx: ModuleContext) {
 			dateYmd: data.date
 		});
 
-		return revenueRepository.create({
+		const row = await revenueRepository.create({
 			...data,
 			currency,
 			sgdEquivalent,
-			gstAmount: data.gstAmount ?? 0
+			gstAmount: data.gstAmount ?? 0,
+			gstCode: data.gstCode ?? null
 		});
+
+		await audit.writeLog({
+			action: 'revenue.created',
+			entityType: 'revenue',
+			entityId: row.id,
+			projectId: data.projectId ?? undefined,
+			metadata: {
+				amount: data.amount,
+				currency,
+				invoiceType: data.invoiceType,
+				clientName: data.clientName
+			}
+		});
+
+		return row;
 	};
 
 	const getProjectRevenueDocumentDetail = async (projectId: string, revenueId: string) => {

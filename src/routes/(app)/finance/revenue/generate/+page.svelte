@@ -21,6 +21,17 @@
 		unitPrice: string;
 	};
 
+	type PoSuggestions = {
+		clientName: string | null;
+		poNumber: string | null;
+		currency: string;
+		date: string | null;
+		totalAmount: number | null;
+		supplierName: string | null;
+		description: string | null;
+		lineItems: Array<{ itemName: string; description: string; qty: number; uom: string; unitPrice: number }>;
+	};
+
 	let { data, form } = $props();
 
 	const today = new Date();
@@ -58,30 +69,13 @@
 	let dueDate = $state(initialDueDate());
 	let projectRef = $state('');
 	let poNumber = $state('');
-	let taxType = $state<'gst' | 'nongst'>('gst');
+	let taxType = $state<'gst' | 'nongst' | 'exempt' | 'out_of_scope'>('gst');
 	let currency = $state('SGD');
 	let notes = $state('');
 	let selectedProjectId = $state(initialProjectId());
 	let lastBillToProjectId = $state('');
 
-	let lineItems = $state<LineItem[]>([
-		{
-			id: crypto.randomUUID(),
-			itemName: 'Engineering services',
-			description: 'Phase 1',
-			qty: '1',
-			uom: 'EA',
-			unitPrice: '8000'
-		},
-		{
-			id: crypto.randomUUID(),
-			itemName: 'Hardware supply',
-			description: 'Installation and materials',
-			qty: '1',
-			uom: 'EA',
-			unitPrice: '3200'
-		}
-	]);
+	let lineItems = $state<LineItem[]>([newLine()]);
 
 	const bankDetails = {
 		accountName: 'AXIOM TECH PTE LTD',
@@ -91,6 +85,83 @@
 		swift: 'OCBCSGSG',
 		paymentTerm: 'net 45 days'
 	};
+
+	// -- PO file upload & extraction --
+	let poFile = $state<File | null>(null);
+	let poExtracting = $state(false);
+	let poError = $state('');
+	let poSuccess = $state('');
+	let poDragOver = $state(false);
+
+	function handlePoFileSelect(e: Event) {
+		const input = e.target as HTMLInputElement;
+		if (input.files?.[0]) startPoExtraction(input.files[0]);
+	}
+
+	function handlePoDrop(e: DragEvent) {
+		e.preventDefault();
+		poDragOver = false;
+		const file = e.dataTransfer?.files?.[0];
+		if (file) startPoExtraction(file);
+	}
+
+	async function startPoExtraction(file: File) {
+		poFile = file;
+		poError = '';
+		poSuccess = '';
+		poExtracting = true;
+
+		try {
+			const fd = new FormData();
+			fd.append('file', file);
+
+			const res = await fetch('/api/finance/invoice-from-po/extract', {
+				method: 'POST',
+				body: fd
+			});
+			const json = await res.json() as { ok: boolean; data?: { suggestions: PoSuggestions; confidence: number }; error?: string };
+			if (!res.ok || !json.ok) {
+				poError = json.error ?? 'Extraction failed';
+				return;
+			}
+
+			const s = json.data!.suggestions;
+			applyPoSuggestions(s);
+			const conf = Math.round((json.data!.confidence ?? 0) * 100);
+			poSuccess = `Extracted from ${file.name} (confidence: ${conf}%)`;
+		} catch (e) {
+			poError = e instanceof Error ? e.message : 'Network error';
+		} finally {
+			poExtracting = false;
+		}
+	}
+
+	function applyPoSuggestions(s: PoSuggestions) {
+		if (s.clientName) toName = s.clientName;
+		if (s.poNumber) poNumber = s.poNumber;
+		if (s.currency) currency = s.currency;
+
+		if (s.lineItems.length > 0) {
+			lineItems = s.lineItems.map((item) => ({
+				id: crypto.randomUUID(),
+				itemName: item.itemName || '',
+				description: item.description || '',
+				qty: String(item.qty ?? 1),
+				uom: item.uom || 'EA',
+				unitPrice: String(item.unitPrice ?? 0)
+			}));
+		}
+
+		// Try to match a project by customer name
+		if (s.clientName) {
+			const match = data.projects.find(
+				(p: ProjectRow) => p.customerName?.toLowerCase() === s.clientName!.toLowerCase()
+			);
+			if (match) {
+				selectedProjectId = match.id;
+			}
+		}
+	}
 
 	function projectById(id: string): ProjectRow | undefined {
 		return data.projects.find((project: ProjectRow) => project.id === id);
@@ -108,7 +179,9 @@
 		if (project.customerCurrency) currency = project.customerCurrency;
 	});
 
-	const invoiceType = $derived(taxType === 'gst' ? 'tax_invoice' : 'zero_rate');
+	const invoiceType = $derived(
+		taxType === 'gst' ? 'tax_invoice' : taxType === 'exempt' ? 'exempt' : taxType === 'out_of_scope' ? 'out_of_scope' : 'zero_rate'
+	);
 
 	const totals = $derived.by(() => {
 		const rows = lineItems.map((item) => {
@@ -122,7 +195,7 @@
 			};
 		});
 		const subtotal = rows.reduce((sum, item) => sum + item.net, 0);
-		const gst = taxType === 'gst' ? subtotal * 0.09 : 0;
+		const gst = taxType === 'gst' ? subtotal * 0.09 : 0; // SG_GST_RATE 9% (2024)
 		return { rows, subtotal, gst, total: subtotal + gst };
 	});
 
@@ -231,6 +304,43 @@
 			<input type="hidden" name="gstAmount" value={totals.gst} />
 			<input type="hidden" name="notes" value={notes} />
 			<input type="hidden" name="metadata" value={metadataJson} />
+
+			<div class="border-b border-slate-200 bg-indigo-50 p-4">
+				<p class="mb-2 text-xs font-medium uppercase tracking-wide text-indigo-700">Auto-fill from Purchase Order</p>
+				<div
+					class="relative rounded-lg border-2 border-dashed transition-colors {poDragOver ? 'border-indigo-400 bg-indigo-50' : 'border-slate-300 bg-white'}"
+					role="region"
+					aria-label="Upload PO file"
+					ondragover={(e: DragEvent) => { e.preventDefault(); poDragOver = true; }}
+					ondragleave={() => { poDragOver = false; }}
+					ondrop={handlePoDrop}
+				>
+					<label class="flex cursor-pointer flex-col items-center gap-1 px-4 py-5 text-center">
+						{#if poExtracting}
+							<svg class="h-6 w-6 animate-spin text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+							</svg>
+							<span class="text-sm text-indigo-600">Extracting PO fields...</span>
+						{:else}
+							<svg class="h-6 w-6 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+							</svg>
+							<span class="text-sm text-slate-600">
+								Drop a PO file here or <span class="font-medium text-indigo-600 hover:underline">browse</span>
+							</span>
+							<span class="text-[11px] text-slate-400">PDF, image, or DOCX — AI will extract customer, line items, and PO reference</span>
+						{/if}
+						<input type="file" class="sr-only" accept=".pdf,.png,.jpg,.jpeg,.webp,.docx" onchange={handlePoFileSelect} disabled={poExtracting} />
+					</label>
+				</div>
+				{#if poError}
+					<p class="mt-2 text-xs text-red-600">{poError}</p>
+				{/if}
+				{#if poSuccess}
+					<p class="mt-2 text-xs text-emerald-600">{poSuccess}</p>
+				{/if}
+			</div>
 
 			<div class="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">Invoice details</div>
 
@@ -353,8 +463,10 @@
 						<label class="block text-xs text-slate-600" for="taxType">
 							Invoice type
 							<select id="taxType" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" bind:value={taxType}>
-								<option value="gst">Tax invoice (9% GST)</option>
-								<option value="nongst">Zero-rate / non-tax invoice</option>
+								<option value="gst">Tax Invoice — SR 9% GST</option>
+								<option value="nongst">Zero-Rate — ZR 0%</option>
+								<option value="exempt">Exempt Supply — ES</option>
+								<option value="out_of_scope">Out-of-Scope — OP</option>
 							</select>
 						</label>
 						<label class="block text-xs text-slate-600" for="currency">

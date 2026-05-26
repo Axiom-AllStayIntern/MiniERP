@@ -972,13 +972,357 @@ export function createFinanceInsightApi(ctx: ModuleContext) {
 		};
 	};
 
+	const getCategoryBreakdown = async (input: DashboardOverviewRangeInput = {}) => {
+		const from = input.from ?? '';
+		const to = input.to ?? '';
+
+		const end = input.now ? new Date(input.now) : new Date();
+		const start = new Date(end);
+		start.setUTCDate(start.getUTCDate() - 29);
+
+		const hasCustomRange = isIsoDate(from) && isIsoDate(to) && from <= to;
+		const current = hasCustomRange
+			? { start: from, end: to }
+			: {
+					start: start.toISOString().slice(0, 10),
+					end: end.toISOString().slice(0, 10)
+				};
+
+		const expenseByCategory = await ctx.db
+			.select({
+				category: expenses.category,
+				expenseType: expenses.expenseType,
+				total: sql<number>`coalesce(sum(${expenseSgdAmountExpr()}), 0)`,
+				count: sql<number>`count(*)`
+			})
+			.from(expenses)
+			.where(
+				and(
+					between(expenses.date, current.start, current.end),
+					isNull(expenses.deletedAt)
+				)
+			)
+			.groupBy(expenses.category, expenses.expenseType)
+			.orderBy(sql`total desc`);
+
+		const revenueByType = await ctx.db
+			.select({
+				invoiceType: revenue.invoiceType,
+				total: sql<number>`coalesce(sum(${revenueSgdAmountExpr()}), 0)`,
+				count: sql<number>`count(*)`
+			})
+			.from(revenue)
+			.where(
+				and(
+					between(revenue.date, current.start, current.end),
+					isNull(revenue.deletedAt)
+				)
+			)
+			.groupBy(revenue.invoiceType);
+
+		const opexCategories = expenseByCategory
+			.filter((r) => r.expenseType === 'opex')
+			.map((r) => ({
+				category: r.category,
+				total: Number(r.total ?? 0),
+				count: Number(r.count ?? 0)
+			}));
+
+		const cogsCategories = expenseByCategory
+			.filter((r) => r.expenseType === 'sales_cost')
+			.map((r) => ({
+				category: r.category,
+				total: Number(r.total ?? 0),
+				count: Number(r.count ?? 0)
+			}));
+
+		const revenueBreakdown = revenueByType.map((r) => ({
+			invoiceType: r.invoiceType,
+			total: Number(r.total ?? 0),
+			count: Number(r.count ?? 0)
+		}));
+
+		const totalOpex = opexCategories.reduce((s, r) => s + r.total, 0);
+		const totalCogs = cogsCategories.reduce((s, r) => s + r.total, 0);
+		const totalRevenue = revenueBreakdown.reduce((s, r) => s + r.total, 0);
+
+		return {
+			range: current,
+			expenses: {
+				opex: { categories: opexCategories, total: totalOpex },
+				salesCost: { categories: cogsCategories, total: totalCogs },
+				grandTotal: totalOpex + totalCogs
+			},
+			revenue: {
+				byType: revenueBreakdown,
+				total: totalRevenue
+			},
+			netProfit: totalRevenue - totalOpex - totalCogs
+		};
+	};
+
+	const getProfitAndLossReport = async (input: DashboardOverviewRangeInput = {}) => {
+		const from = input.from ?? '';
+		const to = input.to ?? '';
+
+		const end = input.now ? new Date(input.now) : new Date();
+		const start = new Date(end);
+		start.setUTCFullYear(start.getUTCFullYear(), 0, 1);
+
+		const hasCustomRange = isIsoDate(from) && isIsoDate(to) && from <= to;
+		const current = hasCustomRange
+			? { start: from, end: to }
+			: { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+
+		const [revenueStandard] = await ctx.db
+			.select({ total: sql<number>`coalesce(sum(${revenueSgdAmountExpr()}), 0)` })
+			.from(revenue)
+			.where(
+				and(
+					between(revenue.date, current.start, current.end),
+					isNull(revenue.deletedAt),
+					eq(revenue.invoiceType, 'standard')
+				)
+			);
+		const [revenueTaxInvoice] = await ctx.db
+			.select({ total: sql<number>`coalesce(sum(${revenueSgdAmountExpr()}), 0)` })
+			.from(revenue)
+			.where(
+				and(
+					between(revenue.date, current.start, current.end),
+					isNull(revenue.deletedAt),
+					eq(revenue.invoiceType, 'tax_invoice')
+				)
+			);
+		const [revenueZeroRate] = await ctx.db
+			.select({ total: sql<number>`coalesce(sum(${revenueSgdAmountExpr()}), 0)` })
+			.from(revenue)
+			.where(
+				and(
+					between(revenue.date, current.start, current.end),
+					isNull(revenue.deletedAt),
+					eq(revenue.invoiceType, 'zero_rate')
+				)
+			);
+		const [revenueExempt] = await ctx.db
+			.select({ total: sql<number>`coalesce(sum(${revenueSgdAmountExpr()}), 0)` })
+			.from(revenue)
+			.where(
+				and(
+					between(revenue.date, current.start, current.end),
+					isNull(revenue.deletedAt),
+					eq(revenue.invoiceType, 'exempt')
+				)
+			);
+
+		const salesCostByCategory = await ctx.db
+			.select({
+				category: expenses.category,
+				total: sql<number>`coalesce(sum(${expenseSgdAmountExpr()}), 0)`
+			})
+			.from(expenses)
+			.where(
+				and(
+					between(expenses.date, current.start, current.end),
+					isNull(expenses.deletedAt),
+					eq(expenses.expenseType, 'sales_cost')
+				)
+			)
+			.groupBy(expenses.category)
+			.orderBy(sql`total desc`);
+
+		const [staffCost] = await ctx.db
+			.select({ total: staffCostSumExpr() })
+			.from(payoutRecords)
+			.innerJoin(compensationComponents, eq(payoutRecords.componentId, compensationComponents.id))
+			.where(and(staffCostPeriodBetween(current.start, current.end), staffCostPayoutJoinConditions()));
+
+		const opexByCategory = await ctx.db
+			.select({
+				category: expenses.category,
+				total: sql<number>`coalesce(sum(${expenseSgdAmountExpr()}), 0)`
+			})
+			.from(expenses)
+			.where(
+				and(
+					between(expenses.date, current.start, current.end),
+					isNull(expenses.deletedAt),
+					eq(expenses.expenseType, 'opex')
+				)
+			)
+			.groupBy(expenses.category)
+			.orderBy(sql`total desc`);
+
+		const stdRevenue = (revenueStandard?.total ?? 0) + (revenueTaxInvoice?.total ?? 0);
+		const zrRevenue = revenueZeroRate?.total ?? 0;
+		const exRevenue = revenueExempt?.total ?? 0;
+		const totalRevenue = stdRevenue + zrRevenue + exRevenue;
+
+		const totalSalesCost = salesCostByCategory.reduce((s, r) => s + Number(r.total ?? 0), 0);
+		const totalStaffCost = Number(staffCost?.total ?? 0);
+		const grossProfit = totalRevenue - totalSalesCost - totalStaffCost;
+
+		const totalOpex = opexByCategory.reduce((s, r) => s + Number(r.total ?? 0), 0);
+		const netProfit = grossProfit - totalOpex;
+
+		return {
+			range: current,
+			revenue: {
+				standardRated: stdRevenue,
+				zeroRated: zrRevenue,
+				exempt: exRevenue,
+				total: totalRevenue
+			},
+			costOfSales: {
+				byCategory: salesCostByCategory.map((r) => ({
+					category: r.category,
+					total: Number(r.total ?? 0)
+				})),
+				staffCost: totalStaffCost,
+				total: totalSalesCost + totalStaffCost
+			},
+			grossProfit,
+			grossMargin: totalRevenue > 0 ? grossProfit / totalRevenue : 0,
+			operatingExpenses: {
+				byCategory: opexByCategory.map((r) => ({
+					category: r.category,
+					total: Number(r.total ?? 0)
+				})),
+				total: totalOpex
+			},
+			netProfit,
+			netMargin: totalRevenue > 0 ? netProfit / totalRevenue : 0
+		};
+	};
+
+	const getTrialBalance = async (input: DashboardOverviewRangeInput = {}) => {
+		const from = input.from ?? '';
+		const to = input.to ?? '';
+
+		const end = input.now ? new Date(input.now) : new Date();
+		const start = new Date(end);
+		start.setUTCFullYear(start.getUTCFullYear(), 0, 1);
+
+		const hasCustomRange = isIsoDate(from) && isIsoDate(to) && from <= to;
+		const current = hasCustomRange
+			? { start: from, end: to }
+			: { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+
+		const revenueByType = await ctx.db
+			.select({
+				account: revenue.invoiceType,
+				total: sql<number>`coalesce(sum(${revenueSgdAmountExpr()}), 0)`,
+				count: sql<number>`count(*)`
+			})
+			.from(revenue)
+			.where(
+				and(
+					between(revenue.date, current.start, current.end),
+					isNull(revenue.deletedAt)
+				)
+			)
+			.groupBy(revenue.invoiceType);
+
+		const expenseByCategory = await ctx.db
+			.select({
+				account: expenses.category,
+				expenseType: expenses.expenseType,
+				total: sql<number>`coalesce(sum(${expenseSgdAmountExpr()}), 0)`,
+				count: sql<number>`count(*)`
+			})
+			.from(expenses)
+			.where(
+				and(
+					between(expenses.date, current.start, current.end),
+					isNull(expenses.deletedAt)
+				)
+			)
+			.groupBy(expenses.category, expenses.expenseType);
+
+		const [staffCostRow] = await ctx.db
+			.select({ total: staffCostSumExpr() })
+			.from(payoutRecords)
+			.innerJoin(compensationComponents, eq(payoutRecords.componentId, compensationComponents.id))
+			.where(and(staffCostPeriodBetween(current.start, current.end), staffCostPayoutJoinConditions()));
+
+		const invoiceTypeLabel: Record<string, string> = {
+			standard: 'Revenue — Standard Rated',
+			tax_invoice: 'Revenue — Tax Invoice',
+			zero_rate: 'Revenue — Zero Rated',
+			exempt: 'Revenue — Exempt',
+			out_of_scope: 'Revenue — Out of Scope'
+		};
+
+		const accounts: Array<{
+			account: string;
+			type: 'revenue' | 'expense';
+			subType: string;
+			debit: number;
+			credit: number;
+			count: number;
+		}> = [];
+
+		for (const row of revenueByType) {
+			const total = Number(row.total ?? 0);
+			accounts.push({
+				account: invoiceTypeLabel[row.account ?? ''] ?? `Revenue — ${row.account}`,
+				type: 'revenue',
+				subType: row.account ?? 'unknown',
+				debit: 0,
+				credit: total,
+				count: Number(row.count ?? 0)
+			});
+		}
+
+		for (const row of expenseByCategory) {
+			const total = Number(row.total ?? 0);
+			accounts.push({
+				account: `${row.expenseType === 'sales_cost' ? 'COGS' : 'OpEx'} — ${row.account}`,
+				type: 'expense',
+				subType: row.expenseType ?? 'opex',
+				debit: total,
+				credit: 0,
+				count: Number(row.count ?? 0)
+			});
+		}
+
+		const staffTotal = Number(staffCostRow?.total ?? 0);
+		if (staffTotal > 0) {
+			accounts.push({
+				account: 'Staff Cost — Payroll',
+				type: 'expense',
+				subType: 'staff_cost',
+				debit: staffTotal,
+				credit: 0,
+				count: 0
+			});
+		}
+
+		const totalDebit = accounts.reduce((s, a) => s + a.debit, 0);
+		const totalCredit = accounts.reduce((s, a) => s + a.credit, 0);
+
+		return {
+			range: current,
+			accounts: accounts.sort((a, b) => {
+				if (a.type !== b.type) return a.type === 'revenue' ? -1 : 1;
+				return b.debit + b.credit - (a.debit + a.credit);
+			}),
+			totalDebit,
+			totalCredit,
+			difference: totalDebit - totalCredit
+		};
+	};
+
 	return {
 		getCompanyFinancialOverview,
 		getDashboardCharts,
 		getProjectsProfitRanking,
 		getProjectsProfitCsv,
 		getProjectFinancialDetail,
-		getProjectDocumentsSummary
+		getProjectDocumentsSummary,
+		getCategoryBreakdown,
+		getProfitAndLossReport,
+		getTrialBalance
 	};
 }
 

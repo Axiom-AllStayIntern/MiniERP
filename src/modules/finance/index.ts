@@ -29,6 +29,8 @@ export type { FinanceExpensesApi } from './services/expense-service';
 export type { FinanceInsightsApi } from './services/insight-service';
 export type { FinanceRevenueApi } from './services/revenue-service';
 export type { FinanceTaxesApi } from './services/tax-service';
+export type { CategoryServiceApi } from './services/category-service';
+export type { FinanceEInvoiceApi } from './services/einvoice-service';
 export type { FinanceInboundContract, FinancePublicGroup } from './contracts/inbound';
 export { FINANCE_PUBLIC_GROUPS } from './contracts/inbound';
 export { financeAppSurface };
@@ -86,6 +88,27 @@ export type {
 	FinanceUserDecisionRequest,
 	FinanceValidationIssue
 } from './agent';
+export { generatePeppolUblXml, createAccessPointClient } from './services/peppol';
+export type {
+	PeppolInvoiceLine,
+	PeppolInvoiceInput,
+	PeppolXmlResult,
+	PeppolParty,
+	AccessPointConfig
+} from './services/peppol';
+export {
+	SG_GST_RATE,
+	SG_GST_RATE_PERCENT,
+	GST_SUPPLY_CODES,
+	GST_SUPPLY_CODE_LABELS,
+	GST_SUPPLY_CODE_RATE,
+	resolveGstCode,
+	calcGstFromSubtotal,
+	calcGstFromGrossAmount,
+	calcSubtotalFromGross
+} from './rules/gst-constants';
+export type { GstSupplyCode } from './rules/gst-constants';
+
 export {
 	financeContracts,
 	financeServices,

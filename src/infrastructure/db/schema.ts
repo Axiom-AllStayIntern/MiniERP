@@ -11,6 +11,9 @@ export { auditLogs } from '$platform/audit/audit-log.schema';
 export { companySettings } from '$platform/config/company-settings.schema';
 export { uploadIdempotency, uploadFileDedup } from '$infrastructure/storage/upload-guards.schema';
 
+// Invite codes (RBAC user invitation)
+export { inviteCodes } from '$platform/auth/invite-codes.schema';
+
 // better-auth tables (sessions, accounts, verifications)
 export { sessions, accounts, verifications } from '../../platform/auth/auth-tables';
 

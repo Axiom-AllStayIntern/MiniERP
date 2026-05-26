@@ -1,6 +1,8 @@
 import type { InboundContract } from '../../../platform/registry/contracts';
 import type { FinanceBillingApi } from '../services/billing-service';
+import type { CategoryServiceApi } from '../services/category-service';
 import type { FinanceDocumentsApi } from '../services/document-service';
+import type { FinanceEInvoiceApi } from '../services/einvoice-service';
 import type { FinanceExpensesApi } from '../services/expense-service';
 import type { FinanceInsightsApi } from '../services/insight-service';
 import type { FinanceRevenueApi } from '../services/revenue-service';
@@ -13,6 +15,8 @@ export interface FinanceInboundContract {
 	revenue: FinanceRevenueApi;
 	taxes: FinanceTaxesApi;
 	insights: FinanceInsightsApi;
+	categories: CategoryServiceApi;
+	einvoice: FinanceEInvoiceApi;
 }
 
 export const FINANCE_PUBLIC_GROUPS = [
@@ -21,7 +25,9 @@ export const FINANCE_PUBLIC_GROUPS = [
 	'expenses',
 	'revenue',
 	'taxes',
-	'insights'
+	'insights',
+	'categories',
+	'einvoice'
 ] as const;
 
 export type FinancePublicGroup = (typeof FINANCE_PUBLIC_GROUPS)[number];
@@ -74,5 +80,21 @@ export const financeInboundContracts: InboundContract[] = [
 		input: { name: 'finance-insight-input', version: 'v1' },
 		output: { name: 'finance-insight-output', version: 'v1' },
 		requiredPermissions: ['finance:view']
+	},
+	{
+		id: 'finance.categories',
+		description: 'Chart of accounts / expense category management',
+		mode: 'sync',
+		input: { name: 'finance-category-input', version: 'v1' },
+		output: { name: 'finance-category-output', version: 'v1' },
+		requiredPermissions: ['finance:view', 'finance:edit']
+	},
+	{
+		id: 'finance.einvoice',
+		description: 'Peppol BIS e-invoice generation and InvoiceNow Access Point operations',
+		mode: 'sync',
+		input: { name: 'finance-einvoice-input', version: 'v1' },
+		output: { name: 'finance-einvoice-output', version: 'v1' },
+		requiredPermissions: ['finance:view', 'finance:edit']
 	}
 ];

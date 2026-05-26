@@ -51,6 +51,26 @@
 
 	let tempEditMode = $state(false);
 	let tempBoxes = $state<Record<BoxKey, number>>(boxesFromGst(data.gst.boxes));
+	let exportingF5 = $state(false);
+
+	async function exportGstF5() {
+		exportingF5 = true;
+		try {
+			const response = await fetch(`/api/finance/tax/gst/${data.year}/${data.quarter}/f5`);
+			const result = await response.json();
+			if (result.ok) {
+				const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = `GST-F5-${data.year}-Q${data.quarter}.json`;
+				a.click();
+				URL.revokeObjectURL(url);
+			}
+		} finally {
+			exportingF5 = false;
+		}
+	}
 
 	/** After loading a period or server refresh: sync draft boxes from server totals (not from in-progress local edits). */
 	$effect(() => {
@@ -69,7 +89,13 @@
 	title="Tax Management"
 	description="Quarterly GST box summary with drill-down to invoice-level details."
 >
-	<div class="flex justify-end">
+	<div class="flex items-center justify-between">
+		<div class="flex items-center gap-2">
+			<span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+				GST Rate: {data.gst.gstRate ?? 9}%
+			</span>
+			<span class="text-xs text-slate-500">Singapore — IRAS GST F5</span>
+		</div>
 		<div class="flex gap-2">
 			<button
 				type="button"
@@ -82,6 +108,14 @@
 				}}
 			>
 				{tempEditMode ? 'Exit Temp Edit' : 'Edit GST (Temp)'}
+			</button>
+			<button
+				type="button"
+				class="rounded-md bg-[var(--sf-green)] px-3 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c] disabled:opacity-50"
+				disabled={exportingF5}
+				onclick={exportGstF5}
+			>
+				{exportingF5 ? 'Exporting…' : 'Export GST F5'}
 			</button>
 			<a
 				class="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"

@@ -22,20 +22,38 @@
 
 	{#if data.breakdown}
 		<p class="mt-3 text-xs text-slate-500">
-			Box 8 here is output tax (standard-rated sales only) minus supplier invoice input tax. Reverse charge (Boxes 10�?2) is manual; confirm net payable on the IRAS return.
+			Box 8 = Box 6 − Box 7 + Box 9 − Box 10 + Box 11 − Box 12 (IRAS GST F5 net payable).
 		</p>
-		<div class="mt-2 grid gap-4 md:grid-cols-3">
+		<div class="mt-2 grid gap-3 md:grid-cols-3 lg:grid-cols-4">
 			<article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-				<p class="text-sm text-slate-500">Box 6</p>
+				<p class="text-sm text-slate-500">Box 6 — Output Tax</p>
 				<p class="mt-2 text-xl font-semibold text-slate-900">{money(data.breakdown.box6)}</p>
 			</article>
 			<article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-				<p class="text-sm text-slate-500">Box 7</p>
+				<p class="text-sm text-slate-500">Box 7 — Input Tax</p>
 				<p class="mt-2 text-xl font-semibold text-slate-900">{money(data.breakdown.box7)}</p>
 			</article>
-			<article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-				<p class="text-sm text-slate-500">Net (Box 8)</p>
-				<p class="mt-2 text-xl font-semibold text-slate-900">{money(data.breakdown.net)}</p>
+			{#if data.breakdown.box9 || data.breakdown.box10 || data.breakdown.box11 || data.breakdown.box12}
+				<article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+					<p class="text-sm text-slate-500">Box 9 — Exempt Imports</p>
+					<p class="mt-2 text-lg font-semibold text-slate-700">{money(data.breakdown.box9 ?? 0)}</p>
+				</article>
+				<article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+					<p class="text-sm text-slate-500">Box 10 — Reverse Charge Output</p>
+					<p class="mt-2 text-lg font-semibold text-slate-700">{money(data.breakdown.box10 ?? 0)}</p>
+				</article>
+				<article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+					<p class="text-sm text-slate-500">Box 11 — Reverse Charge Purchases</p>
+					<p class="mt-2 text-lg font-semibold text-slate-700">{money(data.breakdown.box11 ?? 0)}</p>
+				</article>
+				<article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+					<p class="text-sm text-slate-500">Box 12 — Imported Services</p>
+					<p class="mt-2 text-lg font-semibold text-slate-700">{money(data.breakdown.box12 ?? 0)}</p>
+				</article>
+			{/if}
+			<article class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+				<p class="text-sm font-medium text-emerald-700">Net GST Payable (Box 8)</p>
+				<p class="mt-2 text-xl font-bold text-emerald-900">{money(data.breakdown.net)}</p>
 			</article>
 		</div>
 	{:else if data.manualValue !== null}

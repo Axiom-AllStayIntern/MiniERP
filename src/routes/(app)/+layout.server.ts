@@ -3,7 +3,7 @@ import { createModuleContext } from '$platform/modules';
 import { createProjectApi } from '$modules/project';
 import { filterModuleIdsForRole, getEnabledModuleIds } from '$app-layer/bootstrap/module-access';
 import { registry } from '$platform/registry';
-import { defaultPathForRole } from '$platform/auth/permissions';
+import { defaultPathForRoles } from '$platform/auth/permissions';
 
 function shouldLoadProjectSidebarCounts(pathname: string): boolean {
 	if (!pathname.startsWith('/projects')) return false;
@@ -24,12 +24,12 @@ export const load: LayoutServerLoad = async (event) => {
 		}
 	}
 	if (locals.user) {
-		enabledModules = filterModuleIdsForRole(enabledModules, locals.user.role);
+		enabledModules = filterModuleIdsForRole(enabledModules, locals.user.roles);
 	}
 	return {
 		user: locals.user,
 		enabledModules,
-		defaultHome: locals.user ? defaultPathForRole(locals.user.role) : '/login',
+		defaultHome: locals.user ? defaultPathForRoles(locals.user.roles) : '/login',
 		projectListCounts
 	};
 };

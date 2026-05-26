@@ -1,4 +1,4 @@
-﻿import type { AuthRole } from '../auth/config';
+import type { AuthRole } from '../auth/config';
 import { lookupCapability, type PlatformRiskLevel } from './capability-registry';
 
 export type PolicyBlockReason =
@@ -25,27 +25,27 @@ export interface PolicyDecision {
 export interface PolicyCheckInput {
 	agentId: string;
 	capabilityId: string;
-	userRole: AuthRole | null | undefined;
+	userRoles: AuthRole[] | null | undefined;
 	currentStepAllowedCapabilities?: readonly string[];
 	confirmationRef?: string;
 }
 
 const PERMISSION_TO_ROLES: Record<string, readonly AuthRole[]> = {
-	'finance:view': ['owner', 'finance', 'project_manager', 'employee'],
-	'finance:edit': ['owner', 'finance'],
-	'finance:tax': ['owner', 'finance'],
-	'project:view': ['owner', 'project_manager', 'employee'],
-	'project:edit': ['owner', 'project_manager'],
-	'project:staff': ['owner', 'project_manager'],
-	'hr:view': ['owner', 'hr'],
-	'hr:edit': ['owner', 'hr']
+	'finance:view': ['owner', 'admin', 'finance', 'project_manager', 'employee'],
+	'finance:edit': ['owner', 'admin', 'finance'],
+	'finance:tax': ['owner', 'admin', 'finance'],
+	'project:view': ['owner', 'admin', 'project_manager', 'employee', 'staff'],
+	'project:edit': ['owner', 'admin', 'project_manager'],
+	'project:staff': ['owner', 'admin', 'project_manager'],
+	'hr:view': ['owner', 'admin', 'hr'],
+	'hr:edit': ['owner', 'admin', 'hr']
 };
 
-function roleHasPermission(role: AuthRole | null | undefined, permission: string): boolean {
-	if (!role) return false;
-	const roles = PERMISSION_TO_ROLES[permission];
-	if (!roles) return false;
-	return roles.includes(role);
+function rolesHavePermission(roles: AuthRole[] | null | undefined, permission: string): boolean {
+	if (!roles || roles.length === 0) return false;
+	const allowed = PERMISSION_TO_ROLES[permission];
+	if (!allowed) return false;
+	return roles.some((r) => allowed.includes(r));
 }
 
 const ACCEPTABLE_RISK: ReadonlySet<PlatformRiskLevel> = new Set<PlatformRiskLevel>([
@@ -56,11 +56,6 @@ const ACCEPTABLE_RISK: ReadonlySet<PlatformRiskLevel> = new Set<PlatformRiskLeve
 	'R4'
 ]);
 
-/**
- * Doc 03 搂8 鈥?9-point tool policy check. Order matters: stop on first failure
- * but accumulate human-readable reasons in `blockedBy` so the audit log can
- * see exactly which gate fired.
- */
 export function checkToolPolicy(input: PolicyCheckInput): PolicyDecision {
 	const blockedBy: PolicyBlockReason[] = [];
 	const requiredUserPermissions: string[] = [];
@@ -88,7 +83,7 @@ export function checkToolPolicy(input: PolicyCheckInput): PolicyDecision {
 	if (!manifest.allowedAgents.includes(input.agentId)) blockedBy.push('agent_permission');
 
 	for (const permission of manifest.requiredUserPermissions) {
-		if (!roleHasPermission(input.userRole, permission)) {
+		if (!rolesHavePermission(input.userRoles, permission)) {
 			missingUserPermissions.push(permission);
 		}
 	}

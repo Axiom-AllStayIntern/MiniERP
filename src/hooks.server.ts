@@ -5,8 +5,8 @@ import { svelteKitHandler } from 'better-auth/svelte-kit';
 
 import { getAuth } from '$platform/auth/better-auth';
 import { resolveWorkerAuthEnv } from '$platform/auth/resolve-worker-env';
-import type { AuthRole } from '$platform/auth/config';
-import { defaultPathForRole, isRouteAllowed } from '$platform/auth/permissions';
+import { parseRoles } from '$platform/auth/config';
+import { defaultPathForRoles, isRouteAllowed } from '$platform/auth/permissions';
 import { getDb } from './infrastructure/db';
 import {
 	getEnabledModuleIds,
@@ -23,8 +23,8 @@ function isPublicAppPath(pathname: string) {
 	return (
 		pathname === '/login' ||
 		pathname === '/register' ||
-		pathname === '/forgot-password' ||
-		pathname.startsWith('/reset-password')
+		pathname.startsWith('/reset-password') ||
+		pathname === '/forgot-password'
 	);
 }
 
@@ -75,7 +75,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.locals.user = {
 			id: u.id,
 			email: u.email,
-			role: (u.role as AuthRole) ?? 'employee'
+			roles: parseRoles(u.role)
 		};
 	} else {
 		event.locals.user = null;
@@ -85,7 +85,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		(event.url.pathname === '/login' || event.url.pathname === '/register') &&
 		event.locals.user
 	) {
-		throw redirect(303, defaultPathForRole(event.locals.user.role));
+		throw redirect(303, defaultPathForRoles(event.locals.user.roles));
 	}
 
 	const path = event.url.pathname;
@@ -101,13 +101,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 
 		if (
-			!isRouteAllowed(path, event.locals.user.role) ||
-			!isPathAllowedForRole(path, event.locals.user.role, event.request.method)
+			!isRouteAllowed(path, event.locals.user.roles) ||
+			!isPathAllowedForRole(path, event.locals.user.roles, event.request.method)
 		) {
 			if (wantApiAuth) {
 				return new Response(JSON.stringify({ ok: false, error: 'Forbidden' }), { status: 403 });
 			}
-			const fallback = defaultPathForRole(event.locals.user.role);
+			const fallback = defaultPathForRoles(event.locals.user.roles);
 			if (fallback === path) {
 				return new Response('Forbidden', { status: 403 });
 			}
@@ -121,6 +121,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 				return new Response('Not Found', { status: 404 });
 			}
 		}
+	}
+
+	if (path === '/api/auth/register') {
+		return resolve(event);
 	}
 
 	return svelteKitHandler({ event, resolve, auth, building });

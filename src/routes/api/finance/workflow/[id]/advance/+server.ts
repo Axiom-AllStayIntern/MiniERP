@@ -110,7 +110,7 @@ async function gateAllCapabilities(
 		const decision = checkToolPolicy({
 			agentId: financeAgentManifest.id,
 			capabilityId,
-			userRole: user?.role,
+			userRoles: user?.roles,
 			currentStepAllowedCapabilities: allowedCapabilities
 		});
 		if (!decision.allowed) {
@@ -150,7 +150,7 @@ async function auditCapabilitySuccess(
 	const decision = checkToolPolicy({
 		agentId: financeAgentManifest.id,
 		capabilityId,
-		userRole: user?.role
+		userRoles: user?.roles
 	});
 	await appendAgentAuditEntry(db, {
 		agentId: financeAgentManifest.id,
@@ -220,7 +220,7 @@ export const POST: RequestHandler = async (event) => {
 		useMock: true,
 		// `env` is read by capabilities that may invoke the platform AI runtime
 		// (e.g. extract-invoice-fields LLM fallback). Capabilities that don't
-		// need it ignore the field â€?keeping the runtime ctx shape minimal.
+		// need it ignore the field ï¿½?keeping the runtime ctx shape minimal.
 		env
 	};
 

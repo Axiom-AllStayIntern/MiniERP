@@ -2,8 +2,8 @@
   "$schema": "../node_modules/wrangler/config-schema.json",
 
   // Dedicated worker for the async document-processing queue.
-  // Top-level = v3 consumer.
-  "name": "smartfin-document-processor",
+  // Top-level = personal v4 consumer.
+  "name": "smartfin-document-processor-v4",
   "account_id": "c09bb2823904032b6ec648b23411f2e0",
   "compatibility_date": "2026-03-30",
   "compatibility_flags": ["nodejs_als"],
@@ -12,8 +12,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "smartfin-db",
-      "database_id": "208e1ed4-437f-4da5-93d7-7058debea5c8",
+      "database_name": "smartfin-db-v4",
+      "database_id": "15944d96-71a5-4c5a-b42c-92f6ba0b16b4",
       "migrations_dir": "../drizzle/migrations"
     }
   ],
@@ -21,31 +21,32 @@
   "r2_buckets": [
     {
       "binding": "R2",
-      "bucket_name": "smartfin-files"
+      "bucket_name": "smartfin-files-v4"
     }
   ],
 
   "kv_namespaces": [
     {
       "binding": "KV",
-      "id": "fd0eca3363a3444daff52d1a35af69eb"
+      "id": "7bd4733bae7c460ba265549b3f468e1f"
     }
   ],
 
   "queues": {
     "consumers": [
       {
-        "queue": "smartfin-doc-processor-queue",
+        "queue": "smartfin-doc-processor-queue-v4",
         "max_batch_size": 1,
         "max_concurrency": 2,
         "max_retries": 3,
         "max_batch_timeout": 60,
-        "dead_letter_queue": "smartfin-doc-processor-dlq"
+        "dead_letter_queue": "smartfin-doc-processor-dlq-v4"
       }
     ]
   },
 
   "vars": {
+    "APP_ENV": "personal-v4",
     "LLM_PROVIDER": "heuristic",
     "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct",
     "WORKERS_AI_VISION_MODEL": "@cf/meta/llama-3.2-11b-vision-instruct",
@@ -59,62 +60,5 @@
 
   "observability": {
     "enabled": true
-  },
-
-  "env": {
-    "v4": {
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "smartfin-db-v4",
-          "database_id": "15944d96-71a5-4c5a-b42c-92f6ba0b16b4",
-          "migrations_dir": "../drizzle/migrations"
-        }
-      ],
-
-      "r2_buckets": [
-        {
-          "binding": "R2",
-          "bucket_name": "smartfin-files-v4"
-        }
-      ],
-
-      "kv_namespaces": [
-        {
-          "binding": "KV",
-          "id": "7bd4733bae7c460ba265549b3f468e1f"
-        }
-      ],
-
-      "queues": {
-        "consumers": [
-          {
-            "queue": "smartfin-doc-processor-queue-v4",
-            "max_batch_size": 1,
-            "max_concurrency": 2,
-            "max_retries": 3,
-            "max_batch_timeout": 60,
-            "dead_letter_queue": "smartfin-doc-processor-dlq-v4"
-          }
-        ]
-      },
-
-      "vars": {
-        "LLM_PROVIDER": "heuristic",
-        "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct",
-        "WORKERS_AI_VISION_MODEL": "@cf/meta/llama-3.2-11b-vision-instruct",
-        "OCR_PROMPT_VERSION": "v1",
-        "APP_ENV": "v4"
-      },
-
-      "ai": {
-        "binding": "AI",
-        "remote": true
-      },
-
-      "observability": {
-        "enabled": true
-      }
-    }
   }
 }

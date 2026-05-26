@@ -9,7 +9,7 @@ import {
 	projectEmployees,
 	revenue
 } from '../../../infrastructure/db/schema';
-import { estimateSingaporeResidentTax } from '../rules';
+import { estimateSingaporeResidentTax, SG_GST_RATE_PERCENT } from '../rules';
 import {
 	projectExpenseTotalSumExpr,
 	projectRevenueTotalSumExpr,
@@ -137,8 +137,16 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 					isNull(revenue.deletedAt)
 				)
 			);
-		// Box 3 (exempt supplies) — revenue.invoiceType has no 'exempt' enum; reserved for
-		// future modeling. Returns 0 today.
+		const [box3] = await ctx.db
+			.select({ total: subtotalExpr })
+			.from(revenue)
+			.where(
+				and(
+					eq(revenue.invoiceType, 'exempt'),
+					between(revenue.date, range.start, range.end),
+					isNull(revenue.deletedAt)
+				)
+			);
 		const [expenseRows] = await ctx.db
 			.select({ total: sql<number>`coalesce(sum(${expenses.amount}), 0)` })
 			.from(expenses)
@@ -161,7 +169,7 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 
 		const b1 = (box1?.total ?? 0) + (box1TaxInvoice?.total ?? 0);
 		const b2 = box2?.total ?? 0;
-		const b3 = 0;
+		const b3 = box3?.total ?? 0;
 		const b4 = b1 + b2 + b3;
 		const b5 = expenseRows?.total ?? 0;
 		const b6 = box6?.total ?? 0;
@@ -172,10 +180,14 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 		const b12 = Number.isFinite(manual.gst_box12_manual) ? manual.gst_box12_manual : 0;
 		const b13 = b4;
 
+		// IRAS GST F5: Box 8 = Box 6 - Box 7 + Box 9 - Box 10 + Box 11 - Box 12
+		const b8 = b6 - b7 + b9 - b10 + b11 - b12;
+
 		return {
 			year,
 			quarter,
 			range,
+			gstRate: SG_GST_RATE_PERCENT,
 			boxes: {
 				box1: b1,
 				box2: b2,
@@ -184,7 +196,7 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 				box5: b5,
 				box6: b6,
 				box7: b7,
-				box8: b6 - b7,
+				box8: b8,
 				box9: b9,
 				box10: b10,
 				box11: b11,
@@ -194,16 +206,17 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 			meta: {
 				manualBoxes: ['box9', 'box10', 'box11', 'box12'],
 				notes: [
+					`GST rate: ${SG_GST_RATE_PERCENT}% (effective 1 Jan 2024).`,
 					'Box 1: standard-rated supplies excl. GST (revenue.amount - revenue.gstAmount where invoiceType in {standard, tax_invoice}).',
 					'Box 2: zero-rated supplies excl. GST (revenue where invoiceType = zero_rate).',
-					'Box 3: exempt supplies — currently returns 0; revenue.invoiceType has no exempt enum yet.',
+					'Box 3: exempt supplies excl. GST (revenue where invoiceType = exempt).',
 					'Box 4: sum of boxes 1-3.',
 					'Box 5: total purchases & imports (expenses.amount).',
 					'Box 6: output GST from standard-rated sales (revenue.gstAmount where invoiceType in {standard, tax_invoice}).',
-					'Box 7: input GST claimed (expenses.gstAmount). Wave 2.1a fixes status doc §12.1 — Box 7 no longer ignores expenses.gstAmount.',
-					'Box 8 = Box 6 - Box 7 (simplified). IRAS net payable can also involve Boxes 9-12 — maintain manually where applicable.',
+					'Box 7: input GST claimed (expenses.gstAmount).',
+					'Box 8 = Box 6 - Box 7 + Box 9 - Box 10 + Box 11 - Box 12 (IRAS GST F5 net payable).',
 					'Box 9-12: company_settings keys gst_box9_manual..gst_box12_manual.',
-					'Box 13: set equal to Box 4 for this page.'
+					'Box 13: total value of supplies (excl. GST), equal to Box 4.'
 				]
 			}
 		};
@@ -215,11 +228,9 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 
 		const subtotalExpr = sql<number>`(${revenue.amount} - coalesce(${revenue.gstAmount}, 0))`;
 
-		// Box 1 (standard incl. tax_invoice variant), Box 2 (zero_rate), Box 3 (exempt — empty for now).
 		if ([1, 2, 3].includes(boxNo)) {
-			if (boxNo === 3) return { box: 3, invoices: [] };
-			const types: ('standard' | 'zero_rate' | 'tax_invoice')[] =
-				boxNo === 1 ? ['standard', 'tax_invoice'] : ['zero_rate'];
+			const types: ('standard' | 'zero_rate' | 'tax_invoice' | 'exempt')[] =
+				boxNo === 1 ? ['standard', 'tax_invoice'] : boxNo === 2 ? ['zero_rate'] : ['exempt'];
 			const invoices = await ctx.db
 				.select({
 					id: revenue.id,
@@ -290,7 +301,7 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 		}
 
 		if (boxNo === 8) {
-			const [box6] = await ctx.db
+			const [b6Row] = await ctx.db
 				.select({ total: sql<number>`coalesce(sum(${revenue.gstAmount}), 0)` })
 				.from(revenue)
 				.where(
@@ -300,16 +311,27 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 						isNull(revenue.deletedAt)
 					)
 				);
-			const [box7] = await ctx.db
+			const [b7Row] = await ctx.db
 				.select({ total: sql<number>`coalesce(sum(${expenses.gstAmount}), 0)` })
 				.from(expenses)
 				.where(and(between(expenses.date, range.start, range.end), isNull(expenses.deletedAt)));
+			const manualValues = await getGstManualBoxValues();
+			const b6Val = b6Row?.total ?? 0;
+			const b7Val = b7Row?.total ?? 0;
+			const b9Val = manualValues.gst_box9_manual ?? 0;
+			const b10Val = manualValues.gst_box10_manual ?? 0;
+			const b11Val = manualValues.gst_box11_manual ?? 0;
+			const b12Val = manualValues.gst_box12_manual ?? 0;
 			return {
 				box: 8,
 				breakdown: {
-					box6: box6?.total ?? 0,
-					box7: box7?.total ?? 0,
-					net: (box6?.total ?? 0) - (box7?.total ?? 0)
+					box6: b6Val,
+					box7: b7Val,
+					box9: b9Val,
+					box10: b10Val,
+					box11: b11Val,
+					box12: b12Val,
+					net: b6Val - b7Val + b9Val - b10Val + b11Val - b12Val
 				}
 			};
 		}
@@ -482,11 +504,40 @@ export function createFinanceTaxApi(ctx: ModuleContext) {
 		};
 	};
 
+	const getGstF5Report = async (year: string, quarter: string) => {
+		const estimate = await getGstReturnEstimate(year, quarter);
+		if (!estimate) return null;
+
+		const range = getQuarterRange(year, quarter);
+		if (!range) return null;
+
+		const q = Number.parseInt(quarter, 10);
+		const y = Number.parseInt(year, 10);
+		const filingDeadline = new Date(Date.UTC(y, q * 3, 1));
+		filingDeadline.setUTCDate(filingDeadline.getUTCDate() - 1);
+		const filingDeadlineStr = filingDeadline.toISOString().slice(0, 10);
+
+		const netGstPayable = estimate.boxes.box8;
+
+		return {
+			...estimate,
+			filing: {
+				form: 'GST F5',
+				accountingPeriod: `${range.start} to ${range.end}`,
+				filingDeadline: filingDeadlineStr,
+				netGstPayable,
+				refundDue: netGstPayable < 0 ? Math.abs(netGstPayable) : 0,
+				paymentDue: netGstPayable > 0 ? netGstPayable : 0
+			}
+		};
+	};
+
 	return {
 		getGstManualBoxValues,
 		saveGstManualBoxValues,
 		getGstReturnEstimate,
 		getGstBoxDetail,
+		getGstF5Report,
 		getCorporateTaxEstimate,
 		getEmployeeTaxSummary
 	};

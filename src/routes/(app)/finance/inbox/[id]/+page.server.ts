@@ -36,7 +36,7 @@ interface CategoryChoice {
  * to expenses/revenue/archive" — clicking Confirm posts to /confirm with a
  * tamper-guarded payload hash.
  */
-const DIAGNOSTICS_ROLES = new Set(['owner', 'finance']);
+const DIAGNOSTICS_ROLES = new Set(['owner', 'admin', 'finance']);
 
 export const load: PageServerLoad = async (event) => {
 	const id = event.params.id;
@@ -67,8 +67,8 @@ export const load: PageServerLoad = async (event) => {
 		requiresProject: c.requiresProject
 	}));
 
-	const role = event.locals.user?.role;
-	const canViewDiagnostics = role ? DIAGNOSTICS_ROLES.has(role) : false;
+	const roles = event.locals.user?.roles ?? [];
+	const canViewDiagnostics = roles.some((r) => DIAGNOSTICS_ROLES.has(r));
 
 	return { artifact, categories, canViewDiagnostics };
 };

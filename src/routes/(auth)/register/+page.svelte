@@ -1,58 +1,82 @@
 <script lang="ts">
-	import { authClient } from '$platform/auth/client';
-	import type { AuthRole } from '$platform/auth/config';
-
-	const roleOptions: Array<{ value: AuthRole; label: string; note: string }> = [
-		{ value: 'owner', label: 'Owner', note: 'Full suite access' },
-		{ value: 'finance', label: 'Finance', note: 'Finance and document intake' },
-		{ value: 'project_manager', label: 'Project manager', note: 'Project workspace' },
-		{ value: 'hr', label: 'HR', note: 'Employee workspace' },
-		{ value: 'employee', label: 'Employee', note: 'Project entry access' }
-	];
+	import { onMount } from 'svelte';
 
 	let name = $state('');
 	let email = $state('');
 	let password = $state('');
-	let role = $state<AuthRole>('owner');
+	let inviteCode = $state('');
 	let loading = $state(false);
 	let error = $state('');
 	let done = $state(false);
+	let isFirstUser = $state<boolean | null>(null);
+
+	onMount(async () => {
+		try {
+			const res = await fetch('/api/auth/register');
+			if (res.ok) {
+				const data = await res.json();
+				isFirstUser = data.isFirstUser ?? false;
+			} else {
+				isFirstUser = false;
+			}
+		} catch {
+			isFirstUser = false;
+		}
+	});
 
 	async function onSubmit(e: Event) {
 		e.preventDefault();
 		loading = true;
 		error = '';
-		const callbackURL = `${window.location.origin}/login?verified=1`;
-		const payload: Parameters<typeof authClient.signUp.email>[0] & { role: AuthRole } = {
-			name: name.trim(),
-			email: email.trim().toLowerCase(),
-			password,
-			role,
-			callbackURL
-		};
-		const { error: err } = await authClient.signUp.email(payload);
-		loading = false;
-		if (err) {
-			error = err.message || 'Registration failed.';
-			return;
+
+		try {
+			const payload: Record<string, string> = {
+				name: name.trim(),
+				email: email.trim().toLowerCase(),
+				password
+			};
+			if (inviteCode.trim()) {
+				payload.inviteCode = inviteCode.trim();
+			}
+
+			const res = await fetch('/api/auth/register', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
+			});
+
+			const data = await res.json();
+			if (!res.ok) {
+				error = data.error || 'Registration failed.';
+				loading = false;
+				return;
+			}
+			done = true;
+		} catch {
+			error = 'Network error. Please try again.';
 		}
-		done = true;
+		loading = false;
 	}
 </script>
 
 <main class="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center px-6 py-12">
 	<div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 		<h1 class="text-2xl font-semibold text-slate-900">Create your SmartFin account</h1>
-		<p class="mt-2 text-sm text-slate-600">
-			We will send a verification link to your email. You can sign in only after verifying.
-		</p>
+		{#if isFirstUser}
+			<p class="mt-2 text-sm text-emerald-700">
+				No users exist yet. You will be registered as the workspace owner.
+			</p>
+		{:else}
+			<p class="mt-2 text-sm text-slate-600">
+				Enter your invite code to join the workspace. Contact your admin if you don't have one.
+			</p>
+		{/if}
 		{#if done}
 			<p class="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-				If this email was new, check your inbox to verify. If the address was already registered, we sent a short
-				notice to that inbox instead.
+				Account created successfully. You can now sign in.
 			</p>
-			<a class="mt-4 inline-block text-sm font-medium text-[var(--sf-green)] underline" href="/login?notice=check-email"
-				>Back to sign in</a
+			<a class="mt-4 inline-block text-sm font-medium text-[var(--sf-green)] underline" href="/login"
+				>Go to sign in</a
 			>
 		{:else}
 			{#if error}
@@ -91,23 +115,23 @@
 					/>
 					<span class="mt-1 block text-xs text-slate-500">At least 8 characters.</span>
 				</label>
-				<label class="block text-sm font-medium text-slate-700">
-					Test identity
-					<select
-						bind:value={role}
-						class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-[var(--sf-green)] focus:ring-2"
-					>
-						{#each roleOptions as option}
-							<option value={option.value}>{option.label} - {option.note}</option>
-						{/each}
-					</select>
-				</label>
+				{#if isFirstUser === false}
+					<label class="block text-sm font-medium text-slate-700">
+						Invite Code
+						<input
+							type="text"
+							bind:value={inviteCode}
+							placeholder="Enter your invite code (first user can leave blank)"
+							class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono tracking-wider outline-none ring-[var(--sf-green)] focus:ring-2"
+						/>
+					</label>
+				{/if}
 				<button
 					type="submit"
-					disabled={loading}
+					disabled={loading || isFirstUser === null}
 					class="w-full rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2f5e2c] disabled:opacity-60"
 				>
-					{loading ? 'Creating...' : 'Register'}
+					{loading ? 'Creating...' : isFirstUser ? 'Create Workspace' : 'Register'}
 				</button>
 			</form>
 			<p class="mt-4 text-center text-sm text-slate-600">

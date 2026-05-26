@@ -1,6 +1,14 @@
 import { z } from 'zod';
 
-export const authRoles = ['owner', 'finance', 'project_manager', 'hr', 'employee'] as const;
+export const authRoles = [
+	'owner',
+	'admin',
+	'finance',
+	'project_manager',
+	'hr',
+	'staff',
+	'employee'
+] as const;
 export const authRoleSchema = z.enum(authRoles);
 
 export const authEnvSchema = z.object({
@@ -11,3 +19,18 @@ export const authEnvSchema = z.object({
 });
 
 export type AuthRole = (typeof authRoles)[number];
+
+export function parseRoles(raw: string | null | undefined): AuthRole[] {
+	if (!raw) return ['employee'];
+	try {
+		const parsed = JSON.parse(raw);
+		if (Array.isArray(parsed)) {
+			const valid = parsed.filter((r): r is AuthRole => authRoles.includes(r as AuthRole));
+			return valid.length > 0 ? valid : ['employee'];
+		}
+	} catch {
+		// not JSON — legacy bare string
+	}
+	if (authRoles.includes(raw as AuthRole)) return [raw as AuthRole];
+	return ['employee'];
+}

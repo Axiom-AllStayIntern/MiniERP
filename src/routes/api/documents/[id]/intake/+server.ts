@@ -23,13 +23,13 @@ import { inferFileInlinePreviewKind } from '$platform/files/file-inline-preview'
  * artifact-owner check; for now the synthetic `tenantId: 'default'`
  * plus role gate is the operative boundary.
  */
-const DIAGNOSTICS_ROLES = new Set(['owner', 'finance']);
+const DIAGNOSTICS_ROLES = new Set(['owner', 'admin', 'finance']);
 
 export const GET: RequestHandler = async (event) => {
 	if (!event.platform) return fail('Cloudflare platform bindings are required', 500);
 	const user = event.locals.user;
 	if (!user) return fail('Unauthorized', 401);
-	if (!DIAGNOSTICS_ROLES.has(user.role)) {
+	if (!user.roles.some((r) => DIAGNOSTICS_ROLES.has(r))) {
 		return fail('Forbidden — diagnostics view is restricted to finance operators.', 403);
 	}
 

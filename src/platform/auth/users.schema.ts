@@ -8,9 +8,7 @@ export const users = sqliteTable('users', {
 	/** better-auth email verification */
 	emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
 	image: text('image'),
-	role: text('role', { enum: ['owner', 'finance', 'project_manager', 'hr', 'employee'] })
-		.notNull()
-		.default('owner'),
+	role: text('role').notNull().default('["owner"]'),
 	createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 	updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 	deletedAt: text('deleted_at')

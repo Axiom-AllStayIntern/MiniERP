@@ -1,8 +1,8 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
 
-  // 顶层 = v3 现网
-  "name": "smartfin",
+  // v4 默认开发/测试环境
+  "name": "smartfin-v4",
   "account_id": "c09bb2823904032b6ec648b23411f2e0",
   "compatibility_date": "2026-03-30",
   "compatibility_flags": ["nodejs_als"],
@@ -11,8 +11,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "smartfin-db",
-      "database_id": "208e1ed4-437f-4da5-93d7-7058debea5c8",
+      "database_name": "smartfin-db-v4",
+      "database_id": "15944d96-71a5-4c5a-b42c-92f6ba0b16b4",
       "migrations_dir": "drizzle/migrations"
     }
   ],
@@ -20,32 +20,34 @@
   "r2_buckets": [
     {
       "binding": "R2",
-      "bucket_name": "smartfin-files"
+      "bucket_name": "smartfin-files-v4"
     }
   ],
 
   "kv_namespaces": [
     {
       "binding": "KV",
-      "id": "fd0eca3363a3444daff52d1a35af69eb"
+      "id": "7bd4733bae7c460ba265549b3f468e1f"
     }
   ],
 
-  // OCR_QUEUE 仍被 legacy 路由引用；v4 如需保留兼容，也单独开一条 v4 queue。
+  // OCR_QUEUE 目前仍可保留，因为 legacy 路由可能还引用。
+  // 后续确认 /api/upload/* 等 legacy 路由清掉后，再删除 OCR_QUEUE。
   "queues": {
     "producers": [
       {
         "binding": "OCR_QUEUE",
-        "queue": "smartfin-ocr-queue"
+        "queue": "smartfin-ocr-queue-v4"
       },
       {
         "binding": "DOCUMENT_QUEUE",
-        "queue": "smartfin-doc-processor-queue"
+        "queue": "smartfin-doc-processor-queue-v4"
       }
     ]
   },
 
   "vars": {
+    "APP_ENV": "personal-v4",
     "BETTER_AUTH_URL": "https://smartfin.aki-wang.workers.dev",
     "EMAIL_FROM": "SmartFin <onboarding@resend.dev>",
     "LLM_PROVIDER": "heuristic",
@@ -67,13 +69,16 @@
   "workers_dev": true,
   "preview_urls": true,
 
+  // 公司开发环境配置
   "env": {
-    "v4": {
+    "company-dev": {
+      "account_id": "<COMPANY_CLOUDFLARE_ACCOUNT_ID>",
+
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "smartfin-db-v4",
-          "database_id": "15944d96-71a5-4c5a-b42c-92f6ba0b16b4",
+          "database_name": "smartfin-db-company-dev",
+          "database_id": "<COMPANY_DEV_D1_DATABASE_ID>",
           "migrations_dir": "drizzle/migrations"
         }
       ],
@@ -81,14 +86,14 @@
       "r2_buckets": [
         {
           "binding": "R2",
-          "bucket_name": "smartfin-files-v4"
+          "bucket_name": "smartfin-files-company-dev"
         }
       ],
 
       "kv_namespaces": [
         {
           "binding": "KV",
-          "id": "7bd4733bae7c460ba265549b3f468e1f"
+          "id": "<COMPANY_DEV_KV_NAMESPACE_ID>"
         }
       ],
 
@@ -96,23 +101,23 @@
         "producers": [
           {
             "binding": "OCR_QUEUE",
-            "queue": "smartfin-ocr-queue-v4"
+            "queue": "smartfin-ocr-queue-company-dev"
           },
           {
             "binding": "DOCUMENT_QUEUE",
-            "queue": "smartfin-doc-processor-queue-v4"
+            "queue": "smartfin-doc-processor-queue-company-dev"
           }
         ]
       },
 
       "vars": {
-        "BETTER_AUTH_URL": "https://smartfin-v4.aki-wang.workers.dev",
+        "APP_ENV": "company-dev",
+        "BETTER_AUTH_URL": "https://smartfin-company-dev.<company-workers-subdomain>.workers.dev",
         "EMAIL_FROM": "SmartFin <onboarding@resend.dev>",
         "LLM_PROVIDER": "heuristic",
         "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct",
         "WORKERS_AI_VISION_MODEL": "@cf/meta/llama-3.2-11b-vision-instruct",
-        "OCR_PROMPT_VERSION": "v1",
-        "APP_ENV": "v4"
+        "OCR_PROMPT_VERSION": "v1"
       },
 
       "assets": {
@@ -123,7 +128,78 @@
       "ai": {
         "binding": "AI",
         "remote": true
-      }
+      },
+
+      "workers_dev": true,
+      "preview_urls": true
+    },
+
+    "production": {
+      "account_id": "<COMPANY_CLOUDFLARE_ACCOUNT_ID>",
+
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "smartfin-db-prod",
+          "database_id": "<COMPANY_PROD_D1_DATABASE_ID>",
+          "migrations_dir": "drizzle/migrations"
+        }
+      ],
+
+      "r2_buckets": [
+        {
+          "binding": "R2",
+          "bucket_name": "smartfin-files-prod"
+        }
+      ],
+
+      "kv_namespaces": [
+        {
+          "binding": "KV",
+          "id": "<COMPANY_PROD_KV_NAMESPACE_ID>"
+        }
+      ],
+
+      "queues": {
+        "producers": [
+          {
+            "binding": "OCR_QUEUE",
+            "queue": "smartfin-ocr-queue-prod"
+          },
+          {
+            "binding": "DOCUMENT_QUEUE",
+            "queue": "smartfin-doc-processor-queue-prod"
+          }
+        ]
+      },
+
+      // 产品生产环境配置
+      // 生产环境建议强制走异步队列，避免同步调用导致的性能问题或请求超时。
+      "vars": {
+        "APP_ENV": "production",
+        "BETTER_AUTH_URL": "https://smartfin.<company-domain>.com",
+        "EMAIL_FROM": "SmartFin <finance@<company-domain>.com>",
+        "LLM_PROVIDER": "workers-ai",
+        "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct",
+        "WORKERS_AI_VISION_MODEL": "@cf/meta/llama-3.2-11b-vision-instruct",
+        "OCR_PROMPT_VERSION": "v1",
+
+        // 生产环境建议强制走异步队列
+        "DOCUMENT_QUEUE_FORCE_ASYNC": "true"
+      },
+
+      "assets": {
+        "binding": "ASSETS",
+        "directory": ".svelte-kit/cloudflare"
+      },
+
+      "ai": {
+        "binding": "AI",
+        "remote": true
+      },
+
+      "workers_dev": false,
+      "preview_urls": false
     }
   }
 }

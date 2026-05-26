@@ -23,7 +23,21 @@
       "Bash(./node_modules/.bin/tsx scratch-stage5-doc-intake-check.mjs)",
       "Bash(xargs -I {} basename {})",
       "Bash(perl -ne 'print if /^Content-Type: \\(image|application\\).*\\\\n/ .. /^--/')",
-      "Bash(awk '/^Content-Type: image\\\\/png; name=\"image.png\"/{flag=1; print \"=== image.png start \\(line\", NR, \"\\)\"; next} /^--e70275b73d7508eb3d07f62e74587ae4065447a70458c055ff7e5b102a8e--/{if\\(flag\\){print \"=== image.png end \\(line\", NR, \"\\)\"; flag=0}}' \"C:\\\\Users\\\\akiwc\\\\Documents\\\\Axiom\\\\AR Financial Management System\\\\DOC\\\\Test\\\\PO\\\\Fw Purchase order for 3D printing of BH & Bracket.eml\")"
+      "Bash(awk '/^Content-Type: image\\\\/png; name=\"image.png\"/{flag=1; print \"=== image.png start \\(line\", NR, \"\\)\"; next} /^--e70275b73d7508eb3d07f62e74587ae4065447a70458c055ff7e5b102a8e--/{if\\(flag\\){print \"=== image.png end \\(line\", NR, \"\\)\"; flag=0}}' \"C:\\\\Users\\\\akiwc\\\\Documents\\\\Axiom\\\\AR Financial Management System\\\\DOC\\\\Test\\\\PO\\\\Fw Purchase order for 3D printing of BH & Bracket.eml\")",
+      "Bash(npx svelte-check *)",
+      "Bash(node_modules/.bin/tsc --noEmit --pretty)",
+      "Bash(npm ls *)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(mkdir -p \"C:/Users/akiwc/Documents/Axiom/MiniERP/src/routes/api/finance/tax/gst/[year]/[quarter]/f5\" && mkdir -p \"C:/Users/akiwc/Documents/Axiom/MiniERP/src/routes/api/finance/e-invoice/generate\" && mkdir -p \"C:/Users/akiwc/Documents/Axiom/MiniERP/src/routes/api/finance/e-invoice/access-point\")",
+      "Bash(npx drizzle-kit *)",
+      "Bash(node scripts/check-modular-boundary.mjs)",
+      "Bash(mkdir -p \"C:/Users/akiwc/Documents/Axiom/MiniERP/src/routes/api/settings/users/[id]/roles\")",
+      "Bash(mkdir -p \"C:/Users/akiwc/Documents/Axiom/MiniERP/src/routes/api/settings/invites/[id]\")",
+      "Bash(npx wrangler *)",
+      "Bash(kill %1)",
+      "Bash(netstat -ano)",
+      "Bash(curl -s http://localhost:5173/api/auth/register)"
     ]
   }
 }

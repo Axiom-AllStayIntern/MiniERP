@@ -2,53 +2,80 @@ import type { AuthRole } from './config';
 
 const roleRank: Record<AuthRole, number> = {
 	employee: 1,
-	hr: 2,
-	project_manager: 2,
-	finance: 3,
-	owner: 4
+	staff: 2,
+	hr: 3,
+	project_manager: 3,
+	finance: 4,
+	admin: 5,
+	owner: 6
 };
 
 const MODULES_BY_ROLE: Record<AuthRole, readonly string[]> = {
 	owner: ['finance', 'document-intake', 'project', 'hr', 'business-partner', 'core'],
+	admin: ['finance', 'document-intake', 'project', 'hr', 'business-partner', 'core'],
 	finance: ['finance', 'document-intake'],
 	project_manager: ['project'],
 	hr: ['hr'],
+	staff: ['project'],
 	employee: ['project']
 };
 
 const DEFAULT_PATH_BY_ROLE: Record<AuthRole, string> = {
 	owner: '/finance/dashboard',
+	admin: '/finance/dashboard',
 	finance: '/finance/dashboard',
 	project_manager: '/projects',
 	hr: '/hr/employees',
+	staff: '/projects',
 	employee: '/projects'
 };
 
-export function hasAtLeastRole(current: AuthRole, required: AuthRole): boolean {
-	return roleRank[current] >= roleRank[required];
+export function primaryRole(roles: AuthRole[]): AuthRole {
+	if (roles.length === 0) return 'employee';
+	return roles.reduce((best, r) => (roleRank[r] > roleRank[best] ? r : best), roles[0]);
 }
 
-export function roleAllowedModuleIds(role: AuthRole): readonly string[] {
-	return MODULES_BY_ROLE[role];
+export function hasAtLeastRole(roles: AuthRole[], required: AuthRole): boolean {
+	return roles.some((r) => roleRank[r] >= roleRank[required]);
 }
 
-export function canRoleAccessModule(role: AuthRole, moduleId: string): boolean {
-	return MODULES_BY_ROLE[role].includes(moduleId);
+export function roleAllowedModuleIds(roles: AuthRole[]): readonly string[] {
+	const set = new Set<string>();
+	for (const r of roles) {
+		for (const m of MODULES_BY_ROLE[r]) set.add(m);
+	}
+	return [...set];
 }
 
-export function defaultPathForRole(role: AuthRole): string {
-	return DEFAULT_PATH_BY_ROLE[role];
+export function canRolesAccessModule(roles: AuthRole[], moduleId: string): boolean {
+	return roles.some((r) => MODULES_BY_ROLE[r].includes(moduleId));
 }
 
-export function isRouteAllowed(pathname: string, role: AuthRole): boolean {
+export function defaultPathForRoles(roles: AuthRole[]): string {
+	return DEFAULT_PATH_BY_ROLE[primaryRole(roles)];
+}
+
+export function isRouteAllowed(pathname: string, roles: AuthRole[]): boolean {
+	if (
+		pathname.startsWith('/settings/users') ||
+		pathname.startsWith('/settings/invites') ||
+		pathname.startsWith('/api/settings/users') ||
+		pathname.startsWith('/api/settings/invites')
+	) {
+		return roles.some((r) => r === 'owner' || r === 'admin');
+	}
 	if (pathname.startsWith('/api/finance/tax') || pathname.startsWith('/api/settings')) {
-		return role === 'owner' || role === 'finance';
+		return roles.some((r) => r === 'owner' || r === 'finance' || r === 'admin');
 	}
 	if (pathname.startsWith('/api/employees')) {
-		return role === 'owner' || role === 'hr' || role === 'project_manager' || role === 'finance';
+		return roles.some(
+			(r) => r === 'owner' || r === 'hr' || r === 'project_manager' || r === 'finance' || r === 'admin'
+		);
 	}
-	if (pathname.startsWith('/settings')) return role === 'owner';
-	if (pathname.startsWith('/finance/tax')) return role === 'owner' || role === 'finance';
-	if (pathname.startsWith('/hr/employees')) return role === 'owner' || role === 'hr';
+	if (pathname.startsWith('/settings')) return roles.some((r) => r === 'owner' || r === 'admin');
+	if (pathname.startsWith('/finance/tax'))
+		return roles.some((r) => r === 'owner' || r === 'finance' || r === 'admin');
+	if (pathname.startsWith('/hr/employees'))
+		return roles.some((r) => r === 'owner' || r === 'hr' || r === 'admin');
 	return true;
 }

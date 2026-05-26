@@ -4,7 +4,7 @@ import { fail } from '$platform/http';
 import { createDocumentIntakeService } from '$modules/document-intake';
 import { getDb } from '../../../../../infrastructure/db';
 
-const DIAGNOSTICS_ROLES = new Set(['owner', 'finance']);
+const DIAGNOSTICS_ROLES = new Set(['owner', 'admin', 'finance']);
 const MAX_BUFFER_BYTES = 32 * 1024 * 1024;
 
 function asciiFileName(name: string): string {
@@ -16,7 +16,7 @@ export const GET: RequestHandler = async (event) => {
 	if (!event.platform) return fail('Cloudflare platform bindings are required', 500);
 	const user = event.locals.user;
 	if (!user) return fail('Unauthorized', 401);
-	if (!DIAGNOSTICS_ROLES.has(user.role)) {
+	if (!user.roles.some((r) => DIAGNOSTICS_ROLES.has(r))) {
 		return fail('Forbidden — document preview is restricted to finance operators.', 403);
 	}
 	if (!event.platform.env.R2) return fail('R2 storage is not bound in this runtime.', 503);

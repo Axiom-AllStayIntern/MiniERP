@@ -21,6 +21,7 @@ import {
 	UploadGuardSchemaError
 } from '$platform/files/upload-guards';
 import type { ModuleContext } from '$platform/modules/types';
+import { AuditService } from '$platform/audit/audit-service';
 import { createEvent } from '../../../platform/events';
 import { businessTrips, documents, expenses } from '../../../infrastructure/db/schema';
 import {
@@ -170,6 +171,7 @@ function uploadFailure(
 
 export function createFinanceExpenseApi(ctx: ModuleContext) {
 	const expenseRepository = new ExpenseRepository(ctx.db);
+	const audit = new AuditService(ctx);
 	const insertExpenseRecord = async (input: {
 		id?: string;
 		projectId?: string | null;
@@ -498,6 +500,18 @@ export function createFinanceExpenseApi(ctx: ModuleContext) {
 			})
 			.where(and(eq(expenses.id, expenseId), isNull(expenses.deletedAt)));
 
+		await audit.writeLog({
+			action: 'expense.updated',
+			entityType: 'expense',
+			entityId: expenseId,
+			metadata: {
+				category: data.category,
+				expenseType: data.expenseType,
+				amount,
+				currency
+			}
+		});
+
 		return { ok: true as const };
 	};
 	const softDeleteStandaloneExpense = async (expenseId: string) => {
@@ -523,6 +537,12 @@ export function createFinanceExpenseApi(ctx: ModuleContext) {
 			.update(expenses)
 			.set({ deletedAt: now, updatedAt: now })
 			.where(and(eq(expenses.id, expenseId), isNull(expenses.deletedAt)));
+
+		await audit.writeLog({
+			action: 'expense.deleted',
+			entityType: 'expense',
+			entityId: expenseId
+		});
 
 		return { ok: true as const };
 	};
@@ -555,6 +575,19 @@ export function createFinanceExpenseApi(ctx: ModuleContext) {
 				expenseType: data.expenseType
 			})
 		);
+
+		await audit.writeLog({
+			action: 'expense.created',
+			entityType: 'expense',
+			entityId: row.id,
+			projectId: data.projectId ?? undefined,
+			metadata: {
+				amount: data.amount,
+				currency: data.currency ?? 'SGD',
+				category: data.category,
+				expenseType: data.expenseType
+			}
+		});
 
 		return row;
 	};
@@ -597,6 +630,19 @@ export function createFinanceExpenseApi(ctx: ModuleContext) {
 				updatedAt: nowIso()
 			})
 			.where(and(eq(expenses.id, expenseId), eq(expenses.projectId, projectId), isNull(expenses.deletedAt)));
+
+		await audit.writeLog({
+			action: 'expense.updated',
+			entityType: 'expense',
+			entityId: expenseId,
+			projectId,
+			metadata: {
+				category: data.category,
+				expenseType: data.expenseType,
+				amount,
+				currency
+			}
+		});
 	};
 	const softDeleteProjectExpense = async (projectId: string, expenseId: string) => {
 		const now = nowIso();
@@ -604,6 +650,13 @@ export function createFinanceExpenseApi(ctx: ModuleContext) {
 			.update(expenses)
 			.set({ deletedAt: now, updatedAt: now })
 			.where(and(eq(expenses.id, expenseId), eq(expenses.projectId, projectId), isNull(expenses.deletedAt)));
+
+		await audit.writeLog({
+			action: 'expense.deleted',
+			entityType: 'expense',
+			entityId: expenseId,
+			projectId
+		});
 	};
 	const createBusinessTripWithAllowance = async (data: FinanceBusinessTripAllowanceInput) => {
 		const start = new Date(data.startDate);

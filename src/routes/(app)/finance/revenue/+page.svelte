@@ -5,7 +5,7 @@
 	let { data } = $props();
 
 	let showManualEntry = $state(false);
-	let filterType = $state<'all' | 'standard' | 'zero_rate' | 'tax_invoice'>('all');
+	let filterType = $state<'all' | 'standard' | 'zero_rate' | 'tax_invoice' | 'exempt' | 'out_of_scope'>('all');
 
 	const money = (value: number | null | undefined, currency = 'SGD') =>
 		new Intl.NumberFormat('en-SG', { style: 'currency', currency }).format(value ?? 0);
@@ -27,6 +27,10 @@
 				return 'Tax Invoice';
 			case 'standard':
 				return 'Standard';
+			case 'exempt':
+				return 'Exempt (ES)';
+			case 'out_of_scope':
+				return 'Out-of-Scope (OP)';
 			default:
 				return type ?? '-';
 		}
@@ -80,9 +84,11 @@
 	<div class="flex flex-wrap items-center justify-between gap-3">
 		<select bind:value={filterType} class="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
 			<option value="all">All Types</option>
-			<option value="standard">Standard</option>
-			<option value="tax_invoice">Tax Invoice</option>
-			<option value="zero_rate">Zero Rate</option>
+			<option value="standard">Standard (SR)</option>
+			<option value="tax_invoice">Tax Invoice (SR)</option>
+			<option value="zero_rate">Zero Rate (ZR)</option>
+			<option value="exempt">Exempt (ES)</option>
+			<option value="out_of_scope">Out-of-Scope (OP)</option>
 		</select>
 
 		<div class="flex items-center gap-2">
@@ -203,9 +209,11 @@
 					<div>
 						<label class="block text-sm font-medium text-slate-700" for="invoiceType">Invoice Type</label>
 						<select id="invoiceType" name="invoiceType" class="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm" required>
-							<option value="standard">Standard</option>
-							<option value="tax_invoice">Tax Invoice</option>
-							<option value="zero_rate">Zero Rate</option>
+							<option value="standard">Standard (SR, 9%)</option>
+							<option value="tax_invoice">Tax Invoice (SR, 9%)</option>
+							<option value="zero_rate">Zero Rate (ZR, 0%)</option>
+							<option value="exempt">Exempt (ES)</option>
+							<option value="out_of_scope">Out-of-Scope (OP)</option>
 						</select>
 					</div>
 					<div>
