@@ -283,7 +283,7 @@ Cloudflare 部署还需 **`CLOUDFLARE_ACCOUNT_ID`**、**`CLOUDFLARE_API_TOKEN`**
 | 变量 | 说明 |
 |------|------|
 | `WORKERS_AI_MODEL` | 文本 LLM 模型（默认 `@cf/meta/llama-3.1-8b-instruct`） |
-| `WORKERS_AI_VISION_MODEL` | 视觉 OCR 模型（默认 `@cf/meta/llama-3.2-11b-vision-instruct`） |
+| `WORKERS_AI_VISION_MODEL` | 视觉 OCR 模型（默认 `@cf/google/gemma-3-12b-it`，fallback `@cf/meta/llama-3.2-11b-vision-instruct`） |
 | `PADDLE_OCR_URL` | 本地 PaddleOCR HTTP 服务地址（如 `http://127.0.0.1:8765`） |
 | `OCR_PADDLE_ONLY` | 若为 `true`，仅使用 PaddleOCR，不回退 Workers AI |
 

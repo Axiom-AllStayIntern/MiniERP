@@ -6,7 +6,7 @@
 	let { data } = $props();
 
 	let filterModule = $state(data.filters.module ?? '');
-	let filterActionType = $state(data.filters.actionType ?? '');
+	let filterActionType = $state<string>(data.filters.actionType ?? '');
 	let filterEmail = $state(data.filters.actorEmail ?? '');
 	let filterDateFrom = $state(data.filters.dateFrom ?? '');
 	let filterDateTo = $state(data.filters.dateTo ?? '');
@@ -63,7 +63,7 @@
 		integrityLoading = true;
 		try {
 			const res = await fetch('/api/audit/integrity');
-			const json = await res.json();
+			const json: { data: typeof integrityResult } = await res.json();
 			integrityResult = json.data;
 		} catch {
 			integrityResult = { valid: false, checkedCount: 0, firstInvalidSeq: -1, lastVerifiedSeq: 0 };
