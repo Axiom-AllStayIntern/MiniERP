@@ -38,6 +38,7 @@ const MODULE_PATH_MAPPINGS: ModulePathMapping[] = [
 	{ prefix: '/hr', moduleId: 'hr' },
 
 	// Core platform — settings / audit / company-level config (always-enabled).
+	{ prefix: '/api/audit', moduleId: 'core' },
 	{ prefix: '/api/settings', moduleId: 'core' },
 	{ prefix: '/settings', moduleId: 'core' }
 ];

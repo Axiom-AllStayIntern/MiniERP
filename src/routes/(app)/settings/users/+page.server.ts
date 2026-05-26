@@ -58,6 +58,11 @@ export const actions: Actions = {
 			action: 'user.roles_changed',
 			entityType: 'user',
 			entityId: targetUserId,
+			module: 'core',
+			actionType: 'permission_change',
+			ipAddress: event.getClientAddress(),
+			oldValue: { roles: oldRoles },
+			newValue: { roles: selectedRoles },
 			metadata: { oldRoles, newRoles: selectedRoles }
 		});
 
@@ -83,7 +88,10 @@ export const actions: Actions = {
 		await audit.writeLog(user, {
 			action: 'user.deactivated',
 			entityType: 'user',
-			entityId: targetUserId
+			entityId: targetUserId,
+			module: 'core',
+			actionType: 'permission_change',
+			ipAddress: event.getClientAddress()
 		});
 
 		return { saved: true, message: 'User deactivated.' };
@@ -107,7 +115,10 @@ export const actions: Actions = {
 		await audit.writeLog(user, {
 			action: 'user.reactivated',
 			entityType: 'user',
-			entityId: targetUserId
+			entityId: targetUserId,
+			module: 'core',
+			actionType: 'permission_change',
+			ipAddress: event.getClientAddress()
 		});
 
 		return { saved: true, message: 'User reactivated.' };

@@ -15,6 +15,8 @@ export function registerCoreHandlers(bus: EventBus, ctx: ModuleContext) {
 			entityType: p.type === 'customer' ? 'invoice_out' : 'invoice_in',
 			entityId: p.invoiceId,
 			projectId: p.projectId,
+			module: 'finance',
+			actionType: 'update',
 			metadata: { amount: p.amount, source: 'event_bus' }
 		});
 	});
@@ -26,6 +28,8 @@ export function registerCoreHandlers(bus: EventBus, ctx: ModuleContext) {
 			entityType: 'payment',
 			entityId: p.paymentId,
 			projectId: p.projectId,
+			module: 'finance',
+			actionType: 'create',
 			metadata: { amount: p.amount, invoiceId: p.invoiceId }
 		});
 	});
@@ -37,6 +41,8 @@ export function registerCoreHandlers(bus: EventBus, ctx: ModuleContext) {
 			entityType: 'payment',
 			entityId: p.paymentId,
 			projectId: p.projectId,
+			module: 'finance',
+			actionType: 'create',
 			metadata: { amount: p.amount, invoiceId: p.invoiceId }
 		});
 	});
@@ -53,7 +59,24 @@ export function registerCoreHandlers(bus: EventBus, ctx: ModuleContext) {
 			entityType: 'expense',
 			entityId: p.expenseId,
 			projectId: p.projectId ?? undefined,
+			module: 'finance',
+			actionType: 'create',
 			metadata: { amount: p.amount, expenseType: p.expenseType }
+		});
+	});
+
+	bus.on('expense.deleted', async (event) => {
+		const p = event.payload as {
+			expenseId: string;
+			projectId?: string | null;
+		};
+		await audit.writeLog({
+			action: 'expense.deleted',
+			entityType: 'expense',
+			entityId: p.expenseId,
+			projectId: p.projectId ?? undefined,
+			module: 'finance',
+			actionType: 'delete'
 		});
 	});
 
@@ -70,6 +93,8 @@ export function registerCoreHandlers(bus: EventBus, ctx: ModuleContext) {
 			entityType: 'payout',
 			entityId: p.payoutId,
 			projectId: p.projectId,
+			module: 'hr',
+			actionType: 'create',
 			metadata: { amount: p.amount, personId: p.personId, period: p.period }
 		});
 	});

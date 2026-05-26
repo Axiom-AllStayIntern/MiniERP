@@ -113,6 +113,12 @@
 				{ href: '/settings/users', label: 'Team Members', moduleId: 'core', icon: 'U' },
 				{ href: '/settings/invites', label: 'Invite Codes', moduleId: 'core', icon: '+' }
 			]
+		},
+		{
+			title: 'Compliance',
+			items: [
+				{ href: '/settings/audit-logs', label: 'Audit Trail', moduleId: 'core', icon: 'A' }
+			]
 		}
 	];
 

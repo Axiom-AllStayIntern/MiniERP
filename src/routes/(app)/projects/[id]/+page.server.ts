@@ -51,6 +51,8 @@ export const actions: Actions = {
 			entityType: 'project',
 			entityId: params.id,
 			projectId: params.id,
+			module: 'project',
+			actionType: 'update',
 			metadata: { status: status || 'active', name }
 		});
 
@@ -70,7 +72,9 @@ export const actions: Actions = {
 			action: 'project.archive',
 			entityType: 'project',
 			entityId: params.id,
-			projectId: params.id
+			projectId: params.id,
+			module: 'project',
+			actionType: 'update'
 		});
 
 		return { ok: true };
@@ -90,7 +94,9 @@ export const actions: Actions = {
 			action: 'project.remove',
 			entityType: 'project',
 			entityId: params.id,
-			projectId: params.id
+			projectId: params.id,
+			module: 'project',
+			actionType: 'delete'
 		});
 
 		throw redirect(303, '/projects');

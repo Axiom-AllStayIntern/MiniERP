@@ -76,6 +76,9 @@ export const actions: Actions = {
 			action: 'invite_code.created',
 			entityType: 'invite_code',
 			entityId: id,
+			module: 'core',
+			actionType: 'create',
+			ipAddress: event.getClientAddress(),
 			metadata: { roles: selectedRoles, expiresAt: expiresAt.toISOString(), label }
 		});
 
@@ -100,7 +103,10 @@ export const actions: Actions = {
 		await audit.writeLog(user, {
 			action: 'invite_code.revoked',
 			entityType: 'invite_code',
-			entityId: codeId
+			entityId: codeId,
+			module: 'core',
+			actionType: 'delete',
+			ipAddress: event.getClientAddress()
 		});
 
 		return { saved: true, message: 'Invite code revoked.' };

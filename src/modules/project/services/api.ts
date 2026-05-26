@@ -300,7 +300,7 @@ export function createProjectApi(ctx: ModuleContext) {
 				metadata: auditLogs.metadata
 			})
 			.from(auditLogs)
-			.where(and(eq(auditLogs.projectId, projectId), isNull(auditLogs.deletedAt)))
+			.where(eq(auditLogs.projectId, projectId))
 			.orderBy(desc(auditLogs.createdAt))
 			.limit(25);
 

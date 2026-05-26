@@ -82,6 +82,9 @@ export const POST: RequestHandler = async (event) => {
 				action: 'invite_code.consumed',
 				entityType: 'invite_code',
 				entityId: inviteCodeId,
+				module: 'core',
+				actionType: 'update',
+				ipAddress: event.getClientAddress(),
 				metadata: { usedBy: result.user.id, email }
 			});
 		}
@@ -90,6 +93,9 @@ export const POST: RequestHandler = async (event) => {
 			action: 'user.registered',
 			entityType: 'user',
 			entityId: result.user.id,
+			module: 'core',
+			actionType: 'create',
+			ipAddress: event.getClientAddress(),
 			metadata: {
 				roles,
 				inviteCodeId,

@@ -289,7 +289,7 @@ export class ProjectService {
 				metadata: schema.auditLogs.metadata
 			})
 			.from(schema.auditLogs)
-			.where(and(eq(schema.auditLogs.projectId, projectId), isNull(schema.auditLogs.deletedAt)))
+			.where(eq(schema.auditLogs.projectId, projectId))
 			.orderBy(desc(schema.auditLogs.createdAt))
 			.limit(25);
 
