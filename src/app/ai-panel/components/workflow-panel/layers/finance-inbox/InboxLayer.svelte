@@ -393,7 +393,7 @@
 											{diagnostics.textExtraction.rawText}
 										{/if}
 									{:else}
-										No raw text available.
+										{diagnostics.textExtraction?.provider === 'workers_ai_vision_direct' ? 'Vision direct, no raw OCR text.' : 'No raw text available.'}
 									{/if}
 								</div>
 							{:else}

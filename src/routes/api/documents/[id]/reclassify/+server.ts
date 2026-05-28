@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
 
 import { fail, ok } from '$platform/http';
+import { createFileService } from '$platform/files/file-service';
 import { getDb } from '../../../../../infrastructure/db';
 import { createDocumentIntakeService } from '$modules/document-intake';
 import {
@@ -25,6 +26,11 @@ import {
  */
 interface ReclassifyBody {
 	categoryId: string;
+}
+
+function isImageArtifact(mimeType: string, fileName?: string): boolean {
+	if (mimeType.toLowerCase().startsWith('image/')) return true;
+	return Boolean(fileName && /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(fileName));
 }
 
 export const POST: RequestHandler = async (event) => {
@@ -58,9 +64,15 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	const text = artifact.textExtraction?.text;
-	if (!text || text.length < 32) {
+	const canUseText = Boolean(text && text.length >= 32);
+	const canUseImage = isImageArtifact(artifact.originalFile.mimeType, artifact.originalFile.fileName);
+	let imageBytes: Uint8Array | undefined;
+	if (!canUseText && canUseImage) {
+		imageBytes = await createFileService(env).getBytes(artifact.originalFile.storageRef) ?? undefined;
+	}
+	if (!canUseText && !imageBytes) {
 		return fail(
-			'Artifact has no usable extracted text — cannot re-extract. Re-upload may be required.',
+			'Artifact has no usable extracted text or image bytes — cannot re-extract. Re-upload may be required.',
 			400
 		);
 	}
@@ -69,7 +81,9 @@ export const POST: RequestHandler = async (event) => {
 		{
 			documentId: artifact.id,
 			fileName: artifact.originalFile.fileName,
-			text,
+			text: canUseText ? text : undefined,
+			imageBytes,
+			mimeType: imageBytes ? artifact.originalFile.mimeType : undefined,
 			categoryId: body.categoryId,
 			artifactConfidence: artifact.classification?.confidence
 		},
@@ -94,6 +108,7 @@ export const POST: RequestHandler = async (event) => {
 		fields: result.fields as unknown as Record<string, unknown>,
 		confidence: perFieldConfidence,
 		evidence: result.evidence,
+		sourceQuotes: result.sourceQuotes,
 		categoryId: body.categoryId
 	});
 	if (!updated) return fail('Reclassify failed', 500);

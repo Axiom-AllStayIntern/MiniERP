@@ -1,6 +1,12 @@
+import type { ZodType } from 'zod';
+
 export type WorkersVisionOcrResult =
 	| { ok: true; text: string; model: string }
 	| { ok: false; error: string };
+
+export type WorkersVisionJsonResult<T> =
+	| { ok: true; value: T; model: string }
+	| { ok: false; error: string; model?: string };
 
 function readEnv(platformEnv: Env, key: string): string {
 	const processEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
@@ -60,6 +66,93 @@ function extractVisionText(raw: unknown): string {
 	}
 
 	return '';
+}
+
+function tryParseJson(raw: string): unknown | null {
+	const trimmed = raw.trim();
+	if (!trimmed) return null;
+	try {
+		return JSON.parse(trimmed) as unknown;
+	} catch {
+		return null;
+	}
+}
+
+function extractBalancedJsonObject(s: string): string | null {
+	const start = s.indexOf('{');
+	if (start < 0) return null;
+	let depth = 0;
+	let inString = false;
+	let escape = false;
+	for (let i = start; i < s.length; i += 1) {
+		const c = s[i];
+		if (escape) {
+			escape = false;
+			continue;
+		}
+		if (c === '\\' && inString) {
+			escape = true;
+			continue;
+		}
+		if (c === '"') {
+			inString = !inString;
+			continue;
+		}
+		if (inString) continue;
+		if (c === '{') depth += 1;
+		else if (c === '}') {
+			depth -= 1;
+			if (depth === 0) return s.slice(start, i + 1);
+		}
+	}
+	return null;
+}
+
+function parseLooseJson(text: string): unknown | null {
+	const direct = tryParseJson(text);
+	if (direct !== null) return direct;
+	const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+	if (fenced?.[1]) {
+		const inner = tryParseJson(fenced[1].trim());
+		if (inner !== null) return inner;
+		const balanced = extractBalancedJsonObject(fenced[1]);
+		if (balanced) return tryParseJson(balanced);
+	}
+	const balanced = extractBalancedJsonObject(text);
+	return balanced ? tryParseJson(balanced) : null;
+}
+
+export function parseVisionJsonResponse(raw: unknown): unknown | null {
+	if (raw === null || raw === undefined) return null;
+	if (typeof raw === 'string') return parseLooseJson(raw);
+	if (typeof raw !== 'object') return null;
+
+	const obj = raw as Record<string, unknown>;
+	for (const key of ['response', 'result', 'output', 'output_text', 'text']) {
+		const value = obj[key];
+		if (typeof value === 'string') {
+			const parsed = parseLooseJson(value);
+			if (parsed !== null) return parsed;
+		}
+	}
+
+	if (obj.result && typeof obj.result === 'object' && !Array.isArray(obj.result)) {
+		const parsed = parseVisionJsonResponse(obj.result);
+		if (parsed !== null) return parsed;
+	}
+
+	const choices = obj.choices as Array<{ message?: { content?: unknown } }> | undefined;
+	const content = choices?.[0]?.message?.content;
+	if (typeof content === 'string') return parseLooseJson(content);
+	if (Array.isArray(content)) {
+		const text = content
+			.map((p) => (typeof p === 'object' && p && 'text' in p ? String((p as { text?: string }).text ?? '') : ''))
+			.filter(Boolean)
+			.join('\n');
+		return parseLooseJson(text);
+	}
+
+	return obj;
 }
 
 // Prompt designed to force literal copying, not interpretation.
@@ -134,5 +227,87 @@ export async function runWorkersVisionOcr(
 		return { ok: true, text, model };
 	} catch (e) {
 		return { ok: false, error: e instanceof Error ? e.message : 'Workers AI vision call failed.' };
+	}
+}
+
+export async function runWorkersVisionJson<T>(
+	env: Env,
+	input: {
+		imageBytes: Uint8Array;
+		mimeType: string;
+		systemPrompt: string;
+		userPrompt: string;
+		schema: ZodType<T>;
+		maxTokens?: number;
+	}
+): Promise<WorkersVisionJsonResult<T>> {
+	if (!env.AI) {
+		return { ok: false, error: 'Workers AI is not available (missing AI binding).' };
+	}
+	if (input.imageBytes.length === 0) {
+		return { ok: false, error: 'Empty image payload.' };
+	}
+	if (input.imageBytes.length > MAX_IMAGE_BYTES) {
+		return { ok: false, error: `Image too large (${input.imageBytes.length} bytes, max ${MAX_IMAGE_BYTES}).` };
+	}
+
+	const model = readEnv(env, 'WORKERS_AI_VISION_MODEL') || '@cf/meta/llama-3.2-11b-vision-instruct';
+	const mime = normalizeMime(input.mimeType);
+	const dataUri = `data:${mime};base64,${uint8ToBase64(input.imageBytes)}`;
+	const prompt = `${input.systemPrompt.trim()}
+
+${input.userPrompt.trim()}
+
+Return only one valid JSON object. No markdown, no preamble, no commentary.`;
+
+	const messages = [
+		{
+			role: 'user' as const,
+			content: [
+				{ type: 'text' as const, text: prompt },
+				{ type: 'image_url' as const, image_url: { url: dataUri } }
+			]
+		}
+	];
+
+	const runVision = async () =>
+		env.AI!.run(model as Parameters<NonNullable<Env['AI']>['run']>[0], {
+			messages,
+			max_tokens: input.maxTokens ?? 2048,
+			temperature: 0,
+			response_format: { type: 'json_object' }
+		} as Parameters<NonNullable<Env['AI']>['run']>[1]);
+
+	try {
+		let raw: unknown;
+		try {
+			raw = await runVision();
+		} catch {
+			if (model.includes('llama')) {
+				try {
+					await env.AI!.run(model as Parameters<NonNullable<Env['AI']>['run']>[0], {
+						prompt: 'agree'
+					} as Parameters<NonNullable<Env['AI']>['run']>[1]);
+				} catch { /* already agreed or unrelated */ }
+				raw = await runVision();
+			} else {
+				throw new Error(`Vision model ${model} call failed.`);
+			}
+		}
+
+		const json = parseVisionJsonResponse(raw);
+		const parsed = input.schema.safeParse(json);
+		if (!parsed.success) {
+			return {
+				ok: false,
+				error: parsed.error.issues
+					.map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.message}`)
+					.join('; '),
+				model
+			};
+		}
+		return { ok: true, value: parsed.data, model };
+	} catch (e) {
+		return { ok: false, error: e instanceof Error ? e.message : 'Workers AI vision JSON call failed.', model };
 	}
 }

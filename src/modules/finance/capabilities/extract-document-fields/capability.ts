@@ -13,6 +13,7 @@
  */
 import type { ZodType } from 'zod';
 import { runStructuredOutput } from '../../../../platform/ai/ai-runtime';
+import { runWorkersVisionJson } from '../../../../platform/ai/ocr/workers-vision-ocr';
 import { normalizeDocumentText, smartTruncate } from '../../../../platform/ai/text-preprocessing';
 import {
 	findCategoryById,
@@ -77,6 +78,8 @@ export interface ExtractDocumentFieldsInput {
 	documentId: string;
 	fileName?: string;
 	text?: string;
+	imageBytes?: Uint8Array;
+	mimeType?: string;
 	artifactConfidence?: number;
 	/** Category id from the workflow state, e.g. `expense.sales_cost.invoice`.
 	 *  When absent the capability defaults to invoice extraction (Phase 2 behavior). */
@@ -357,6 +360,59 @@ async function tryLlmExtraction(
 	return { fields, confidence, provider, quotes };
 }
 
+async function tryVisionExtraction(
+	imageBytes: Uint8Array,
+	mimeType: string,
+	docType: CategoryDocType,
+	ctx: CapabilityContextWithEnv,
+	categoryId: string,
+	documentId: string,
+	fileName?: string
+): Promise<{ fields: CommonFields; confidence: number; provider: ExtractionProvider; quotes: Record<string, string> } | null> {
+	if (!ctx.env) return null;
+	const cfg = configForDocType(docType);
+	if (!cfg) return null;
+
+	const result = await runWorkersVisionJson<unknown>(ctx.env, {
+		imageBytes,
+		mimeType,
+		schema: cfg.schema,
+		maxTokens: 2048,
+		systemPrompt: `${cfg.systemPrompt}
+
+IMAGE MODE:
+- You are looking at the original document image, not an OCR transcription.
+- Read only visible text in the image and extract the requested fields.
+- Do not transcribe the full document.
+- If a field is not visible or is ambiguous, return null.`,
+		userPrompt: `Filename: ${fileName ?? 'unavailable'}
+Document id: ${documentId}
+Category id: ${categoryId}
+
+Extract the category-specific fields directly from this image.`
+	});
+
+	if (!result.ok) {
+		console.warn(
+			`[extract-document-fields] vision JSON call failed for ${docType}/${documentId}: ${result.error}`
+		);
+		return null;
+	}
+
+	const fields = cfg.mapToFields(result.value);
+	if (!fields) return null;
+	const confidence = cfg.confidenceFromValue(result.value) ?? 0.8;
+	const rawQuotes = (result.value as Record<string, unknown>)._quotes;
+	const quotes: Record<string, string> = {};
+	if (rawQuotes && typeof rawQuotes === 'object' && !Array.isArray(rawQuotes)) {
+		for (const [k, v] of Object.entries(rawQuotes as Record<string, unknown>)) {
+			if (typeof v === 'string' && v.trim().length > 0) quotes[k] = v.trim();
+		}
+	}
+
+	return { fields, confidence, provider: 'workers_ai', quotes };
+}
+
 // ---------------------------------------------------------------------------
 // Capability
 // ---------------------------------------------------------------------------
@@ -483,6 +539,38 @@ export const extractDocumentFieldsCapability: FinanceCapability<
 	async execute(input, ctx) {
 		const ctxWithEnv = ctx as CapabilityContextWithEnv;
 		const { docType, category } = resolveDocType(input);
+
+		if (input.imageBytes && input.mimeType && ctxWithEnv.env && !ctxWithEnv.useMock) {
+			const categoryIdRef = category?.id ?? input.categoryId ?? 'unknown';
+			const llm = await tryVisionExtraction(
+				input.imageBytes,
+				input.mimeType,
+				docType,
+				ctxWithEnv,
+				categoryIdRef,
+				input.documentId,
+				input.fileName
+			);
+			if (llm) {
+				const fields = outputFor(llm.fields, category, input.outputShape);
+				return {
+					fields,
+					confidence: llm.confidence,
+					evidence: buildEvidenceForFields(llm.provider, fields),
+					sourceQuotes: Object.keys(llm.quotes).length > 0 ? llm.quotes : undefined,
+					provider: llm.provider
+				};
+			}
+			console.warn(
+				`[extract-document-fields] vision extraction produced no usable fields for ${docType}/${input.documentId} (categoryId=${input.categoryId})`
+			);
+			return {
+				fields: {},
+				confidence: 0,
+				evidence: [],
+				provider: 'none'
+			};
+		}
 
 		// 1. No usable text, or a direct unit/demo call without runtime env → fixture mock fallback.
 		if (!input.text || input.text.length < MIN_TEXT_LENGTH_FOR_REAL_EXTRACT || !ctxWithEnv.env) {

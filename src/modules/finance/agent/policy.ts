@@ -26,6 +26,12 @@ export const financeAgentAllowedCapabilities: FinanceCapabilityPolicyEntry[] = [
 		requiredUserPermissions: ['finance:edit']
 	},
 	{
+		id: 'finance.classify-document-category',
+		riskLevel: 'R1',
+		requiresConfirmation: false,
+		requiredUserPermissions: ['finance:view']
+	},
+	{
 		id: 'finance.match-supplier',
 		riskLevel: 'R1',
 		requiresConfirmation: false,

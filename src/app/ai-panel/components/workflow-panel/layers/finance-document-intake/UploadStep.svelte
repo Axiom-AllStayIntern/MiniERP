@@ -22,6 +22,8 @@
 	const TERMINAL_BAD: DocumentProcessingStatus[] = ['needs_manual_review', 'failed'];
 	const MIN_USEFUL_CLIENT_TEXT = 48;
 	const MAX_BATCH_FILES = 25;
+	const VISION_IMAGE_MAX_EDGE = 1800;
+	const VISION_IMAGE_MAX_BYTES = 5_500_000;
 	const SUPPORTED_DOCUMENT_EXT_RE = /\.(pdf|docx|doc|eml|png|jpe?g|webp)$/i;
 	const ZIP_EXT_RE = /\.zip$/i;
 
@@ -66,6 +68,58 @@
 		return chunks.join('\n').trim();
 	}
 
+	async function canvasToJpegFile(canvas: HTMLCanvasElement, fileName: string): Promise<File | null> {
+		for (const quality of [0.86, 0.76, 0.66]) {
+			const blob = await new Promise<Blob | null>((resolve) =>
+				canvas.toBlob((b) => resolve(b), 'image/jpeg', quality)
+			);
+			if (!blob) continue;
+			if (blob.size <= VISION_IMAGE_MAX_BYTES || quality === 0.66) {
+				return new File([blob], fileName.replace(/\.[^.]+$/i, '') + '.jpg', { type: 'image/jpeg' });
+			}
+		}
+		return null;
+	}
+
+	function enhanceCanvasForVision(canvas: HTMLCanvasElement) {
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+		const data = imageData.data;
+		const contrast = 1.12;
+		for (let i = 0; i < data.length; i += 4) {
+			const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+			const adjusted = Math.max(0, Math.min(255, (gray - 128) * contrast + 128));
+			data[i] = adjusted;
+			data[i + 1] = adjusted;
+			data[i + 2] = adjusted;
+			data[i + 3] = 255;
+		}
+		ctx.putImageData(imageData, 0, 0);
+	}
+
+	async function preprocessImageForVision(file: File): Promise<File | null> {
+		try {
+			const bitmap = await createImageBitmap(file);
+			const scale = Math.min(1, VISION_IMAGE_MAX_EDGE / Math.max(bitmap.width, bitmap.height, 1));
+			const width = Math.max(1, Math.round(bitmap.width * scale));
+			const height = Math.max(1, Math.round(bitmap.height * scale));
+			const canvas = document.createElement('canvas');
+			canvas.width = width;
+			canvas.height = height;
+			const ctx = canvas.getContext('2d');
+			if (!ctx) return null;
+			ctx.fillStyle = '#ffffff';
+			ctx.fillRect(0, 0, width, height);
+			ctx.drawImage(bitmap, 0, 0, width, height);
+			bitmap.close?.();
+			enhanceCanvasForVision(canvas);
+			return await canvasToJpegFile(canvas, file.name);
+		} catch {
+			return null;
+		}
+	}
+
 	async function renderPdfFirstPageJpeg(file: File): Promise<File | null> {
 		try {
 			const pdfjs = await loadPdfJs();
@@ -83,12 +137,9 @@
 			const ctx = canvas.getContext('2d');
 			if (!ctx) return null;
 			await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-			const blob = await new Promise<Blob | null>((resolve) =>
-				canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.88)
-			);
-			if (!blob) return null;
 			const baseName = file.name.replace(/\.pdf$/i, '') || 'document';
-			return new File([blob], `${baseName}-p1.jpg`, { type: 'image/jpeg' });
+			enhanceCanvasForVision(canvas);
+			return await canvasToJpegFile(canvas, `${baseName}-p1.jpg`);
 		} catch {
 			return null;
 		}
@@ -96,7 +147,7 @@
 
 	type ClientExtraction = {
 		text: string;
-		method: 'pdfjs' | 'vision_first_page' | 'manual';
+		method: 'pdfjs' | 'vision_first_page' | 'vision_preprocessed' | 'manual';
 		uploadFile: File;
 	};
 
@@ -223,8 +274,8 @@
 			name.endsWith('.docx');
 
 		if (isImage) {
-			// Server-side vision OCR will handle this; nothing to extract on client.
-			return { text: '', method: 'manual', uploadFile: file };
+			const processed = await preprocessImageForVision(file);
+			return { text: '', method: 'vision_preprocessed', uploadFile: processed ?? file };
 		}
 
 		if (isDocx) {
@@ -268,7 +319,7 @@
 			// Server-side vision OCR handles it from there.
 			const jpeg = await renderPdfFirstPageJpeg(file);
 			if (jpeg) {
-				return { text: '', method: 'vision_first_page', uploadFile: jpeg };
+				return { text: '', method: 'vision_preprocessed', uploadFile: jpeg };
 			}
 			// Last-resort: upload the original PDF; server will mark needs_manual_review.
 			return { text: '', method: 'manual', uploadFile: file };
