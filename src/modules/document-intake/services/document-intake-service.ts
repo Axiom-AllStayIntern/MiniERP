@@ -66,12 +66,9 @@ export interface FieldExtractorInput {
 	tenantId: string;
 	documentId: string;
 	fileName: string;
-	text?: string;
-	imageBytes?: Uint8Array;
-	mimeType?: string;
+	text: string;
 	documentType: DocumentArtifact['documentType'];
 	classificationConfidence: number;
-	categoryId?: string;
 }
 
 export interface FieldExtractorResult {
@@ -88,25 +85,6 @@ export type FieldExtractor = (
 	input: FieldExtractorInput
 ) => Promise<FieldExtractorResult | null>;
 
-export interface CategoryClassifierInput {
-	tenantId: string;
-	documentId: string;
-	fileName: string;
-	mimeType: string;
-	imageBytes: Uint8Array;
-}
-
-export interface CategoryClassifierResult {
-	categoryId: string | null;
-	documentType: NonNullable<DocumentArtifact['documentType']>;
-	confidence: number;
-	reason?: string;
-}
-
-export type CategoryClassifier = (
-	input: CategoryClassifierInput
-) => Promise<CategoryClassifierResult | null>;
-
 export interface ProcessDocumentInput {
 	tenantId?: string;
 	documentId: string;
@@ -121,7 +99,7 @@ export interface ProcessDocumentInput {
 	 */
 	clientExtractedText?: string;
 	/** How the client extracted the text. Used in audit metadata for evaluation. */
-	clientExtractionMethod?: 'pdfjs' | 'vision_first_page' | 'vision_preprocessed' | 'manual';
+	clientExtractionMethod?: 'pdfjs' | 'vision_first_page' | 'manual';
 	/**
 	 * Optional finance-side field extraction step. When present and the
 	 * artifact reaches the `classified` state, the service invokes this to
@@ -131,12 +109,6 @@ export interface ProcessDocumentInput {
 	 * control — document-intake never imports finance.
 	 */
 	fieldExtractor?: FieldExtractor;
-	/**
-	 * Optional finance-side image classifier for direct vision intake. When
-	 * present, image artifacts with no useful client text skip long OCR and use
-	 * this callback to pick the finance category directly from the image.
-	 */
-	categoryClassifier?: CategoryClassifier;
 }
 
 export interface DocumentArtifactView {
@@ -201,11 +173,6 @@ function toView(artifact: DocumentArtifact): DocumentArtifactView {
 	};
 }
 
-function isImageArtifact(mimeType: string, fileName?: string): boolean {
-	if (mimeType.toLowerCase().startsWith('image/')) return true;
-	return Boolean(fileName && /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(fileName));
-}
-
 export interface DocumentIntakeService {
 	createDocumentFromUpload(
 		input: CreateDocumentFromUploadInput
@@ -241,7 +208,6 @@ export interface DocumentIntakeService {
 		fields: Record<string, unknown>;
 		confidence?: Record<string, number>;
 		evidence?: unknown;
-		sourceQuotes?: Record<string, string>;
 		categoryId: string;
 	}): Promise<DocumentArtifact | null>;
 	listDocumentArtifacts(input: DocumentArtifactLibraryFilters): Promise<{
@@ -394,126 +360,6 @@ export function createDocumentIntakeService(
 					confidence: 0.9,
 					provider: `client_${input.clientExtractionMethod ?? 'manual'}`
 				};
-			} else if (
-				input.categoryClassifier &&
-				isImageArtifact(artifact.originalFile.mimeType, artifact.originalFile.fileName)
-			) {
-				const imageBytes = await fileService.getBytes(artifact.originalFile.storageRef);
-				if (!imageBytes) {
-					throw new Error(`No object at ${artifact.originalFile.storageRef}`);
-				}
-				extraction = {
-					method: 'vision_model',
-					status: 'success',
-					text: '',
-					confidence: 0.85,
-					provider: 'workers_ai_vision_direct'
-				};
-				await repo.setTextExtraction(artifact.id, extraction);
-				await repo.setStatus(artifact.id, 'text_extracted');
-				const afterText = await repo.findById(artifact.id, tenantId);
-				await audit(afterText!, 'document.text_extracted', 'ok', {
-					outputRefs: {
-						method: extraction.method,
-						confidence: extraction.confidence,
-						provider: extraction.provider,
-						mode: 'vision_direct'
-					}
-				});
-
-				await repo.setStatus(artifact.id, 'classification_pending');
-				const categoryClassification = await input.categoryClassifier({
-					tenantId,
-					documentId: artifact.id,
-					fileName: artifact.originalFile.fileName,
-					mimeType: artifact.originalFile.mimeType,
-					imageBytes
-				});
-				const classification: DocumentClassificationResult = categoryClassification
-					? {
-							documentType: categoryClassification.documentType,
-							confidence: categoryClassification.confidence,
-							possibleTypes: [
-								{
-									documentType: categoryClassification.documentType,
-									confidence: categoryClassification.confidence
-								}
-							],
-							reason: categoryClassification.reason,
-							modelId: 'workers_ai_vision_direct',
-							promptVersion: 'finance-classify-document-category-v1',
-							schemaVersion: 'v1'
-						}
-					: {
-							documentType: 'unknown',
-							confidence: 0,
-							possibleTypes: [],
-							reason: 'Vision category classifier returned no valid category.',
-							modelId: 'workers_ai_vision_direct',
-							promptVersion: 'finance-classify-document-category-v1',
-							schemaVersion: 'v1'
-						};
-				await repo.setClassification(artifact.id, classification);
-				const afterClass = await repo.findById(artifact.id, tenantId);
-				await audit(afterClass!, 'document.classified', 'ok', {
-					outputRefs: {
-						documentType: classification.documentType,
-						confidence: classification.confidence,
-						categoryId: categoryClassification?.categoryId,
-						mode: 'vision_direct'
-					}
-				});
-
-				if (classification.confidence < MIN_CLASSIFICATION_CONFIDENCE) {
-					await repo.addSecurityFlag(artifact.id, 'low_ocr_confidence');
-				}
-
-				const MIN_VISION_EXTRACT_CONFIDENCE = 0.35;
-				if (input.fieldExtractor && categoryClassification?.categoryId &&
-					categoryClassification.confidence >= MIN_VISION_EXTRACT_CONFIDENCE) {
-					await repo.setStatus(artifact.id, 'fields_extraction_pending');
-					console.log(`[processDocument] vision field extraction: reusing imageBytes (${imageBytes.length} bytes) for ${artifact.id}, category=${categoryClassification.categoryId}`);
-					try {
-						const extracted = await input.fieldExtractor({
-							tenantId,
-							documentId: artifact.id,
-							fileName: artifact.originalFile.fileName,
-							imageBytes,
-							mimeType: artifact.originalFile.mimeType,
-							documentType: classification.documentType,
-							classificationConfidence: classification.confidence,
-							categoryId: categoryClassification.categoryId
-						});
-						if (extracted) {
-							const result: SuggestedFieldsResult = {
-								fields: extracted.fields,
-								confidence: extracted.confidence,
-								evidence: extracted.evidence,
-								sourceQuotes: extracted.sourceQuotes,
-								categoryId: extracted.categoryId,
-								extractedAt: new Date().toISOString()
-							};
-							await repo.setSuggestedFields(artifact.id, result, extracted.categoryId);
-							const afterFields = await repo.findById(artifact.id, tenantId);
-							await audit(afterFields!, 'document.fields_extracted', 'ok', {
-								outputRefs: {
-									categoryId: extracted.categoryId,
-									fieldCount: Object.keys(extracted.fields).length,
-									mode: 'vision_direct'
-								}
-							});
-						}
-					} catch (err) {
-						await audit(artifact, 'document.fields_extraction_failed', 'failed', {
-							errorCode: err instanceof Error ? err.message.slice(0, 80) : 'extractor_error'
-						});
-					}
-				}
-
-				await repo.setStatus(artifact.id, 'ready_for_review');
-				const ready = await repo.findById(artifact.id, tenantId);
-				await audit(ready!, 'document.ready_for_review');
-				return ready!;
 			} else {
 				extraction = await extractTextFromBlob({
 					fileRef: {
