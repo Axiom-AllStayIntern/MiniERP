@@ -60,7 +60,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 
 	return ok({
 		text: result.text,
-		model: result.model,
+		provider: result.provider,
 		fileName: file.name
 	});
 };
