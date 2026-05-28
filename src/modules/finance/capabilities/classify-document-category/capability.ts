@@ -27,7 +27,7 @@ export interface ClassifyDocumentCategoryOutput {
 const classifyCategorySchema = z.object({
 	categoryId: z.string().nullable().optional(),
 	documentType: z.string().nullable().optional(),
-	confidence: z.number().min(0).max(1),
+	confidence: z.number().min(0).max(1).optional().default(0.5),
 	reason: z.string().nullable().optional()
 });
 
