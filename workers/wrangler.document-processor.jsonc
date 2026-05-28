@@ -50,7 +50,8 @@
     "LLM_PROVIDER": "heuristic",
     "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct",
     "WORKERS_AI_VISION_MODEL": "@cf/meta/llama-3.2-11b-vision-instruct",
-    "OCR_PROMPT_VERSION": "v1"
+    "OCR_PROMPT_VERSION": "v1",
+    "GEMINI_MODEL": "gemini-2.0-flash"
   },
 
   "ai": {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PageShell from '$app-layer/components/PageShell.svelte';
 	import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+	import { preprocessImageForOcr } from '$lib/utils/preprocess-image';
 	import {
 		isLegacyDocMimeOrName,
 		isLikelyDocxMimeOrName,
@@ -349,8 +350,9 @@
 			const isImage = mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(fname);
 
 			if (isImage) {
-				// Image: run Workers AI vision OCR client-side, pass result as rawText
-				const ocrText = await runWorkersVisionOcr(selectedFile, selectedFile.name);
+				// Image: preprocess then run OCR
+				const processed = await preprocessImageForOcr(selectedFile);
+				const ocrText = await runWorkersVisionOcr(processed, processed.name);
 				if (ocrText.trim()) fd.set('rawText', ocrText);
 			} else if (isPdf) {
 				// PDF: try pdfjs text extraction first
