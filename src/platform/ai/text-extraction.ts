@@ -191,9 +191,9 @@ export async function extractTextFromBytesRaw(
 			method: 'vision_model',
 			status: 'success',
 			text: result.text,
-			confidence: result.provider === 'gemini' ? 0.9 : 0.85,
+			confidence: result.provider === 'openai' ? 0.9 : 0.85,
 			provider: result.provider,
-			providerJobId: result.provider === 'gemini' ? readEnv(env, 'GEMINI_MODEL') || 'gemini-2.0-flash' : undefined
+			providerJobId: result.provider === 'openai' ? readEnv(env, 'OPENAI_VISION_MODEL') || 'gpt-4o-mini' : undefined
 		};
 	}
 

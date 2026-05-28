@@ -1,4 +1,4 @@
-export type GeminiVisionOcrResult =
+export type OpenAiVisionOcrResult =
 	| { ok: true; text: string; model: string }
 	| { ok: false; error: string };
 
@@ -20,8 +20,8 @@ function uint8ToBase64(bytes: Uint8Array): string {
 	return btoa(binary);
 }
 
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+const DEFAULT_MODEL = 'gpt-4o-mini';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 const SYSTEM_PROMPT =
@@ -38,13 +38,15 @@ const USER_PROMPT =
 	'Transcribe every legible word, digit, and symbol from this document image exactly once. ' +
 	'Do not repeat any section. Use the same language(s) as printed on the page. Stop after the last line.';
 
-export async function runGeminiVisionOcr(
+export async function runOpenAiVisionOcr(
 	env: Env,
 	input: { imageBytes: Uint8Array; mimeType: string }
-): Promise<GeminiVisionOcrResult> {
-	const apiKey = readEnv(env, 'GEMINI_API_KEY');
+): Promise<OpenAiVisionOcrResult> {
+	// Prefer the dedicated OPENAI_API_KEY; fall back to LLM_API_KEY so local dev
+	// works without duplicating the same OpenAI key in .dev.vars.
+	const apiKey = readEnv(env, 'OPENAI_API_KEY') || readEnv(env, 'LLM_API_KEY');
 	if (!apiKey) {
-		return { ok: false, error: 'GEMINI_API_KEY is not configured.' };
+		return { ok: false, error: 'OPENAI_API_KEY (or LLM_API_KEY) is not configured.' };
 	}
 	if (input.imageBytes.length === 0) {
 		return { ok: false, error: 'Empty image payload.' };
@@ -53,69 +55,80 @@ export async function runGeminiVisionOcr(
 		return { ok: false, error: `Image too large (${input.imageBytes.length} bytes, max ${MAX_IMAGE_BYTES}).` };
 	}
 
-	const model = readEnv(env, 'GEMINI_MODEL') || DEFAULT_MODEL;
-	const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`;
-
+	const model = readEnv(env, 'OPENAI_VISION_MODEL') || DEFAULT_MODEL;
 	const mimeType = input.mimeType.toLowerCase().startsWith('image/') ? input.mimeType : 'image/jpeg';
+	const dataUri = `data:${mimeType};base64,${uint8ToBase64(input.imageBytes)}`;
 
 	const body = {
-		system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-		contents: [
+		model,
+		messages: [
+			{ role: 'system', content: SYSTEM_PROMPT },
 			{
-				parts: [
-					{ text: USER_PROMPT },
-					{ inline_data: { mime_type: mimeType, data: uint8ToBase64(input.imageBytes) } }
+				role: 'user',
+				content: [
+					{ type: 'text', text: USER_PROMPT },
+					{ type: 'image_url', image_url: { url: dataUri } }
 				]
 			}
 		],
-		generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
+		max_tokens: 2048,
+		temperature: 0.1
 	};
 
 	let response: Response;
 	try {
-		response = await fetch(url, {
+		response = await fetch(OPENAI_ENDPOINT, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${apiKey}`
+			},
 			body: JSON.stringify(body)
 		});
 	} catch (e) {
-		return { ok: false, error: `Gemini API unreachable: ${e instanceof Error ? e.message : String(e)}` };
+		return { ok: false, error: `OpenAI API unreachable: ${e instanceof Error ? e.message : String(e)}` };
 	}
 
 	let data: unknown;
 	try {
 		data = await response.json();
 	} catch {
-		return { ok: false, error: `Gemini API returned non-JSON (status ${response.status}).` };
+		return { ok: false, error: `OpenAI API returned non-JSON (status ${response.status}).` };
 	}
 
 	if (!response.ok) {
 		const err = (data as Record<string, unknown>)?.error;
-		const msg = typeof err === 'object' && err !== null ? String((err as Record<string, unknown>).message ?? '') : String(err ?? '');
-		return { ok: false, error: `Gemini API error ${response.status}: ${msg || 'unknown'}` };
+		const msg = typeof err === 'object' && err !== null
+			? String((err as Record<string, unknown>).message ?? '')
+			: String(err ?? '');
+		return { ok: false, error: `OpenAI API error ${response.status}: ${msg || 'unknown'}` };
 	}
 
-	// Extract text from candidates[0].content.parts[0].text
-	const text = extractGeminiText(data);
+	const text = extractOpenAiText(data);
 	if (!text || text === '[UNREADABLE]') {
-		return { ok: false, error: 'Gemini returned no usable text.' };
+		return { ok: false, error: 'OpenAI returned no usable text.' };
 	}
 
 	return { ok: true, text, model };
 }
 
-function extractGeminiText(data: unknown): string {
+function extractOpenAiText(data: unknown): string {
 	if (!data || typeof data !== 'object') return '';
 	const d = data as Record<string, unknown>;
-	const candidates = d.candidates as Array<unknown> | undefined;
-	if (!Array.isArray(candidates) || candidates.length === 0) return '';
-	const first = candidates[0] as Record<string, unknown>;
-	const content = first.content as Record<string, unknown> | undefined;
-	if (!content) return '';
-	const parts = content.parts as Array<unknown> | undefined;
-	if (!Array.isArray(parts)) return '';
-	return parts
-		.map((p) => (typeof p === 'object' && p !== null ? String((p as Record<string, unknown>).text ?? '') : ''))
-		.join('\n')
-		.trim();
+	const choices = d.choices as Array<unknown> | undefined;
+	if (!Array.isArray(choices) || choices.length === 0) return '';
+	const first = choices[0] as Record<string, unknown>;
+	const message = first.message as Record<string, unknown> | undefined;
+	if (!message) return '';
+	const content = message.content;
+	if (typeof content === 'string') return content.trim();
+	if (Array.isArray(content)) {
+		return content
+			.map((p) =>
+				typeof p === 'object' && p !== null ? String((p as Record<string, unknown>).text ?? '') : ''
+			)
+			.join('\n')
+			.trim();
+	}
+	return '';
 }

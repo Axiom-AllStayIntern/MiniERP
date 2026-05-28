@@ -74,16 +74,12 @@ jobs:
         run: |
           test -n "$BETTER_AUTH_SECRET"
           test -n "$RESEND_API_KEY"
-          test -n "$GEMINI_API_KEY"
+          test -n "$OPENAI_API_KEY"
 
           printf '%s' "$BETTER_AUTH_SECRET" | npx wrangler secret put BETTER_AUTH_SECRET
           printf '%s' "$RESEND_API_KEY" | npx wrangler secret put RESEND_API_KEY
-          printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY
-          printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY --config workers/wrangler.document-processor.jsonc
-
-          if [ -n "${OPENAI_API_KEY:-}" ]; then
-            printf '%s' "$OPENAI_API_KEY" | npx wrangler secret put OPENAI_API_KEY
-          fi
+          printf '%s' "$OPENAI_API_KEY" | npx wrangler secret put OPENAI_API_KEY
+          printf '%s' "$OPENAI_API_KEY" | npx wrangler secret put OPENAI_API_KEY --config workers/wrangler.document-processor.jsonc
 
           if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
             printf '%s' "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
@@ -95,7 +91,6 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
       # ── 7. D1 Migrations ──────────────────────────────────────────────────
       - name: Run personal v4 migrations

@@ -1,7 +1,7 @@
-import { runGeminiVisionOcr } from './gemini-vision-ocr';
+import { runOpenAiVisionOcr } from './openai-vision-ocr';
 import { runWorkersVisionOcr } from './workers-vision-ocr';
 
-export type ImageOcrProvider = 'gemini' | 'workers_ai';
+export type ImageOcrProvider = 'openai' | 'workers_ai';
 type ImageOcrPreference = 'auto' | ImageOcrProvider;
 
 export type ImageDocumentOcrResult =
@@ -18,41 +18,41 @@ function readEnv(platformEnv: Env, key: string): string {
 
 function readProviderPreference(env: Env): ImageOcrPreference {
 	const value = readEnv(env, 'OCR_IMAGE_PROVIDER').toLowerCase();
-	if (value === 'gemini' || value === 'workers_ai') return value;
+	if (value === 'openai' || value === 'workers_ai') return value;
 	return 'auto';
 }
 
 /**
  * OCR an image document.
- * Uses Gemini Flash when GEMINI_API_KEY is set; falls back to Workers AI vision model
- * only in `auto` mode.
+ * Uses OpenAI vision (gpt-4o-mini) when OPENAI_API_KEY (or LLM_API_KEY) is
+ * set; falls back to Workers AI vision only in `auto` mode.
  */
 export async function runImageDocumentOcr(
 	env: Env,
 	input: { imageBytes: Uint8Array; mimeType: string; fileName: string }
 ): Promise<ImageDocumentOcrResult> {
 	const preference = readProviderPreference(env);
-	const geminiKey = readEnv(env, 'GEMINI_API_KEY');
+	const openaiKey = readEnv(env, 'OPENAI_API_KEY') || readEnv(env, 'LLM_API_KEY');
 
 	if (preference !== 'workers_ai') {
-		if (!geminiKey && preference === 'gemini') {
+		if (!openaiKey && preference === 'openai') {
 			return {
 				ok: false,
-				error: 'GEMINI_API_KEY is not configured for OCR_IMAGE_PROVIDER=gemini.',
-				provider: 'gemini'
+				error: 'OPENAI_API_KEY is not configured for OCR_IMAGE_PROVIDER=openai.',
+				provider: 'openai'
 			};
 		}
-		if (!geminiKey) {
+		if (!openaiKey) {
 			return runWorkersFallback(env, input);
 		}
-		const result = await runGeminiVisionOcr(env, { imageBytes: input.imageBytes, mimeType: input.mimeType });
+		const result = await runOpenAiVisionOcr(env, { imageBytes: input.imageBytes, mimeType: input.mimeType });
 		if (result.ok) {
-			return { ok: true, text: result.text, provider: 'gemini' };
+			return { ok: true, text: result.text, provider: 'openai' };
 		}
-		if (preference === 'gemini') {
-			return { ok: false, error: result.error, provider: 'gemini' };
+		if (preference === 'openai') {
+			return { ok: false, error: result.error, provider: 'openai' };
 		}
-		console.warn(`[image-ocr] Gemini failed (${result.error}), falling back to Workers AI.`);
+		console.warn(`[image-ocr] OpenAI failed (${result.error}), falling back to Workers AI.`);
 	}
 
 	return runWorkersFallback(env, input);
