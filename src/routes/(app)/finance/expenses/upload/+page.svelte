@@ -259,7 +259,7 @@
 		}
 	});
 
-	// --- Client-side PDF / image extraction (pdfjs-dist + Workers AI vision) ---
+	// --- Client-side PDF / image extraction (pdfjs-dist + server image OCR) ---
 	let _pdfJsCache: (typeof import('pdfjs-dist')) | null = null;
 
 	async function loadPdfJs() {
@@ -307,13 +307,13 @@
 		}
 	}
 
-	async function runWorkersVisionOcr(blob: Blob, fileName: string): Promise<string> {
+	async function runImageOcr(blob: Blob, fileName: string): Promise<string> {
 		const fd = new FormData();
 		fd.append('file', blob, fileName);
-		const res = await fetch('/api/ocr/workers-vision', { method: 'POST', body: fd });
+		const res = await fetch('/api/ocr/image', { method: 'POST', body: fd });
 		const payload = (await res.json()) as { ok?: boolean; data?: { text?: string }; error?: string };
 		if (!res.ok || !payload.ok || typeof payload.data?.text !== 'string') {
-			throw new Error(payload.error ?? `Workers AI vision OCR failed (${res.status})`);
+			throw new Error(payload.error ?? `Image OCR failed (${res.status})`);
 		}
 		return payload.data.text;
 	}
@@ -352,7 +352,7 @@
 			if (isImage) {
 				// Image: preprocess then run OCR
 				const processed = await preprocessImageForOcr(selectedFile);
-				const ocrText = await runWorkersVisionOcr(processed, processed.name);
+				const ocrText = await runImageOcr(processed, processed.name);
 				if (ocrText.trim()) fd.set('rawText', ocrText);
 			} else if (isPdf) {
 				// PDF: try pdfjs text extraction first
@@ -361,11 +361,11 @@
 					if (text.trim().length >= 48) {
 						fd.set('rawText', text);
 					} else {
-						// Scanned PDF: render first page �?Workers AI vision
+						// Scanned PDF: render first page and run server image OCR
 						const jpeg = await renderPdfFirstPageToJpeg(selectedFile);
 						if (jpeg) {
 							const baseName = fname.replace(/\.pdf$/i, '') || 'document';
-							const ocrText = await runWorkersVisionOcr(jpeg, `${baseName}-p1.jpg`);
+							const ocrText = await runImageOcr(jpeg, `${baseName}-p1.jpg`);
 							if (ocrText.trim()) fd.set('rawText', ocrText);
 						}
 					}

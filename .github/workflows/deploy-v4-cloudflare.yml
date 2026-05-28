@@ -74,9 +74,12 @@ jobs:
         run: |
           test -n "$BETTER_AUTH_SECRET"
           test -n "$RESEND_API_KEY"
+          test -n "$GEMINI_API_KEY"
 
           printf '%s' "$BETTER_AUTH_SECRET" | npx wrangler secret put BETTER_AUTH_SECRET
           printf '%s' "$RESEND_API_KEY" | npx wrangler secret put RESEND_API_KEY
+          printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY
+          printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY --config workers/wrangler.document-processor.jsonc
 
           if [ -n "${OPENAI_API_KEY:-}" ]; then
             printf '%s' "$OPENAI_API_KEY" | npx wrangler secret put OPENAI_API_KEY
@@ -84,11 +87,6 @@ jobs:
 
           if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
             printf '%s' "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
-          fi
-
-          if [ -n "${GEMINI_API_KEY:-}" ]; then
-            printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY
-            printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY --config workers/wrangler.document-processor.jsonc
           fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

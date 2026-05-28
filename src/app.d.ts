@@ -21,6 +21,10 @@ declare global {
 		AI?: Ai;
 		/** Workers AI vision model for document image OCR (default @cf/meta/llama-3.2-11b-vision-instruct). */
 		WORKERS_AI_VISION_MODEL?: string;
+		/** Image OCR provider preference. `gemini` disables silent Workers AI fallback for image OCR. */
+		OCR_IMAGE_PROVIDER?: 'auto' | 'gemini' | 'workers_ai';
+		GEMINI_API_KEY?: string;
+		GEMINI_MODEL?: string;
 		/** Local PaddleOCR HTTP service base or full `/ocr` URL (e.g. http://127.0.0.1:8765). When set, tried before Workers AI. */
 		PADDLE_OCR_URL?: string;
 		/** If `true`, only use Paddle (`PADDLE_OCR_URL`); no Workers AI fallback. */
