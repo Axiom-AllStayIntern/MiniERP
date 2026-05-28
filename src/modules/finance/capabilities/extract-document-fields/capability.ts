@@ -368,7 +368,14 @@ async function tryVisionExtraction(
 	categoryId: string,
 	documentId: string,
 	fileName?: string
-): Promise<{ fields: CommonFields; confidence: number; provider: ExtractionProvider; quotes: Record<string, string> } | null> {
+): Promise<{
+	fields: CommonFields | null;
+	confidence: number;
+	provider: ExtractionProvider;
+	quotes: Record<string, string>;
+	rawJson?: unknown;
+	error?: string;
+} | null> {
 	if (!ctx.env) return null;
 	const cfg = configForDocType(docType);
 	if (!cfg) return null;
@@ -396,11 +403,17 @@ Extract the category-specific fields directly from this image.`
 		console.warn(
 			`[extract-document-fields] vision JSON call failed for ${docType}/${documentId}: ${result.error}`
 		);
-		return null;
+		return {
+			fields: null,
+			confidence: 0,
+			provider: 'none',
+			quotes: {},
+			rawJson: result.rawJson,
+			error: result.error
+		};
 	}
 
 	const fields = cfg.mapToFields(result.value);
-	if (!fields) return null;
 	const confidence = cfg.confidenceFromValue(result.value) ?? 0.8;
 	const rawQuotes = (result.value as Record<string, unknown>)._quotes;
 	const quotes: Record<string, string> = {};
@@ -410,7 +423,14 @@ Extract the category-specific fields directly from this image.`
 		}
 	}
 
-	return { fields, confidence, provider: 'workers_ai', quotes };
+	return {
+		fields,
+		confidence,
+		provider: 'workers_ai',
+		quotes,
+		rawJson: result.rawJson,
+		error: fields ? undefined : 'Vision JSON passed schema, but required business fields were missing for this category.'
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -424,6 +444,39 @@ function buildEvidenceForFields(provider: ExtractionProvider, fields: Record<str
 		refId: `${provider}://${field}`,
 		summary: `Extracted ${field} via ${provider}`
 	}));
+}
+
+function safeJsonPreview(value: unknown): string {
+	if (value === undefined) return 'undefined';
+	try {
+		return JSON.stringify(value).slice(0, 2000);
+	} catch {
+		return '[unserializable]';
+	}
+}
+
+function buildVisionDebugEvidence(input: {
+	provider: ExtractionProvider;
+	categoryId: string;
+	docType: CategoryDocType;
+	rawJson?: unknown;
+	error?: string;
+}): FinanceEvidence[] {
+	const evidence: FinanceEvidence[] = [
+		{
+			type: 'ocr_result',
+			refId: `${input.provider}://vision-json/${input.categoryId}`,
+			summary: `Vision field extraction result for ${input.docType ?? 'unknown'} / ${input.categoryId}${input.error ? ` failed: ${input.error}` : ' succeeded'}.`
+		}
+	];
+	if (input.rawJson !== undefined) {
+		evidence.push({
+			type: 'ocr_result',
+			refId: `${input.provider}://vision-json/${input.categoryId}/raw`,
+			summary: `Raw vision JSON: ${safeJsonPreview(input.rawJson)}`
+		});
+	}
+	return evidence;
 }
 
 function setIfValue(output: Record<string, unknown>, key: string, value: unknown) {
@@ -552,11 +605,29 @@ export const extractDocumentFieldsCapability: FinanceCapability<
 				input.fileName
 			);
 			if (llm) {
+				const debugEvidence = buildVisionDebugEvidence({
+					provider: llm.provider,
+					categoryId: categoryIdRef,
+					docType,
+					rawJson: llm.rawJson,
+					error: llm.error
+				});
+				if (!llm.fields) {
+					console.warn(
+						`[extract-document-fields] vision extraction returned unusable fields for ${docType}/${input.documentId} (categoryId=${input.categoryId}): ${llm.error}`
+					);
+					return {
+						fields: {},
+						confidence: 0,
+						evidence: debugEvidence,
+						provider: 'none'
+					};
+				}
 				const fields = outputFor(llm.fields, category, input.outputShape);
 				return {
 					fields,
 					confidence: llm.confidence,
-					evidence: buildEvidenceForFields(llm.provider, fields),
+					evidence: [...buildEvidenceForFields(llm.provider, fields), ...debugEvidence],
 					sourceQuotes: Object.keys(llm.quotes).length > 0 ? llm.quotes : undefined,
 					provider: llm.provider
 				};

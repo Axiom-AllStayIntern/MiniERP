@@ -5,8 +5,8 @@ export type WorkersVisionOcrResult =
 	| { ok: false; error: string };
 
 export type WorkersVisionJsonResult<T> =
-	| { ok: true; value: T; model: string }
-	| { ok: false; error: string; model?: string };
+	| { ok: true; value: T; model: string; rawJson: unknown }
+	| { ok: false; error: string; model?: string; rawJson?: unknown };
 
 function readEnv(platformEnv: Env, key: string): string {
 	const processEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
@@ -303,10 +303,11 @@ Return only one valid JSON object. No markdown, no preamble, no commentary.`;
 				error: parsed.error.issues
 					.map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.message}`)
 					.join('; '),
-				model
+				model,
+				rawJson: json ?? undefined
 			};
 		}
-		return { ok: true, value: parsed.data, model };
+		return { ok: true, value: parsed.data, model, rawJson: json };
 	} catch (e) {
 		return { ok: false, error: e instanceof Error ? e.message : 'Workers AI vision JSON call failed.', model };
 	}
