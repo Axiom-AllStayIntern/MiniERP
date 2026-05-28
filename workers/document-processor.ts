@@ -44,6 +44,7 @@ import { getDb } from '../src/infrastructure/db';
 
 export type { DocumentProcessorMessage };
 
+
 export default {
 	async queue(
 		batch: MessageBatch<DocumentProcessorMessage>,
