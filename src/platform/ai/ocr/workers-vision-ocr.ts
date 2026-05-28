@@ -168,13 +168,105 @@ Rules:
 - Do NOT write sentences like "The invoice is..." or "This document contains...".
 - Output only the copied text, nothing else.`;
 
+async function runExternalVisionText(
+	env: Env,
+	input: { imageBytes: Uint8Array; mimeType: string; prompt: string; maxTokens?: number }
+): Promise<{ ok: true; text: string; model: string } | { ok: false; error: string }> {
+	const apiUrl = readEnv(env, 'VISION_API_URL');
+	const apiKey = readEnv(env, 'VISION_API_KEY') || readEnv(env, 'LLM_API_KEY');
+	if (!apiUrl || !apiKey) return { ok: false, error: 'External vision API not configured.' };
+	const model = readEnv(env, 'VISION_API_MODEL') || 'gpt-4o';
+
+	const mime = normalizeMime(input.mimeType);
+	const b64 = uint8ToBase64(input.imageBytes);
+	const body = {
+		model,
+		messages: [
+			{
+				role: 'user',
+				content: [
+					{ type: 'text', text: input.prompt },
+					{ type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } }
+				]
+			}
+		],
+		max_tokens: input.maxTokens ?? 4096,
+		temperature: 0
+	};
+
+	const resp = await fetch(apiUrl, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+		body: JSON.stringify(body)
+	});
+	if (!resp.ok) return { ok: false, error: `External vision API ${resp.status}: ${await resp.text().catch(() => '')}` };
+	const json = (await resp.json()) as Record<string, unknown>;
+	const text = extractVisionText(json).trim();
+	if (!text) return { ok: false, error: 'External vision API returned empty text.' };
+	return { ok: true, text, model };
+}
+
+async function runExternalVisionJson<T>(
+	env: Env,
+	input: {
+		imageBytes: Uint8Array;
+		mimeType: string;
+		prompt: string;
+		schema: ZodType<T>;
+		maxTokens?: number;
+	}
+): Promise<WorkersVisionJsonResult<T>> {
+	const apiUrl = readEnv(env, 'VISION_API_URL');
+	const apiKey = readEnv(env, 'VISION_API_KEY') || readEnv(env, 'LLM_API_KEY');
+	if (!apiUrl || !apiKey) return { ok: false, error: 'External vision API not configured.' };
+	const model = readEnv(env, 'VISION_API_MODEL') || 'gpt-4o';
+
+	const mime = normalizeMime(input.mimeType);
+	const b64 = uint8ToBase64(input.imageBytes);
+	const body = {
+		model,
+		messages: [
+			{
+				role: 'user',
+				content: [
+					{ type: 'text', text: input.prompt },
+					{ type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } }
+				]
+			}
+		],
+		max_tokens: input.maxTokens ?? 2048,
+		temperature: 0,
+		response_format: { type: 'json_object' }
+	};
+
+	try {
+		const resp = await fetch(apiUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+			body: JSON.stringify(body)
+		});
+		if (!resp.ok) return { ok: false, error: `External vision API ${resp.status}`, model };
+		const raw = (await resp.json()) as Record<string, unknown>;
+		const json = parseVisionJsonResponse(raw);
+		const parsed = input.schema.safeParse(json);
+		if (!parsed.success) {
+			return {
+				ok: false,
+				error: parsed.error.issues.map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`).join('; '),
+				model,
+				rawJson: json ?? undefined
+			};
+		}
+		return { ok: true, value: parsed.data, model, rawJson: json };
+	} catch (e) {
+		return { ok: false, error: e instanceof Error ? e.message : 'External vision JSON call failed.', model };
+	}
+}
+
 export async function runWorkersVisionOcr(
 	env: Env,
 	input: { imageBytes: Uint8Array; mimeType: string }
 ): Promise<WorkersVisionOcrResult> {
-	if (!env.AI) {
-		return { ok: false, error: 'Workers AI is not available (missing AI binding).' };
-	}
 	if (input.imageBytes.length === 0) {
 		return { ok: false, error: 'Empty image payload.' };
 	}
@@ -182,52 +274,63 @@ export async function runWorkersVisionOcr(
 		return { ok: false, error: `Image too large (${input.imageBytes.length} bytes, max ${MAX_IMAGE_BYTES}).` };
 	}
 
-	const model = readEnv(env, 'WORKERS_AI_VISION_MODEL') || '@cf/meta/llama-3.2-11b-vision-instruct';
-	const mime = normalizeMime(input.mimeType);
-	const dataUri = `data:${mime};base64,${uint8ToBase64(input.imageBytes)}`;
+	const skipWorkers = readEnv(env, 'VISION_SKIP_WORKERS') === 'true';
 
-	const messages = [
-		{
-			role: 'user' as const,
-			content: [
-				{ type: 'text' as const, text: OCR_PROMPT },
-				{ type: 'image_url' as const, image_url: { url: dataUri } }
-			]
-		}
-	];
+	if (!skipWorkers && env.AI) {
+		const model = readEnv(env, 'WORKERS_AI_VISION_MODEL') || '@cf/meta/llama-3.2-11b-vision-instruct';
+		const mime = normalizeMime(input.mimeType);
+		const dataUri = `data:${mime};base64,${uint8ToBase64(input.imageBytes)}`;
 
-	const runVision = async () =>
-		env.AI!.run(model as Parameters<NonNullable<Env['AI']>['run']>[0], {
-			messages,
-			max_tokens: 4096,
-			temperature: 0
-		} as Parameters<NonNullable<Env['AI']>['run']>[1]);
-
-	try {
-		let raw: unknown;
-		try {
-			raw = await runVision();
-		} catch {
-			if (model.includes('llama')) {
-				try {
-					await env.AI!.run(model as Parameters<NonNullable<Env['AI']>['run']>[0], {
-						prompt: 'agree'
-					} as Parameters<NonNullable<Env['AI']>['run']>[1]);
-				} catch { /* already agreed or unrelated */ }
-				raw = await runVision();
-			} else {
-				throw new Error(`Vision model ${model} call failed.`);
+		const messages = [
+			{
+				role: 'user' as const,
+				content: [
+					{ type: 'text' as const, text: OCR_PROMPT },
+					{ type: 'image_url' as const, image_url: { url: dataUri } }
+				]
 			}
-		}
+		];
 
-		const text = extractVisionText(raw).trim();
-		if (!text || text === '[UNREADABLE]') {
-			return { ok: false, error: 'Vision model returned no usable text.' };
+		const runVision = async () =>
+			env.AI!.run(model as Parameters<NonNullable<Env['AI']>['run']>[0], {
+				messages,
+				max_tokens: 4096,
+				temperature: 0
+			} as Parameters<NonNullable<Env['AI']>['run']>[1]);
+
+		try {
+			let raw: unknown;
+			try {
+				raw = await runVision();
+			} catch {
+				if (model.includes('llama')) {
+					try {
+						await env.AI!.run(model as Parameters<NonNullable<Env['AI']>['run']>[0], {
+							prompt: 'agree'
+						} as Parameters<NonNullable<Env['AI']>['run']>[1]);
+					} catch { /* already agreed or unrelated */ }
+					raw = await runVision();
+				} else {
+					throw new Error(`Vision model ${model} call failed.`);
+				}
+			}
+
+			const text = extractVisionText(raw).trim();
+			if (text && text !== '[UNREADABLE]') {
+				return { ok: true, text, model };
+			}
+			console.warn('[runWorkersVisionOcr] Workers AI returned no usable text, trying external fallback.');
+		} catch (e) {
+			console.warn(`[runWorkersVisionOcr] Workers AI failed: ${e instanceof Error ? e.message : e}, trying external fallback.`);
 		}
-		return { ok: true, text, model };
-	} catch (e) {
-		return { ok: false, error: e instanceof Error ? e.message : 'Workers AI vision call failed.' };
 	}
+
+	const external = await runExternalVisionText(env, {
+		imageBytes: input.imageBytes,
+		mimeType: input.mimeType,
+		prompt: OCR_PROMPT
+	});
+	return external;
 }
 
 export async function runWorkersVisionJson<T>(
@@ -241,9 +344,6 @@ export async function runWorkersVisionJson<T>(
 		maxTokens?: number;
 	}
 ): Promise<WorkersVisionJsonResult<T>> {
-	if (!env.AI) {
-		return { ok: false, error: 'Workers AI is not available (missing AI binding).' };
-	}
 	if (input.imageBytes.length === 0) {
 		return { ok: false, error: 'Empty image payload.' };
 	}
@@ -251,64 +351,71 @@ export async function runWorkersVisionJson<T>(
 		return { ok: false, error: `Image too large (${input.imageBytes.length} bytes, max ${MAX_IMAGE_BYTES}).` };
 	}
 
-	const model = readEnv(env, 'WORKERS_AI_VISION_MODEL') || '@cf/meta/llama-3.2-11b-vision-instruct';
-	const mime = normalizeMime(input.mimeType);
-	const dataUri = `data:${mime};base64,${uint8ToBase64(input.imageBytes)}`;
-	const prompt = `${input.systemPrompt.trim()}
+	const combinedPrompt = `${input.systemPrompt.trim()}
 
 ${input.userPrompt.trim()}
 
 Return only one valid JSON object. No markdown, no preamble, no commentary.`;
 
-	const messages = [
-		{
-			role: 'user' as const,
-			content: [
-				{ type: 'text' as const, text: prompt },
-				{ type: 'image_url' as const, image_url: { url: dataUri } }
-			]
-		}
-	];
+	const skipWorkers = readEnv(env, 'VISION_SKIP_WORKERS') === 'true';
 
-	const runVision = async () =>
-		env.AI!.run(model as Parameters<NonNullable<Env['AI']>['run']>[0], {
-			messages,
-			max_tokens: input.maxTokens ?? 2048,
-			temperature: 0,
-			response_format: { type: 'json_object' }
-		} as Parameters<NonNullable<Env['AI']>['run']>[1]);
+	if (!skipWorkers && env.AI) {
+		const model = readEnv(env, 'WORKERS_AI_VISION_MODEL') || '@cf/meta/llama-3.2-11b-vision-instruct';
+		const mime = normalizeMime(input.mimeType);
+		const dataUri = `data:${mime};base64,${uint8ToBase64(input.imageBytes)}`;
 
-	try {
-		let raw: unknown;
-		try {
-			raw = await runVision();
-		} catch {
-			if (model.includes('llama')) {
-				try {
-					await env.AI!.run(model as Parameters<NonNullable<Env['AI']>['run']>[0], {
-						prompt: 'agree'
-					} as Parameters<NonNullable<Env['AI']>['run']>[1]);
-				} catch { /* already agreed or unrelated */ }
-				raw = await runVision();
-			} else {
-				throw new Error(`Vision model ${model} call failed.`);
+		const messages = [
+			{
+				role: 'user' as const,
+				content: [
+					{ type: 'text' as const, text: combinedPrompt },
+					{ type: 'image_url' as const, image_url: { url: dataUri } }
+				]
 			}
-		}
+		];
 
-		const json = parseVisionJsonResponse(raw);
-		const parsed = input.schema.safeParse(json);
-		if (!parsed.success) {
-			return {
-				ok: false,
-				error: parsed.error.issues
-					.map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.message}`)
-					.join('; '),
-				model,
-				rawJson: json ?? undefined
-			};
+		const runVision = async () =>
+			env.AI!.run(model as Parameters<NonNullable<Env['AI']>['run']>[0], {
+				messages,
+				max_tokens: input.maxTokens ?? 2048,
+				temperature: 0,
+				response_format: { type: 'json_object' }
+			} as Parameters<NonNullable<Env['AI']>['run']>[1]);
+
+		try {
+			let raw: unknown;
+			try {
+				raw = await runVision();
+			} catch {
+				if (model.includes('llama')) {
+					try {
+						await env.AI!.run(model as Parameters<NonNullable<Env['AI']>['run']>[0], {
+							prompt: 'agree'
+						} as Parameters<NonNullable<Env['AI']>['run']>[1]);
+					} catch { /* already agreed or unrelated */ }
+					raw = await runVision();
+				} else {
+					throw new Error(`Vision model ${model} call failed.`);
+				}
+			}
+
+			const json = parseVisionJsonResponse(raw);
+			const parsed = input.schema.safeParse(json);
+			if (parsed.success) {
+				return { ok: true, value: parsed.data, model, rawJson: json };
+			}
+			console.warn(`[runWorkersVisionJson] Workers AI schema validation failed, trying external fallback: ${parsed.error.issues.map((i) => i.message).join('; ')}`);
+		} catch (e) {
+			console.warn(`[runWorkersVisionJson] Workers AI failed: ${e instanceof Error ? e.message : e}, trying external fallback.`);
 		}
-		return { ok: true, value: parsed.data, model, rawJson: json };
-	} catch (e) {
-		return { ok: false, error: e instanceof Error ? e.message : 'Workers AI vision JSON call failed.', model };
 	}
+
+	const external = await runExternalVisionJson<T>(env, {
+		imageBytes: input.imageBytes,
+		mimeType: input.mimeType,
+		prompt: combinedPrompt,
+		schema: input.schema,
+		maxTokens: input.maxTokens
+	});
+	return external;
 }

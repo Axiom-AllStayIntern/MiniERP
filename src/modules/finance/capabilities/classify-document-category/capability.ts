@@ -4,6 +4,7 @@ import type { FinanceCapability, FinanceCapabilityContext } from '../types';
 import {
 	FALLBACK_CATEGORY_ID,
 	FINANCE_CATEGORY_CATALOG,
+	categoryIdForDocumentType,
 	findCategoryById,
 	type CategoryDefinition
 } from '../../workflows/financial-document-intake/categories';
@@ -24,7 +25,8 @@ export interface ClassifyDocumentCategoryOutput {
 }
 
 const classifyCategorySchema = z.object({
-	categoryId: z.string().nullable(),
+	categoryId: z.string().nullable().optional(),
+	documentType: z.string().nullable().optional(),
 	confidence: z.number().min(0).max(1),
 	reason: z.string().nullable().optional()
 });
@@ -49,6 +51,79 @@ function isValidDocumentCategory(categoryId: string | null | undefined): categor
 	if (!categoryId) return false;
 	const category = findCategoryById(categoryId);
 	return Boolean(category?.hasDocument);
+}
+
+function normalizeDocumentType(value: string | null | undefined): Parameters<typeof categoryIdForDocumentType>[0] | null {
+	if (!value) return null;
+	const normalized = value.trim().toLowerCase().replace(/[-\s]/g, '_');
+	const aliases: Record<string, Parameters<typeof categoryIdForDocumentType>[0]> = {
+		invoice_in: 'supplier_invoice',
+		vendor_invoice: 'supplier_invoice',
+		supplier_bill: 'supplier_invoice',
+		supplier_invoice: 'supplier_invoice',
+		bill: 'supplier_invoice',
+		ai_subscription: 'supplier_invoice',
+		saas: 'supplier_invoice',
+		subscription: 'supplier_invoice',
+		invoice_out: 'customer_invoice',
+		sales_invoice: 'customer_invoice',
+		customer_invoice: 'customer_invoice',
+		receipt: 'receipt',
+		expense_receipt: 'receipt',
+		transport: 'receipt',
+		taxi: 'receipt',
+		grab: 'receipt',
+		mrt: 'receipt',
+		meal: 'receipt',
+		food: 'receipt',
+		accommodation: 'receipt',
+		hotel: 'receipt',
+		gift: 'receipt',
+		payment_voucher: 'receipt',
+		po: 'purchase_order',
+		purchase_order_doc: 'purchase_order',
+		purchase_order: 'purchase_order',
+		contract: 'contract',
+		agreement: 'contract',
+		service_agreement: 'contract',
+		quotation: 'quotation',
+		quote: 'quotation',
+		proposal: 'quotation',
+		estimate: 'quotation',
+		proforma: 'quotation',
+		bank_statement: 'bank_statement',
+		statement: 'bank_statement',
+		tax_document: 'tax_document',
+		tax: 'tax_document',
+		gst_return: 'tax_document',
+		logistics_document: 'logistics_document',
+		logistics: 'logistics_document',
+		shipping: 'logistics_document',
+		courier: 'logistics_document',
+		unknown: 'unknown'
+	};
+	return aliases[normalized] ?? null;
+}
+
+function fuzzyMatchCategoryId(raw: string | null | undefined): string | null {
+	if (!raw) return null;
+	const normalized = raw.trim().toLowerCase().replace(/[-\s]/g, '_');
+	return FINANCE_CATEGORY_CATALOG.find(
+		(c) => c.hasDocument && (c.id.endsWith('.' + normalized) || c.id === normalized)
+	)?.id ?? null;
+}
+
+function resolveCategoryId(value: {
+	categoryId?: string | null;
+	documentType?: string | null;
+}): string | null {
+	if (isValidDocumentCategory(value.categoryId)) return value.categoryId;
+	const fromCategoryAsDocType = normalizeDocumentType(value.categoryId);
+	if (fromCategoryAsDocType) return categoryIdForDocumentType(fromCategoryAsDocType);
+	const fuzzy = fuzzyMatchCategoryId(value.categoryId);
+	if (fuzzy) return fuzzy;
+	const fromDocType = normalizeDocumentType(value.documentType);
+	return fromDocType ? categoryIdForDocumentType(fromDocType) : null;
 }
 
 function filenameHint(fileName?: string): string {
@@ -111,8 +186,12 @@ Definitions:
 - Receipt: payment proof, card receipt, ride/meal/hotel/logistics receipt, or small expense proof.
 - Purchase order / contract / quotation are archive documents unless the category explicitly says expense purchase.
 
+CRITICAL: categoryId MUST be one of the exact id strings listed above. Do NOT invent IDs.
+If uncertain, set categoryId to null and use documentType as fallback.
+
 Return JSON only with:
 - categoryId: one allowed id string or null
+- documentType: optional fallback, one of supplier_invoice, customer_invoice, receipt, purchase_order, contract, quotation, bank_statement, tax_document, logistics_document, unknown
 - confidence: number from 0 to 1
 - reason: short explanation`,
 			userPrompt: `${filenameHint(input.fileName)}
@@ -131,13 +210,15 @@ Look at the image and choose the best categoryId.`
 			};
 		}
 
-		const categoryId = isValidDocumentCategory(result.value.categoryId)
-			? result.value.categoryId
-			: null;
+		const categoryId = resolveCategoryId(result.value);
+		const invalidCategory =
+			result.value.categoryId && !categoryId
+				? ` Model returned unsupported categoryId "${result.value.categoryId}".`
+				: '';
 		return {
 			categoryId,
 			confidence: categoryId ? clamp01(result.value.confidence) : 0,
-			reason: result.value.reason ?? undefined,
+			reason: `${result.value.reason ?? 'Vision classifier completed.'}${invalidCategory}`.trim(),
 			provider: 'workers_ai',
 			modelId: result.model
 		};

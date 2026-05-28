@@ -177,9 +177,7 @@ async function processInlineFallback(
 					{ documentId, fileName, imageBytes, mimeType },
 					{ tenantId, userId: message.userId, env, useMock: !env.AI }
 				);
-				if (!result.categoryId) return null;
-				const category = findCategoryById(result.categoryId);
-				if (!category) return null;
+				const category = result.categoryId ? findCategoryById(result.categoryId) : undefined;
 				return {
 					categoryId: result.categoryId,
 					documentType: documentTypeForFinanceCategory(category),
@@ -200,19 +198,17 @@ async function processInlineFallback(
 			}) => {
 				const categoryId = classifiedCategoryId ?? categoryIdForDocumentType(documentType ?? 'unknown');
 				if (!categoryId) return null;
-				if (!classifiedCategoryId && classificationConfidence < 0.4) return null;
+				if (classificationConfidence < 0.35) return null;
 
 				const result = await extractDocumentFieldsCapability.execute(
 					{ documentId, fileName, text, imageBytes, mimeType, categoryId, artifactConfidence: classificationConfidence },
 					{ tenantId, userId: message.userId, env, useMock: !env.AI }
 				);
-				const cat = findCategoryById(categoryId);
-				const fieldKeys = cat?.llmFields ?? Object.keys(result.fields);
-				const perFieldConfidence: Record<string, number> = {};
-				for (const k of fieldKeys) perFieldConfidence[k] = result.confidence;
 				return {
 					fields: result.fields as unknown as Record<string, unknown>,
-					confidence: perFieldConfidence,
+					confidence: result.fieldConfidence ?? Object.fromEntries(
+						Object.keys(result.fields).map(k => [k, result.confidence])
+					),
 					evidence: result.evidence,
 					sourceQuotes: result.sourceQuotes,
 					categoryId

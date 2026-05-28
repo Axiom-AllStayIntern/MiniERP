@@ -97,7 +97,7 @@ export interface CategoryClassifierInput {
 }
 
 export interface CategoryClassifierResult {
-	categoryId: string;
+	categoryId: string | null;
 	documentType: NonNullable<DocumentArtifact['documentType']>;
 	confidence: number;
 	reason?: string;
@@ -468,8 +468,11 @@ export function createDocumentIntakeService(
 					await repo.addSecurityFlag(artifact.id, 'low_ocr_confidence');
 				}
 
-				if (input.fieldExtractor && categoryClassification) {
+				const MIN_VISION_EXTRACT_CONFIDENCE = 0.35;
+				if (input.fieldExtractor && categoryClassification?.categoryId &&
+					categoryClassification.confidence >= MIN_VISION_EXTRACT_CONFIDENCE) {
 					await repo.setStatus(artifact.id, 'fields_extraction_pending');
+					console.log(`[processDocument] vision field extraction: reusing imageBytes (${imageBytes.length} bytes) for ${artifact.id}, category=${categoryClassification.categoryId}`);
 					try {
 						const extracted = await input.fieldExtractor({
 							tenantId,

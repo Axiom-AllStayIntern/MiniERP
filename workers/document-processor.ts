@@ -119,9 +119,7 @@ async function processOne(
 				{ documentId, fileName, imageBytes, mimeType },
 				{ tenantId, userId: payload.userId, env, useMock: !env.AI }
 			);
-			if (!result.categoryId) return null;
-			const category = findCategoryById(result.categoryId);
-			if (!category) return null;
+			const category = result.categoryId ? findCategoryById(result.categoryId) : undefined;
 			return {
 				categoryId: result.categoryId,
 				documentType: documentTypeForFinanceCategory(category),
@@ -147,11 +145,7 @@ async function processOne(
 			const categoryId = classifiedCategoryId ?? categoryIdForDocumentType(documentType ?? 'unknown');
 			if (!categoryId) return null;
 
-			// Extra guard: skip extraction when classification confidence is
-			// very low — better to let the user pick than to pre-fill from a
-			// wrong category (e.g. classifier guessed `supplier_invoice` for a
-			// receipt).
-			if (!classifiedCategoryId && classificationConfidence < 0.4) return null;
+			if (classificationConfidence < 0.35) return null;
 
 			const result = await extractDocumentFieldsCapability.execute(
 				{
@@ -166,22 +160,11 @@ async function processOne(
 				{ tenantId, userId: payload.userId, env, useMock: !env.AI }
 			);
 
-			// `result.fields` is the canonical ExtractedInvoiceFields shape (7
-			// keys). Map field-level confidence: capability returns a single
-			// overall `confidence` number, not per-field. We replicate to all
-			// keys so the UI's per-field confidence-color logic still works
-			// uniformly. When the underlying provider returns per-field
-			// confidence in the future, swap this projection.
-			const cat = findCategoryById(categoryId);
-			const fieldKeys = cat?.llmFields ?? Object.keys(result.fields);
-			const perFieldConfidence: Record<string, number> = {};
-			for (const k of fieldKeys) {
-				perFieldConfidence[k] = result.confidence;
-			}
-
 			return {
 				fields: result.fields as unknown as Record<string, unknown>,
-				confidence: perFieldConfidence,
+				confidence: result.fieldConfidence ?? Object.fromEntries(
+					Object.keys(result.fields).map(k => [k, result.confidence])
+				),
 				evidence: result.evidence,
 				sourceQuotes: result.sourceQuotes,
 				categoryId

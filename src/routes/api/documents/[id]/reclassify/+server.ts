@@ -95,18 +95,13 @@ export const POST: RequestHandler = async (event) => {
 		}
 	);
 
-	// Per-field confidence projection — capability returns one overall
-	// confidence number, replicate to category.llmFields so the inbox UI's
-	// per-field color logic can render uniformly.
-	const fieldKeys = category.llmFields ?? Object.keys(result.fields);
-	const perFieldConfidence: Record<string, number> = {};
-	for (const k of fieldKeys) perFieldConfidence[k] = result.confidence;
-
 	const updated = await intake.replaceSuggestedFields({
 		tenantId: 'default',
 		documentId: id,
 		fields: result.fields as unknown as Record<string, unknown>,
-		confidence: perFieldConfidence,
+		confidence: result.fieldConfidence ?? Object.fromEntries(
+			Object.keys(result.fields).map(k => [k, result.confidence])
+		),
 		evidence: result.evidence,
 		sourceQuotes: result.sourceQuotes,
 		categoryId: body.categoryId
