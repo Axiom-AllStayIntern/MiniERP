@@ -53,7 +53,9 @@
     "LLM_PROVIDER": "heuristic",
     "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct",
     "WORKERS_AI_VISION_MODEL": "@cf/meta/llama-3.2-11b-vision-instruct",
-    "OCR_PROMPT_VERSION": "v1"
+    "OCR_PROMPT_VERSION": "v1",
+    "GEMINI_MODEL": "gemini-2.0-flash"
+    // GEMINI_API_KEY: set via wrangler secret / .dev.vars — do not commit here
   },
 
   "assets": {
@@ -117,7 +119,8 @@
         "LLM_PROVIDER": "heuristic",
         "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct",
         "WORKERS_AI_VISION_MODEL": "@cf/meta/llama-3.2-11b-vision-instruct",
-        "OCR_PROMPT_VERSION": "v1"
+        "OCR_PROMPT_VERSION": "v1",
+        "GEMINI_MODEL": "gemini-2.0-flash"
       },
 
       "assets": {
@@ -183,6 +186,7 @@
         "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct",
         "WORKERS_AI_VISION_MODEL": "@cf/meta/llama-3.2-11b-vision-instruct",
         "OCR_PROMPT_VERSION": "v1",
+        "GEMINI_MODEL": "gemini-2.0-flash",
 
         // 生产环境建议强制走异步队列
         "DOCUMENT_QUEUE_FORCE_ASYNC": "true"
