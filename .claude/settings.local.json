@@ -37,7 +37,9 @@
       "Bash(npx wrangler *)",
       "Bash(kill %1)",
       "Bash(netstat -ano)",
-      "Bash(curl -s http://localhost:5173/api/auth/register)"
+      "Bash(curl -s http://localhost:5173/api/auth/register)",
+      "Bash(npx vitest *)",
+      "Bash(npm test *)"
     ]
   }
 }

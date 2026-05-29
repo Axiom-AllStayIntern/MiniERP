@@ -37,12 +37,12 @@ import {
 } from '../src/modules/document-intake';
 import {
 	extractDocumentFieldsCapability,
-	categoryIdForDocumentType,
-	findCategoryById
+	categoryIdForDocumentType
 } from '../src/modules/finance';
 import { getDb } from '../src/infrastructure/db';
 
 export type { DocumentProcessorMessage };
+
 
 export default {
 	async queue(
@@ -138,22 +138,9 @@ async function processOne(
 				{ tenantId, userId: payload.userId, env, useMock: !env.AI }
 			);
 
-			// `result.fields` is the canonical ExtractedInvoiceFields shape (7
-			// keys). Map field-level confidence: capability returns a single
-			// overall `confidence` number, not per-field. We replicate to all
-			// keys so the UI's per-field confidence-color logic still works
-			// uniformly. When the underlying provider returns per-field
-			// confidence in the future, swap this projection.
-			const cat = findCategoryById(categoryId);
-			const fieldKeys = cat?.llmFields ?? Object.keys(result.fields);
-			const perFieldConfidence: Record<string, number> = {};
-			for (const k of fieldKeys) {
-				perFieldConfidence[k] = result.confidence;
-			}
-
 			return {
 				fields: result.fields as unknown as Record<string, unknown>,
-				confidence: perFieldConfidence,
+				confidence: result.fieldConfidence,
 				evidence: result.evidence,
 				sourceQuotes: result.sourceQuotes,
 				categoryId

@@ -45,7 +45,8 @@ export const invoiceSchemaV1 = z.object({
 	serviceName: z.string().nullable().optional(),
 	period: z.string().nullable().optional(),
 	confidence: z.number().min(0).max(1).optional(),
-	_quotes: z.record(z.string(), z.string().nullable()).optional()
+	_quotes: z.record(z.string(), z.string().nullable()).optional(),
+	_confidence: z.record(z.string(), z.number().min(0).max(1)).optional()
 });
 export type InvoiceLlmV1 = z.infer<typeof invoiceSchemaV1>;
 
@@ -64,7 +65,8 @@ export const receiptSchemaV1 = z.object({
 	destination: z.string().nullable().optional(),
 	trackingNumber: z.string().nullable().optional(),
 	confidence: z.number().min(0).max(1).optional(),
-	_quotes: z.record(z.string(), z.string().nullable()).optional()
+	_quotes: z.record(z.string(), z.string().nullable()).optional(),
+	_confidence: z.record(z.string(), z.number().min(0).max(1)).optional()
 });
 export type ReceiptLlmV1 = z.infer<typeof receiptSchemaV1>;
 
@@ -88,7 +90,8 @@ export const poSchemaV1 = z.object({
 	description: z.string().nullable(),
 	lineItems: z.array(lineItemSchemaV1).nullable().optional(),
 	confidence: z.number().min(0).max(1).optional(),
-	_quotes: z.record(z.string(), z.string().nullable()).optional()
+	_quotes: z.record(z.string(), z.string().nullable()).optional(),
+	_confidence: z.record(z.string(), z.number().min(0).max(1)).optional()
 });
 export type PoLlmV1 = z.infer<typeof poSchemaV1>;
 
@@ -106,7 +109,8 @@ export const customerInvoiceSchemaV1 = z.object({
 	currency: z.string().nullable(),
 	poNumber: z.string().nullable(),
 	confidence: z.number().min(0).max(1).optional(),
-	_quotes: z.record(z.string(), z.string().nullable()).optional()
+	_quotes: z.record(z.string(), z.string().nullable()).optional(),
+	_confidence: z.record(z.string(), z.number().min(0).max(1)).optional()
 });
 export type CustomerInvoiceLlmV1 = z.infer<typeof customerInvoiceSchemaV1>;
 
@@ -123,7 +127,8 @@ export const contractSchemaV1 = z.object({
 	paymentTerms: z.string().nullable(),
 	scope: z.string().nullable(),
 	confidence: z.number().min(0).max(1).optional(),
-	_quotes: z.record(z.string(), z.string().nullable()).optional()
+	_quotes: z.record(z.string(), z.string().nullable()).optional(),
+	_confidence: z.record(z.string(), z.number().min(0).max(1)).optional()
 });
 export type ContractLlmV1 = z.infer<typeof contractSchemaV1>;
 
@@ -136,8 +141,9 @@ export const quotationSchemaV1 = z.object({
 	currency: z.string().nullable(),
 	lineItems: z.array(lineItemSchemaV1).nullable(),
 	confidence: z.number().min(0).max(1).optional(),
-	_quotes: z.record(z.string(), z.string().nullable()).optional()
+	_quotes: z.record(z.string(), z.string().nullable()).optional(),
+	_confidence: z.record(z.string(), z.number().min(0).max(1)).optional()
 });
 export type QuotationLlmV1 = z.infer<typeof quotationSchemaV1>;
 
-export const EXTRACT_DOCUMENT_FIELDS_SCHEMA_VERSION = 'v2';
+export const EXTRACT_DOCUMENT_FIELDS_SCHEMA_VERSION = 'v3';
