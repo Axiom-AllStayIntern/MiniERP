@@ -305,7 +305,7 @@
 			const mime = selectedFile.type.toLowerCase();
 			const fname = selectedFile.name.toLowerCase();
 			const isPdf = mime === 'application/pdf' || fname.endsWith('.pdf');
-			const isImage = mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(fname);
+			const isImage = mime.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(fname);
 
 			if (isImage) {
 				const processed = await preprocessImageForOcr(selectedFile);
@@ -453,7 +453,7 @@
 					<label><span class="mb-1 block text-xs font-medium text-slate-700">Document Type</span><select class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" value={docType} onchange={(e) => onDocTypeChange((e.currentTarget as HTMLSelectElement).value as DocType)}><option value="contract">Contract</option><option value="quotation">Quotation</option><option value="purchase_order">Purchase Order</option></select></label>
 					<label><span class="mb-1 block text-xs font-medium text-slate-700">Status</span><input class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" bind:value={status} /></label>
 				</div>
-				<label class="block"><span class="mb-1 block text-xs font-medium text-slate-700">File</span><input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.doc,.docx,.xls,.xlsx" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" onchange={onPickFile} /></label>
+				<label class="block"><span class="mb-1 block text-xs font-medium text-slate-700">File</span><input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.txt,.csv,.doc,.docx,.xls,.xlsx" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" onchange={onPickFile} /></label>
 				<div class="grid gap-3 md:grid-cols-2">
 					<label><span class="mb-1 block text-xs font-medium text-slate-700">Amount</span><input type="number" step="0.01" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" bind:value={amount} /></label>
 					<label><span class="mb-1 block text-xs font-medium text-slate-700">Currency</span><input class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" bind:value={currency} /></label>

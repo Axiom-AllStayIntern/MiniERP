@@ -22,11 +22,28 @@ export const DOCUMENT_INTAKE_AGENT_ID = 'document-intake';
 const DOCUMENT_INTAKE_VERSION = '0.1.0';
 const MIN_CLASSIFICATION_CONFIDENCE = 0.5;
 const ABANDONABLE_STATUSES: DocumentProcessingStatus[] = [
+	// Terminal-ish states the user can clean up after the fact.
 	'ready_for_review',
 	'ready_for_workflow',
 	'needs_manual_review',
-	'failed'
+	'failed',
+	// In-flight states — user wants to interrupt a stuck pipeline. The
+	// async worker checks for `abandoned` between stages (see
+	// `processDocument` + `repo.setStatusIfActive`) and exits early.
+	'received',
+	'stored',
+	'text_extraction_pending',
+	'text_extracted',
+	'ocr_pending',
+	'ocr_completed',
+	'classification_pending',
+	'classified',
+	'fields_extraction_pending'
 ];
+
+class AbortedByUser extends Error {
+	override readonly name = 'AbortedByUser';
+}
 
 const SUPPORTED_MIME_PATTERNS = [
 	/^application\/pdf$/i,
@@ -208,6 +225,7 @@ export interface DocumentIntakeService {
 		fields: Record<string, unknown>;
 		confidence?: Record<string, number>;
 		evidence?: unknown;
+		sourceQuotes?: Record<string, string>;
 		categoryId: string;
 	}): Promise<DocumentArtifact | null>;
 	listDocumentArtifacts(input: DocumentArtifactLibraryFilters): Promise<{
@@ -338,12 +356,18 @@ export function createDocumentIntakeService(
 			artifact.processingStatus !== 'received' &&
 			artifact.processingStatus !== 'needs_manual_review' &&
 			artifact.processingStatus !== 'failed') {
-			// Already further along; don't re-run.
+			// Already further along (or `abandoned` — user cancelled before we
+			// dequeued); don't re-run.
 			return artifact;
 		}
 
+		const setStatusOrAbort = async (status: DocumentProcessingStatus): Promise<void> => {
+			const ok = await repo.setStatusIfActive(artifact.id, status);
+			if (!ok) throw new AbortedByUser();
+		};
+
 		try {
-			await repo.setStatus(artifact.id, 'text_extraction_pending');
+			await setStatusOrAbort('text_extraction_pending');
 
 			// Ship 1: prefer client-extracted text. The browser pdfjs path produces
 			// reliable text from PDFs (the Workers byte heuristic cannot — modern
@@ -376,7 +400,7 @@ export function createDocumentIntakeService(
 			await repo.setTextExtraction(artifact.id, extraction);
 
 			if (extraction.status === 'failed') {
-				await repo.setStatus(artifact.id, 'failed');
+				await setStatusOrAbort('failed');
 				const failed = await repo.findById(artifact.id, tenantId);
 				await audit(failed!, 'document.failed', 'failed', {
 					errorCode: extraction.error?.code ?? 'extraction_failed'
@@ -386,7 +410,7 @@ export function createDocumentIntakeService(
 
 			if (extraction.status === 'partial' || !extraction.text) {
 				await repo.addSecurityFlag(artifact.id, 'low_ocr_confidence');
-				await repo.setStatus(artifact.id, 'needs_manual_review');
+				await setStatusOrAbort('needs_manual_review');
 				const partial = await repo.findById(artifact.id, tenantId);
 				await audit(partial!, 'document.needs_manual_review', 'failed', {
 					errorCode: extraction.error?.code ?? 'low_text_yield'
@@ -394,7 +418,7 @@ export function createDocumentIntakeService(
 				return partial!;
 			}
 
-			await repo.setStatus(artifact.id, 'text_extracted');
+			await setStatusOrAbort('text_extracted');
 			const afterText = await repo.findById(artifact.id, tenantId);
 			await audit(afterText!, 'document.text_extracted', 'ok', {
 				outputRefs: {
@@ -404,7 +428,7 @@ export function createDocumentIntakeService(
 				}
 			});
 
-			await repo.setStatus(artifact.id, 'classification_pending');
+			await setStatusOrAbort('classification_pending');
 			const classification = await classifyDocumentCapability.execute(
 				{
 					text: extraction.text,
@@ -435,7 +459,7 @@ export function createDocumentIntakeService(
 			// Optional field extraction step (Ship 2 async pipeline). Worker
 			// supplies a finance-aware extractor; legacy sync callers don't.
 			if (input.fieldExtractor && extraction.text) {
-				await repo.setStatus(artifact.id, 'fields_extraction_pending');
+				await setStatusOrAbort('fields_extraction_pending');
 				try {
 					const extracted = await input.fieldExtractor({
 						tenantId,
@@ -477,12 +501,22 @@ export function createDocumentIntakeService(
 				}
 			}
 
-			await repo.setStatus(artifact.id, 'ready_for_review');
+			await setStatusOrAbort('ready_for_review');
 			const ready = await repo.findById(artifact.id, tenantId);
 			await audit(ready!, 'document.ready_for_review');
 			return ready!;
 		} catch (err) {
-			await repo.setStatus(artifact.id, 'failed');
+			if (err instanceof AbortedByUser) {
+				// The /abandon endpoint already wrote processingStatus='abandoned'
+				// and the abandon metadata. Nothing else to do — exit cleanly so
+				// the queue handler acks the message (no retry).
+				const aborted = await repo.findById(artifact.id, tenantId);
+				await audit(aborted ?? artifact, 'document.processing_aborted', 'ok');
+				return aborted ?? artifact;
+			}
+			// Use the active-guarded setter so a real failure on an already
+			// user-cancelled artifact doesn't stomp 'abandoned' back to 'failed'.
+			await repo.setStatusIfActive(artifact.id, 'failed');
 			const failed = await repo.findById(artifact.id, tenantId);
 			await audit(failed!, 'document.failed', 'failed', {
 				errorCode: 'processing_exception'

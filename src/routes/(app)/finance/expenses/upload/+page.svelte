@@ -347,7 +347,7 @@
 			const mime = selectedFile.type.toLowerCase();
 			const fname = selectedFile.name.toLowerCase();
 			const isPdf = mime === 'application/pdf' || fname.endsWith('.pdf');
-			const isImage = mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(fname);
+			const isImage = mime.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(fname);
 
 			if (isImage) {
 				// Image: preprocess then run OCR
@@ -664,7 +664,7 @@
 						<span class="mb-1 block text-xs font-medium text-slate-700">File</span>
 						<input
 							type="file"
-							accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.eml,.doc,.docx,.xls,.xlsx"
+							accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.txt,.csv,.eml,.doc,.docx,.xls,.xlsx"
 							class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
 							onchange={onPickFile}
 						/>

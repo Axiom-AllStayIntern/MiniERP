@@ -311,7 +311,7 @@
 	<input
 		bind:this={fileInput}
 		type="file"
-		accept="application/pdf,image/png,image/jpeg,image/webp"
+		accept="application/pdf,image/png,image/jpeg,image/webp,image/gif,image/bmp,image/tiff,.pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff"
 		onchange={onInputChange}
 		hidden
 	/>

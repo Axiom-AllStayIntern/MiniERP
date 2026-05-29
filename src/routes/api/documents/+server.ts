@@ -153,8 +153,7 @@ async function processInlineFallback(
 	// queue-driven prod path doesn't pull them into the HTTP worker bundle.
 	const {
 		extractDocumentFieldsCapability,
-		categoryIdForDocumentType,
-		findCategoryById
+		categoryIdForDocumentType
 	} = await import('$modules/finance');
 
 	try {
@@ -179,14 +178,11 @@ async function processInlineFallback(
 					{ documentId, fileName, text, categoryId, artifactConfidence: classificationConfidence },
 					{ tenantId, userId: message.userId, env, useMock: !env.AI }
 				);
-				const cat = findCategoryById(categoryId);
-				const fieldKeys = cat?.llmFields ?? Object.keys(result.fields);
-				const perFieldConfidence: Record<string, number> = {};
-				for (const k of fieldKeys) perFieldConfidence[k] = result.confidence;
 				return {
 					fields: result.fields as unknown as Record<string, unknown>,
-					confidence: perFieldConfidence,
+					confidence: result.fieldConfidence,
 					evidence: result.evidence,
+					sourceQuotes: result.sourceQuotes,
 					categoryId
 				};
 			}

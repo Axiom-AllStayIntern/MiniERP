@@ -37,25 +37,18 @@ export async function preprocessImageForOcr(input: Blob, fileName?: string): Pro
 			? input
 			: new File([input], sourceName, { type: input.type || 'image/jpeg' });
 
-	if (!input.type.startsWith('image/') || input.type === 'image/svg+xml') {
-		return passthrough();
-	}
+	const mime = (input.type || '').toLowerCase();
+	if (mime === 'image/svg+xml') return passthrough();
+	const looksTiff = isTiff(mime, sourceName);
+	if (!mime.startsWith('image/') && !looksTiff) return passthrough();
 
-	// 1. Decode with EXIF orientation honoured.
-	let bitmap: ImageBitmap;
+	// 1. Decode to a canvas at OCR_MAX_LONG_SIDE. Browsers can't decode TIFF
+	//    natively, so route TIFF through utif2 first; everything else uses
+	//    createImageBitmap so EXIF orientation is honoured.
+	let canvas = await decodeToCanvas(input, looksTiff).catch(() => null);
+	if (!canvas) return passthrough();
+
 	try {
-		bitmap = await createImageBitmap(input, { imageOrientation: 'from-image' });
-	} catch {
-		return passthrough();
-	}
-
-	try {
-		// 2. Resize to working canvas at OCR_MAX_LONG_SIDE.
-		const { width, height } = fitToLongSide(bitmap.width, bitmap.height, OCR_MAX_LONG_SIDE);
-		let canvas = drawTo(bitmap, width, height);
-		bitmap.close();
-		if (!canvas) return passthrough();
-
 		// 3. Best-effort document detection + perspective de-warp.
 		try {
 			const warped = await tryWarpDocument(canvas);
@@ -107,6 +100,58 @@ function drawTo(source: CanvasImageSource, width: number, height: number): HTMLC
 function drawCanvasTo(src: HTMLCanvasElement, width: number, height: number): HTMLCanvasElement | null {
 	if (src.width === width && src.height === height) return src;
 	return drawTo(src, width, height);
+}
+
+// ---------------------------------------------------------------------------
+// Decoding
+// ---------------------------------------------------------------------------
+
+const TIFF_EXT_RE = /\.tiff?$/i;
+const TIFF_MIME_RE = /^image\/tiff?$/i;
+
+function isTiff(mime: string, name: string): boolean {
+	return TIFF_MIME_RE.test(mime) || TIFF_EXT_RE.test(name);
+}
+
+async function decodeToCanvas(input: Blob, looksTiff: boolean): Promise<HTMLCanvasElement | null> {
+	if (looksTiff) {
+		const native = await decodeTiffToCanvas(input);
+		if (!native) return null;
+		const fit = fitToLongSide(native.width, native.height, OCR_MAX_LONG_SIDE);
+		return drawCanvasTo(native, fit.width, fit.height);
+	}
+	let bitmap: ImageBitmap;
+	try {
+		bitmap = await createImageBitmap(input, { imageOrientation: 'from-image' });
+	} catch {
+		return null;
+	}
+	const fit = fitToLongSide(bitmap.width, bitmap.height, OCR_MAX_LONG_SIDE);
+	const out = drawTo(bitmap, fit.width, fit.height);
+	bitmap.close();
+	return out;
+}
+
+async function decodeTiffToCanvas(input: Blob): Promise<HTMLCanvasElement | null> {
+	const UTIF = await import('utif2');
+	const buf = await input.arrayBuffer();
+	const ifds = UTIF.decode(buf);
+	if (!ifds.length) return null;
+	const ifd = ifds[0]!;
+	UTIF.decodeImage(buf, ifd);
+	const rgba = UTIF.toRGBA8(ifd);
+	const w = ifd.width;
+	const h = ifd.height;
+	if (!w || !h) return null;
+	const canvas = document.createElement('canvas');
+	canvas.width = w;
+	canvas.height = h;
+	const ctx = canvas.getContext('2d');
+	if (!ctx) return null;
+	const img = ctx.createImageData(w, h);
+	img.data.set(rgba);
+	ctx.putImageData(img, 0, 0);
+	return canvas;
 }
 
 function canvasToBlob(

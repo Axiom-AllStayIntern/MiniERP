@@ -7,6 +7,7 @@
 		uploadDocument,
 		type DocumentProcessingStatus
 	} from '$app-layer/ai-panel/workflow/finance-workflow-api';
+	import { preprocessImageForOcr } from '$lib/utils/preprocess-image';
 
 	type Stage = 'idle' | 'storing' | 'extracting' | 'wiring' | 'error';
 
@@ -25,10 +26,18 @@
 		stage = 'storing';
 
 		try {
-			// 1. Real upload to /api/documents â€?server stores the blob,
+			// 1. Real upload to /api/documents ï¿½?server stores the blob,
 			// extracts text, classifies, and returns the artifact view.
+			// Images go through preprocessImageForOcr first â€” required for
+			// TIFF/BMP (OpenAI Vision can't decode those, so we re-encode to
+			// JPEG client-side), no-op for PDFs.
 			stage = 'extracting';
-			const artifact = await uploadDocument(file, { uploadedFrom: 'ai_panel' });
+			const mime = (file.type || '').toLowerCase();
+			const isImage =
+				mime.startsWith('image/') ||
+				/\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(file.name);
+			const uploadFile = isImage ? await preprocessImageForOcr(file).catch(() => file) : file;
+			const artifact = await uploadDocument(uploadFile, { uploadedFrom: 'ai_panel' });
 
 			if (TERMINAL_BAD.includes(artifact.processingStatus)) {
 				const why =
@@ -140,9 +149,9 @@
 
 		<span class="drop-heading">
 			{#if stage === 'storing'}
-				Storing {fileName}â€?			{:else if stage === 'extracting'}
-				Reading {fileName}â€?			{:else if stage === 'wiring'}
-				Wiring it into the workflowâ€?			{:else if stage === 'error'}
+				Storing {fileName}ï¿½?			{:else if stage === 'extracting'}
+				Reading {fileName}ï¿½?			{:else if stage === 'wiring'}
+				Wiring it into the workflowï¿½?			{:else if stage === 'error'}
 				Couldn't start
 			{:else}
 				Drop the supplier invoice here
@@ -159,7 +168,7 @@
 
 		<span class="drop-footnote">
 			{#if stage === 'idle' && !fileName}
-				Click or drop â€?real OCR + classify, then finance agent
+				Click or drop ï¿½?real OCR + classify, then finance agent
 			{:else if stage === 'storing'}
 				Stashing in object storage
 			{:else if stage === 'extracting'}
@@ -173,7 +182,7 @@
 	<input
 		bind:this={fileInput}
 		type="file"
-		accept="application/pdf,image/png,image/jpeg,image/webp"
+		accept="application/pdf,image/png,image/jpeg,image/webp,image/gif,image/bmp,image/tiff,.pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff"
 		onchange={onInputChange}
 		hidden
 	/>

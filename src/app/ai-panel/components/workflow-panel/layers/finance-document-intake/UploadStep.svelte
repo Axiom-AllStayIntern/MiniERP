@@ -8,6 +8,7 @@
 		type DocumentProcessingStatus
 	} from '$app-layer/ai-panel/workflow/finance-workflow-api';
 	import { extractEmlClientText } from '$app-layer/ai-panel/workflow/extract-eml-client';
+	import { preprocessImageForOcr } from '$lib/utils/preprocess-image';
 
 	type Stage = 'idle' | 'expanding' | 'parsing' | 'storing' | 'queued' | 'error';
 
@@ -22,7 +23,7 @@
 	const TERMINAL_BAD: DocumentProcessingStatus[] = ['needs_manual_review', 'failed'];
 	const MIN_USEFUL_CLIENT_TEXT = 48;
 	const MAX_BATCH_FILES = 25;
-	const SUPPORTED_DOCUMENT_EXT_RE = /\.(pdf|docx|doc|eml|png|jpe?g|webp)$/i;
+	const SUPPORTED_DOCUMENT_EXT_RE = /\.(pdf|docx|doc|eml|png|jpe?g|webp|gif|bmp|tiff?)$/i;
 	const ZIP_EXT_RE = /\.zip$/i;
 
 	// ---------------------------------------------------------------------------
@@ -118,6 +119,9 @@
 		if (/\.png$/i.test(fileName)) return 'image/png';
 		if (/\.jpe?g$/i.test(fileName)) return 'image/jpeg';
 		if (/\.webp$/i.test(fileName)) return 'image/webp';
+		if (/\.gif$/i.test(fileName)) return 'image/gif';
+		if (/\.bmp$/i.test(fileName)) return 'image/bmp';
+		if (/\.tiff?$/i.test(fileName)) return 'image/tiff';
 		return fallback;
 	}
 
@@ -128,9 +132,7 @@
 			mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
 			mime === 'application/msword' ||
 			mime === 'message/rfc822' ||
-			mime === 'image/png' ||
-			mime === 'image/jpeg' ||
-			mime === 'image/webp' ||
+			mime.startsWith('image/') ||
 			SUPPORTED_DOCUMENT_EXT_RE.test(file.name)
 		);
 	}
@@ -223,8 +225,12 @@
 			name.endsWith('.docx');
 
 		if (isImage) {
-			// Server-side vision OCR will handle this; nothing to extract on client.
-			return { text: '', method: 'manual', uploadFile: file };
+			// Server-side vision OCR will handle this. Run client-side preprocessing
+			// first — required for TIFF/BMP (OpenAI Vision can't decode them, so
+			// preprocessImageForOcr re-encodes to JPEG), and a quality win for the
+			// rest (EXIF orientation, downscale, de-warp, sharpen).
+			const uploadFile = await preprocessImageForOcr(file).catch(() => file);
+			return { text: '', method: 'manual', uploadFile };
 		}
 
 		if (isDocx) {
@@ -465,7 +471,7 @@
 	<input
 		bind:this={fileInput}
 		type="file"
-		accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,message/rfc822,image/png,image/jpeg,image/webp,application/zip,.pdf,.docx,.doc,.eml,.zip"
+		accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,message/rfc822,image/png,image/jpeg,image/webp,image/gif,image/bmp,image/tiff,application/zip,.pdf,.docx,.doc,.eml,.zip,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff"
 		multiple
 		onchange={onInputChange}
 		hidden
