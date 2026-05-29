@@ -28,15 +28,17 @@
 		try {
 			// 1. Real upload to /api/documents �?server stores the blob,
 			// extracts text, classifies, and returns the artifact view.
-			// Images go through preprocessImageForOcr first — required for
-			// TIFF/BMP (OpenAI Vision can't decode those, so we re-encode to
-			// JPEG client-side), no-op for PDFs.
+			// Only TIFF / BMP need a client-side re-encode to JPEG (OpenAI
+			// Vision can't decode them). JPEG/PNG/WebP/GIF and PDFs upload
+			// as-is — going through preprocessImageForOcr would pull in
+			// OpenCV.js (~10 MB WASM) on first use and block the main thread.
 			stage = 'extracting';
 			const mime = (file.type || '').toLowerCase();
-			const isImage =
-				mime.startsWith('image/') ||
-				/\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(file.name);
-			const uploadFile = isImage ? await preprocessImageForOcr(file).catch(() => file) : file;
+			const needsClientReencode =
+				/\.(tiff?|bmp)$/i.test(file.name) || /^image\/(tiff?|bmp|x-bmp)$/i.test(mime);
+			const uploadFile = needsClientReencode
+				? await preprocessImageForOcr(file).catch(() => file)
+				: file;
 			const artifact = await uploadDocument(uploadFile, { uploadedFrom: 'ai_panel' });
 
 			if (TERMINAL_BAD.includes(artifact.processingStatus)) {

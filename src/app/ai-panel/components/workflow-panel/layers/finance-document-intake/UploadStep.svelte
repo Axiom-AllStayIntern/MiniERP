@@ -225,11 +225,15 @@
 			name.endsWith('.docx');
 
 		if (isImage) {
-			// Server-side vision OCR will handle this. Run client-side preprocessing
-			// first — required for TIFF/BMP (OpenAI Vision can't decode them, so
-			// preprocessImageForOcr re-encodes to JPEG), and a quality win for the
-			// rest (EXIF orientation, downscale, de-warp, sharpen).
-			const uploadFile = await preprocessImageForOcr(file).catch(() => file);
+			// OpenAI Vision handles JPEG/PNG/WebP/GIF natively — upload as-is so
+			// we don't pay the OpenCV.js (~10 MB WASM) first-load cost on the
+			// critical path. Only TIFF and BMP need a client-side re-encode to
+			// JPEG, because the vision API can't decode them.
+			const needsClientReencode =
+				/\.(tiff?|bmp)$/i.test(name) || /^image\/(tiff?|bmp|x-bmp)$/i.test(mime);
+			const uploadFile = needsClientReencode
+				? await preprocessImageForOcr(file).catch(() => file)
+				: file;
 			return { text: '', method: 'manual', uploadFile };
 		}
 
