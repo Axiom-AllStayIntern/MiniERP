@@ -15,6 +15,16 @@ export function createProcurementApi(ctx: ModuleContext) {
 		createSupplierEvaluation: svc.createSupplierEvaluation.bind(svc),
 		createSupplier: svc.createSupplier.bind(svc),
 		updateSupplierWithContacts: svc.updateSupplierWithContacts.bind(svc),
-		deleteSupplier: svc.deleteSupplier.bind(svc)
+		deleteSupplier: svc.deleteSupplier.bind(svc),
+		listRfqs: svc.listRfqs.bind(svc),
+		createRfq: svc.createRfq.bind(svc),
+		getRfqComparison: svc.getRfqComparison.bind(svc),
+		submitSupplierQuotation: svc.submitSupplierQuotation.bind(svc),
+		selectWinningQuotation: svc.selectWinningQuotation.bind(svc),
+		createPurchaseOrder: svc.createPurchaseOrder.bind(svc),
+		updatePurchaseOrderApproval: svc.updatePurchaseOrderApproval.bind(svc),
+		recordPurchaseOrderAcknowledgment: svc.recordPurchaseOrderAcknowledgment.bind(svc),
+		recordPurchaseOrderReceipt: svc.recordPurchaseOrderReceipt.bind(svc),
+		listPurchaseOrders: svc.listPurchaseOrders.bind(svc)
 	};
 }

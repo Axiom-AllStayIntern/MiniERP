@@ -10,6 +10,16 @@ import {
 	partnerSupplierEvaluations,
 	partnerSupplierProfiles
 } from './repositories/supplier.schema';
+import {
+	procurementPurchaseOrderItems,
+	procurementPurchaseOrderReceipts,
+	procurementPurchaseOrders,
+	procurementRfqItems,
+	procurementRfqs,
+	procurementRfqSuppliers,
+	procurementSupplierQuotationItems,
+	procurementSupplierQuotations
+} from './repositories/rfq.schema';
 
 type SupplierType = 'individual' | 'corporate_local' | 'corporate_international';
 type SupplierStatus = 'approved' | 'preferred' | 'on_hold' | 'blacklisted';
@@ -97,6 +107,134 @@ export type SupplierEvaluationInput = {
 	notes?: string;
 };
 
+type RfqSourceType = 'purchase_requisition' | 'mrp_suggestion' | 'manual';
+type PoSourceType = 'purchase_requisition' | 'rfq' | 'mrp_suggestion' | 'manual';
+type SupplierRiskLevel = 'low' | 'medium' | 'high';
+
+type RfqItemInput = {
+	itemCode?: string;
+	description: string;
+	quantity?: number;
+	uom?: string;
+	targetUnitPrice?: number;
+	notes?: string;
+};
+
+type RfqSupplierInput = {
+	supplierId: string;
+	contactName?: string;
+	contactEmail?: string;
+	notes?: string;
+};
+
+export type CreateRfqInput = {
+	rfqNumber?: string;
+	title: string;
+	sourceType?: RfqSourceType;
+	sourceId?: string;
+	projectId?: string;
+	currency?: string;
+	requiredByDate?: string;
+	notes?: string;
+	items: RfqItemInput[];
+	suppliers: RfqSupplierInput[];
+	sendImmediately?: boolean;
+};
+
+type QuotationItemInput = {
+	rfqItemId: string;
+	quantity?: number;
+	unitPrice: number;
+	notes?: string;
+};
+
+export type SubmitSupplierQuotationInput = {
+	rfqSupplierId?: string;
+	supplierId: string;
+	quotationNumber?: string;
+	submittedAt?: string;
+	currency?: string;
+	leadTimeDays?: number;
+	deliveryTerms?: string;
+	paymentTerms?: string;
+	validityDate?: string;
+	shippingAmount?: number;
+	taxAmount?: number;
+	dutiesAmount?: number;
+	discountAmount?: number;
+	notes?: string;
+	items: QuotationItemInput[];
+};
+
+export type SelectWinningQuotationInput = {
+	quotationId: string;
+	poNumber?: string;
+	poDate?: string;
+	goodsReceiptDate?: string;
+	status?: 'draft' | 'pending_approval' | 'approved' | 'sent' | 'confirmed' | 'received';
+	deliveryDate?: string;
+	taxCode?: TaxCode;
+	incoterms?: string;
+	billingAddress?: string;
+	notes?: string;
+};
+
+type PurchaseOrderItemInput = {
+	itemCode?: string;
+	description: string;
+	quantity?: number;
+	uom?: string;
+	unitPrice?: number;
+	taxCode?: TaxCode;
+	deliveryDate?: string;
+	notes?: string;
+};
+
+export type CreatePurchaseOrderInput = {
+	poNumber?: string;
+	sourceType?: PoSourceType;
+	sourceId?: string;
+	rfqId?: string;
+	quotationId?: string;
+	supplierId: string;
+	projectId?: string;
+	poDate?: string;
+	deliveryDate?: string;
+	currency?: string;
+	taxCode?: TaxCode;
+	incoterms?: string;
+	billingAddress?: string;
+	shippingAmount?: number;
+	taxAmount?: number;
+	dutiesAmount?: number;
+	competitiveQuotesCount?: number;
+	goodsReceiptDate?: string;
+	status?: 'draft' | 'pending_approval' | 'approved' | 'sent' | 'confirmed' | 'received';
+	notes?: string;
+	items: PurchaseOrderItemInput[];
+};
+
+export type PurchaseOrderApprovalInput = {
+	action: 'approve' | 'reject';
+	reason?: string;
+};
+
+export type PurchaseOrderAcknowledgmentInput = {
+	ackStatus: 'requested' | 'acknowledged' | 'rejected' | 'overdue';
+	acknowledgedAt?: string;
+	supplierAckReference?: string;
+};
+
+export type PurchaseOrderReceiptInput = {
+	poItemId: string;
+	receiptNumber?: string;
+	receiptDate?: string;
+	quantityReceived: number;
+	acceptedQuantity?: number;
+	rejectedQuantity?: number;
+	notes?: string;
+};
+
 function nullable(value?: string) {
 	const trimmed = value?.trim();
 	return trimmed ? trimmed : null;
@@ -134,6 +272,27 @@ function scoreFromInverseRate(rate: number, unacceptableRate: number) {
 
 function roundScore(value: number) {
 	return Math.round(value * 10) / 10;
+}
+
+function roundMoney(value: number) {
+	return Math.round(value * 100) / 100;
+}
+
+function finiteNumber(value: unknown, fallback = 0) {
+	const number = Number(value);
+	return Number.isFinite(number) ? number : fallback;
+}
+
+function generatedNumber(prefix: string) {
+	const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+	const suffix = crypto.randomUUID().slice(0, 6).toUpperCase();
+	return `${prefix}-${stamp}-${suffix}`;
+}
+
+function approvalThresholdForRisk(risk: SupplierRiskLevel) {
+	if (risk === 'high') return 0;
+	if (risk === 'medium') return 25_000;
+	return 50_000;
 }
 
 function normalizeWeights(input?: Partial<ScoreWeights>): ScoreWeights {
@@ -487,6 +646,655 @@ export class ProcurementService {
 		return { latest, evaluations, trend };
 	}
 
+	async listRfqs() {
+		const rfqs = await this.db
+			.select()
+			.from(procurementRfqs)
+			.where(isNull(procurementRfqs.deletedAt))
+			.orderBy(desc(procurementRfqs.createdAt));
+		const result = [];
+		for (const rfq of rfqs) {
+			const [items, suppliers, quotations, purchaseOrders] = await Promise.all([
+				this.db
+					.select()
+					.from(procurementRfqItems)
+					.where(and(eq(procurementRfqItems.rfqId, rfq.id), isNull(procurementRfqItems.deletedAt))),
+				this.db
+					.select()
+					.from(procurementRfqSuppliers)
+					.where(and(eq(procurementRfqSuppliers.rfqId, rfq.id), isNull(procurementRfqSuppliers.deletedAt))),
+				this.db
+					.select()
+					.from(procurementSupplierQuotations)
+					.where(
+						and(
+							eq(procurementSupplierQuotations.rfqId, rfq.id),
+							isNull(procurementSupplierQuotations.deletedAt)
+						)
+					),
+				this.db
+					.select()
+					.from(procurementPurchaseOrders)
+					.where(and(eq(procurementPurchaseOrders.rfqId, rfq.id), isNull(procurementPurchaseOrders.deletedAt)))
+			]);
+			result.push({
+				...rfq,
+				itemCount: items.length,
+				supplierCount: suppliers.length,
+				quotationCount: quotations.length,
+				competitiveQuotesCount: quotations.filter((q) => q.status !== 'expired').length,
+				bestTotalCost: quotations.length
+					? Math.min(...quotations.map((q) => finiteNumber(q.totalCost)))
+					: null,
+				purchaseOrder: purchaseOrders[0] ?? null
+			});
+		}
+		return result;
+	}
+
+	async createRfq(input: CreateRfqInput) {
+		const title = input.title.trim();
+		if (!title) throw new Error('RFQ title is required');
+		const items = input.items.filter((item) => item.description.trim());
+		if (items.length === 0) throw new Error('At least one RFQ item is required');
+		const suppliers = input.suppliers.filter((supplier) => supplier.supplierId.trim());
+		if (suppliers.length === 0) throw new Error('At least one supplier is required');
+
+		const now = new Date().toISOString();
+		const rfqId = crypto.randomUUID();
+		const sendImmediately = input.sendImmediately ?? true;
+		const rfq = {
+			id: rfqId,
+			rfqNumber: nullable(input.rfqNumber) ?? generatedNumber('RFQ'),
+			title,
+			sourceType: input.sourceType ?? 'manual',
+			sourceId: nullable(input.sourceId),
+			projectId: nullable(input.projectId),
+			status: sendImmediately ? 'sent' : 'draft',
+			currency: nullable(input.currency) ?? 'SGD',
+			requiredByDate: nullable(input.requiredByDate),
+			createdByUserId: this.user?.id ?? null,
+			createdByEmail: this.user?.email ?? null,
+			notes: nullable(input.notes),
+			createdAt: now,
+			updatedAt: now
+		};
+		await this.db.insert(procurementRfqs).values(rfq as any);
+
+		const insertedItems = [];
+		for (const item of items) {
+			const row = {
+				id: crypto.randomUUID(),
+				rfqId,
+				itemCode: nullable(item.itemCode),
+				description: item.description.trim(),
+				quantity: Math.max(0, finiteNumber(item.quantity, 1)),
+				uom: nullable(item.uom) ?? 'unit',
+				targetUnitPrice: item.targetUnitPrice === undefined ? null : Math.max(0, finiteNumber(item.targetUnitPrice)),
+				notes: nullable(item.notes),
+				createdAt: now,
+				updatedAt: now
+			};
+			await this.db.insert(procurementRfqItems).values(row as any);
+			insertedItems.push(row);
+		}
+
+		for (const supplier of suppliers) {
+			const found = await this.suppliers.findById(supplier.supplierId);
+			if (!found) throw new NotFoundError('Supplier', supplier.supplierId);
+			await this.db.insert(procurementRfqSuppliers).values({
+				id: crypto.randomUUID(),
+				rfqId,
+				supplierId: supplier.supplierId,
+				contactName: nullable(supplier.contactName),
+				contactEmail: nullable(supplier.contactEmail),
+				status: sendImmediately ? 'sent' : 'draft',
+				sentAt: sendImmediately ? now : null,
+				notes: nullable(supplier.notes),
+				createdAt: now,
+				updatedAt: now
+			} as any);
+		}
+
+		await this.audit.writeLog({
+			module: 'procurement',
+			actionType: 'create',
+			action: sendImmediately ? 'rfq.sent' : 'rfq.created',
+			entityType: 'rfq',
+			entityId: rfqId,
+			newValue: { ...rfq, items: insertedItems, supplierIds: suppliers.map((s) => s.supplierId) },
+			metadata: { sourceType: rfq.sourceType, sourceId: rfq.sourceId, supplierCount: suppliers.length }
+		});
+		return rfq;
+	}
+
+	async getRfqComparison(rfqId: string) {
+		const rfqRows = await this.db
+			.select()
+			.from(procurementRfqs)
+			.where(and(eq(procurementRfqs.id, rfqId), isNull(procurementRfqs.deletedAt)))
+			.limit(1);
+		const rfq = rfqRows[0];
+		if (!rfq) throw new NotFoundError('RFQ', rfqId);
+
+		const [items, invitations, quotations, purchaseOrders, suppliers] = await Promise.all([
+			this.db
+				.select()
+				.from(procurementRfqItems)
+				.where(and(eq(procurementRfqItems.rfqId, rfqId), isNull(procurementRfqItems.deletedAt))),
+			this.db
+				.select()
+				.from(procurementRfqSuppliers)
+				.where(and(eq(procurementRfqSuppliers.rfqId, rfqId), isNull(procurementRfqSuppliers.deletedAt))),
+			this.db
+				.select()
+				.from(procurementSupplierQuotations)
+				.where(
+					and(eq(procurementSupplierQuotations.rfqId, rfqId), isNull(procurementSupplierQuotations.deletedAt))
+				)
+				.orderBy(procurementSupplierQuotations.totalCost),
+			this.db
+				.select()
+				.from(procurementPurchaseOrders)
+				.where(and(eq(procurementPurchaseOrders.rfqId, rfqId), isNull(procurementPurchaseOrders.deletedAt))),
+			this.listSuppliers()
+		]);
+		const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
+		const quotationItems = await this.getQuotationItems(quotations.map((q) => q.id));
+		const itemById = new Map(items.map((item) => [item.id, item]));
+		const quotesBySupplier = new Map<string, typeof quotations>();
+		for (const quote of quotations) {
+			const list = quotesBySupplier.get(quote.supplierId) ?? [];
+			list.push(quote);
+			quotesBySupplier.set(quote.supplierId, list);
+		}
+
+		return {
+			rfq,
+			items,
+			invitations: invitations.map((invitation) => ({
+				...invitation,
+				supplier: supplierById.get(invitation.supplierId) ?? null,
+				quotations: quotesBySupplier.get(invitation.supplierId) ?? []
+			})),
+			quotations: quotations.map((quotation) => {
+				const lines = (quotationItems.get(quotation.id) ?? []).map((line) => ({
+					...line,
+					rfqItem: itemById.get(line.rfqItemId) ?? null
+				}));
+				return {
+					...quotation,
+					supplier: supplierById.get(quotation.supplierId) ?? null,
+					lines,
+					totalCostAnalysis: {
+						subtotal: quotation.subtotalAmount,
+						shipping: quotation.shippingAmount,
+						tax: quotation.taxAmount,
+						duties: quotation.dutiesAmount,
+						discount: quotation.discountAmount,
+						total: quotation.totalCost
+					}
+				};
+			}),
+			purchaseOrder: purchaseOrders[0] ?? null
+		};
+	}
+
+	async submitSupplierQuotation(rfqId: string, input: SubmitSupplierQuotationInput) {
+		const rfq = await this.getRfqComparison(rfqId);
+		const invitation =
+			rfq.invitations.find((i) => i.id === input.rfqSupplierId) ??
+			rfq.invitations.find((i) => i.supplierId === input.supplierId);
+		if (!invitation) throw new Error('Supplier is not invited to this RFQ');
+		const supplierRating = await this.getSupplierScorecard(input.supplierId);
+		const now = new Date().toISOString();
+		const quoteId = crypto.randomUUID();
+		const rfqItemById = new Map(rfq.items.map((item) => [item.id, item]));
+		let subtotal = 0;
+		const normalizedItems = input.items
+			.filter((item) => rfqItemById.has(item.rfqItemId))
+			.map((item) => {
+				const rfqItem = rfqItemById.get(item.rfqItemId)!;
+				const quantity = Math.max(0, finiteNumber(item.quantity, finiteNumber(rfqItem.quantity, 1)));
+				const unitPrice = Math.max(0, finiteNumber(item.unitPrice));
+				const lineTotal = roundMoney(quantity * unitPrice);
+				subtotal += lineTotal;
+				return {
+					id: crypto.randomUUID(),
+					quotationId: quoteId,
+					rfqItemId: item.rfqItemId,
+					quantity,
+					unitPrice,
+					lineTotal,
+					notes: nullable(item.notes),
+					createdAt: now,
+					updatedAt: now
+				};
+			});
+		if (normalizedItems.length === 0) throw new Error('At least one valid quotation item is required');
+
+		const shipping = Math.max(0, finiteNumber(input.shippingAmount));
+		const tax = Math.max(0, finiteNumber(input.taxAmount));
+		const duties = Math.max(0, finiteNumber(input.dutiesAmount));
+		const discount = Math.max(0, finiteNumber(input.discountAmount));
+		const totalCost = roundMoney(subtotal + shipping + tax + duties - discount);
+		const quote = {
+			id: quoteId,
+			rfqId,
+			rfqSupplierId: invitation.id,
+			supplierId: input.supplierId,
+			quotationNumber: nullable(input.quotationNumber),
+			status: 'submitted',
+			submittedAt: nullable(input.submittedAt) ?? now,
+			currency: nullable(input.currency) ?? rfq.rfq.currency ?? 'SGD',
+			leadTimeDays: input.leadTimeDays === undefined ? null : Math.max(0, finiteNumber(input.leadTimeDays)),
+			deliveryTerms: nullable(input.deliveryTerms),
+			paymentTerms: nullable(input.paymentTerms),
+			validityDate: nullable(input.validityDate),
+			shippingAmount: shipping,
+			taxAmount: tax,
+			dutiesAmount: duties,
+			discountAmount: discount,
+			subtotalAmount: roundMoney(subtotal),
+			totalCost,
+			supplierRatingSnapshot: supplierRating.latest?.overallScore ?? null,
+			notes: nullable(input.notes),
+			createdAt: now,
+			updatedAt: now
+		};
+		await this.db.insert(procurementSupplierQuotations).values(quote as any);
+		for (const item of normalizedItems) {
+			await this.db.insert(procurementSupplierQuotationItems).values(item as any);
+		}
+		await this.db
+			.update(procurementRfqSuppliers)
+			.set({ status: 'responded', updatedAt: now } as any)
+			.where(eq(procurementRfqSuppliers.id, invitation.id));
+		await this.audit.writeLog({
+			module: 'procurement',
+			actionType: 'create',
+			action: 'rfq.quotation.submitted',
+			entityType: 'supplier_quotation',
+			entityId: quoteId,
+			newValue: { ...quote, items: normalizedItems },
+			metadata: { rfqId, supplierId: input.supplierId, totalCost }
+		});
+		return quote;
+	}
+
+	async selectWinningQuotation(rfqId: string, input: SelectWinningQuotationInput) {
+		const comparison = await this.getRfqComparison(rfqId);
+		const quotation = comparison.quotations.find((q) => q.id === input.quotationId);
+		if (!quotation) throw new NotFoundError('Supplier quotation', input.quotationId);
+		const competitiveQuotesCount = comparison.quotations.filter((q) => q.status !== 'expired').length;
+		const po = await this.createPurchaseOrder({
+			poNumber: input.poNumber,
+			sourceType: 'rfq',
+			sourceId: rfqId,
+			rfqId,
+			quotationId: quotation.id,
+			supplierId: quotation.supplierId,
+			projectId: comparison.rfq.projectId ?? undefined,
+			status: input.status,
+			poDate: input.poDate,
+			deliveryDate: input.deliveryDate,
+			goodsReceiptDate: input.goodsReceiptDate,
+			currency: quotation.currency,
+			shippingAmount: quotation.shippingAmount,
+			taxAmount: quotation.taxAmount,
+			dutiesAmount: quotation.dutiesAmount,
+			competitiveQuotesCount,
+			taxCode: input.taxCode,
+			incoterms: input.incoterms,
+			billingAddress: input.billingAddress,
+			notes: input.notes,
+			items: quotation.lines.map((line) => ({
+				itemCode: line.rfqItem?.itemCode ?? undefined,
+				description: line.rfqItem?.description ?? 'Quoted item',
+				quantity: line.quantity,
+				uom: line.rfqItem?.uom ?? 'unit',
+				unitPrice: line.unitPrice,
+				taxCode: input.taxCode,
+				deliveryDate: input.deliveryDate,
+				notes: line.notes ?? undefined
+			}))
+		});
+		const now = new Date().toISOString();
+		await this.db
+			.update(procurementSupplierQuotations)
+			.set({ status: 'rejected', updatedAt: now } as any)
+			.where(eq(procurementSupplierQuotations.rfqId, rfqId));
+		await this.db
+			.update(procurementSupplierQuotations)
+			.set({ status: 'selected', updatedAt: now } as any)
+			.where(eq(procurementSupplierQuotations.id, quotation.id));
+		await this.db
+			.update(procurementRfqs)
+			.set({ status: 'converted', updatedAt: now } as any)
+			.where(eq(procurementRfqs.id, rfqId));
+		await this.audit.writeLog({
+			module: 'procurement',
+			actionType: 'create',
+			action: 'rfq.quotation.selected.po.created',
+			entityType: 'purchase_order',
+			entityId: po.id,
+			newValue: po,
+			metadata: {
+				rfqId,
+				quotationId: quotation.id,
+				competitiveQuotesCount,
+				afterTheFactFlag: po.afterTheFactFlag,
+				iaExceptionCode: po.iaExceptionCode
+			}
+		});
+		return po;
+	}
+
+	async createPurchaseOrder(input: CreatePurchaseOrderInput) {
+		const supplier = await this.suppliers.findById(input.supplierId);
+		if (!supplier) throw new NotFoundError('Supplier', input.supplierId);
+		const items = input.items.filter((item) => item.description.trim());
+		if (items.length === 0) throw new Error('At least one PO item is required');
+
+		const now = new Date().toISOString();
+		const poId = crypto.randomUUID();
+		const poDate = nullable(input.poDate) ?? now.slice(0, 10);
+		const goodsReceiptDate = nullable(input.goodsReceiptDate);
+		const normalizedItems = items.map((item) => {
+			const quantity = Math.max(0, finiteNumber(item.quantity, 1));
+			const unitPrice = Math.max(0, finiteNumber(item.unitPrice));
+			const lineSubtotal = roundMoney(quantity * unitPrice);
+			return {
+				id: crypto.randomUUID(),
+				poId,
+				itemCode: nullable(item.itemCode),
+				description: item.description.trim(),
+				quantity,
+				receivedQuantity: 0,
+				backOrderedQuantity: 0,
+				uom: nullable(item.uom) ?? 'unit',
+				unitPrice,
+				lineSubtotal,
+				taxCode: item.taxCode ?? input.taxCode ?? null,
+				deliveryDate: nullable(item.deliveryDate) ?? nullable(input.deliveryDate),
+				notes: nullable(item.notes),
+				createdAt: now,
+				updatedAt: now
+			};
+		});
+		const subtotalAmount = roundMoney(normalizedItems.reduce((sum, item) => sum + item.lineSubtotal, 0));
+		const shippingAmount = Math.max(0, finiteNumber(input.shippingAmount));
+		const taxAmount = Math.max(0, finiteNumber(input.taxAmount));
+		const dutiesAmount = Math.max(0, finiteNumber(input.dutiesAmount));
+		const totalAmount = roundMoney(subtotalAmount + shippingAmount + taxAmount + dutiesAmount);
+		const risk = await this.resolveSupplierRisk(input.supplierId);
+		const approvalThresholdAmount = approvalThresholdForRisk(risk);
+		const approvalRequired = risk === 'high' || totalAmount >= approvalThresholdAmount;
+		const approvalStatus = approvalRequired ? 'pending_approval' : 'not_required';
+		const status = approvalRequired ? 'pending_approval' : input.status ?? 'approved';
+		const competitiveQuotesCount = Math.max(0, finiteNumber(input.competitiveQuotesCount));
+		const afterTheFactFlag = Boolean(goodsReceiptDate && poDate > goodsReceiptDate);
+		const ia002 = totalAmount > 50_000 && competitiveQuotesCount < 2;
+		const profile = await this.getProfileByPartnerId(input.supplierId);
+
+		const po = {
+			id: poId,
+			poNumber: nullable(input.poNumber) ?? generatedNumber('PO'),
+			sourceType: input.sourceType ?? 'manual',
+			sourceId: nullable(input.sourceId),
+			rfqId: nullable(input.rfqId),
+			quotationId: nullable(input.quotationId),
+			supplierId: input.supplierId,
+			projectId: nullable(input.projectId),
+			status,
+			approvalStatus,
+			approvalRequired,
+			approvalThresholdAmount,
+			supplierRiskLevel: risk,
+			approvedByUserId: null,
+			approvedByEmail: null,
+			approvedAt: null,
+			rejectedReason: null,
+			poDate,
+			deliveryDate: nullable(input.deliveryDate),
+			goodsReceiptDate,
+			currency: nullable(input.currency) ?? profile?.preferredCurrency ?? 'SGD',
+			taxCode: input.taxCode ?? profile?.taxCode ?? null,
+			incoterms: nullable(input.incoterms),
+			billingAddress: nullable(input.billingAddress) ?? profile?.billingAddress ?? null,
+			ackStatus: 'not_requested',
+			ackRequestedAt: null,
+			acknowledgedAt: null,
+			supplierAckReference: null,
+			subtotalAmount,
+			shippingAmount,
+			taxAmount,
+			dutiesAmount,
+			totalAmount,
+			competitiveQuotesCount,
+			afterTheFactFlag,
+			iaExceptionCode: ia002 ? 'IA002' : null,
+			iaExceptionReason: ia002
+				? 'PO over 50000 requires at least two competitive supplier quotations.'
+				: null,
+			createdByUserId: this.user?.id ?? null,
+			createdByEmail: this.user?.email ?? null,
+			notes: nullable(input.notes),
+			createdAt: now,
+			updatedAt: now
+		};
+		await this.db.insert(procurementPurchaseOrders).values(po as any);
+		for (const item of normalizedItems) {
+			await this.db.insert(procurementPurchaseOrderItems).values(item as any);
+		}
+		await this.audit.writeLog({
+			module: 'procurement',
+			actionType: 'create',
+			action: approvalRequired ? 'purchase_order.created.pending_approval' : 'purchase_order.created',
+			entityType: 'purchase_order',
+			entityId: poId,
+			newValue: { ...po, items: normalizedItems },
+			metadata: {
+				sourceType: po.sourceType,
+				sourceId: po.sourceId,
+				supplierId: input.supplierId,
+				totalAmount,
+				supplierRiskLevel: risk,
+				approvalStatus
+			}
+		});
+		return { ...po, items: normalizedItems, receipts: [], supplier };
+	}
+
+	async updatePurchaseOrderApproval(poId: string, input: PurchaseOrderApprovalInput) {
+		const po = await this.getPurchaseOrder(poId);
+		const now = new Date().toISOString();
+		const approved = input.action === 'approve';
+		const updates = {
+			approvalStatus: approved ? 'approved' : 'rejected',
+			status: approved ? 'approved' : 'draft',
+			approvedByUserId: approved ? this.user?.id ?? null : null,
+			approvedByEmail: approved ? this.user?.email ?? null : null,
+			approvedAt: approved ? now : null,
+			rejectedReason: approved ? null : nullable(input.reason),
+			updatedAt: now
+		};
+		await this.db.update(procurementPurchaseOrders).set(updates as any).where(eq(procurementPurchaseOrders.id, poId));
+		await this.audit.writeLog({
+			module: 'procurement',
+			actionType: 'update',
+			action: approved ? 'purchase_order.approved' : 'purchase_order.rejected',
+			entityType: 'purchase_order',
+			entityId: poId,
+			oldValue: po,
+			newValue: { ...po, ...updates },
+			metadata: { totalAmount: po.totalAmount, supplierRiskLevel: po.supplierRiskLevel }
+		});
+		return { ...po, ...updates };
+	}
+
+	async recordPurchaseOrderAcknowledgment(poId: string, input: PurchaseOrderAcknowledgmentInput) {
+		const po = await this.getPurchaseOrder(poId);
+		const now = new Date().toISOString();
+		const updates = {
+			ackStatus: input.ackStatus,
+			ackRequestedAt:
+				input.ackStatus === 'requested' && !po.ackRequestedAt ? now : po.ackRequestedAt,
+			acknowledgedAt:
+				input.ackStatus === 'acknowledged' ? nullable(input.acknowledgedAt) ?? now : po.acknowledgedAt,
+			supplierAckReference: nullable(input.supplierAckReference) ?? po.supplierAckReference,
+			status: input.ackStatus === 'acknowledged' ? 'confirmed' : po.status,
+			updatedAt: now
+		};
+		await this.db.update(procurementPurchaseOrders).set(updates as any).where(eq(procurementPurchaseOrders.id, poId));
+		await this.audit.writeLog({
+			module: 'procurement',
+			actionType: 'update',
+			action: 'purchase_order.acknowledgment.updated',
+			entityType: 'purchase_order',
+			entityId: poId,
+			oldValue: po,
+			newValue: { ...po, ...updates },
+			metadata: { ackStatus: input.ackStatus }
+		});
+		return { ...po, ...updates };
+	}
+
+	async recordPurchaseOrderReceipt(poId: string, input: PurchaseOrderReceiptInput) {
+		const po = await this.getPurchaseOrder(poId);
+		const items = await this.getPurchaseOrderItems(poId);
+		const item = items.find((row) => row.id === input.poItemId);
+		if (!item) throw new NotFoundError('Purchase order item', input.poItemId);
+
+		const now = new Date().toISOString();
+		const quantityReceived = Math.max(0, finiteNumber(input.quantityReceived));
+		if (quantityReceived <= 0) throw new Error('Receipt quantity must be greater than zero');
+		const acceptedQuantity = Math.max(0, finiteNumber(input.acceptedQuantity, quantityReceived));
+		const rejectedQuantity = Math.max(0, finiteNumber(input.rejectedQuantity));
+		const nextReceived = Math.min(finiteNumber(item.quantity), finiteNumber(item.receivedQuantity) + acceptedQuantity);
+		const backOrderQuantity = Math.max(0, finiteNumber(item.quantity) - nextReceived);
+		const receipt = {
+			id: crypto.randomUUID(),
+			poId,
+			poItemId: input.poItemId,
+			receiptNumber: nullable(input.receiptNumber) ?? generatedNumber('GRN'),
+			receiptDate: nullable(input.receiptDate) ?? now.slice(0, 10),
+			quantityReceived,
+			acceptedQuantity,
+			rejectedQuantity,
+			backOrderQuantity,
+			notes: nullable(input.notes),
+			createdAt: now,
+			updatedAt: now
+		};
+		await this.db.insert(procurementPurchaseOrderReceipts).values(receipt as any);
+		await this.db
+			.update(procurementPurchaseOrderItems)
+			.set({ receivedQuantity: nextReceived, backOrderedQuantity: backOrderQuantity, updatedAt: now } as any)
+			.where(eq(procurementPurchaseOrderItems.id, input.poItemId));
+
+		const refreshedItems = items.map((row) =>
+			row.id === input.poItemId
+				? { ...row, receivedQuantity: nextReceived, backOrderedQuantity: backOrderQuantity }
+				: row
+		);
+		const orderedTotal = refreshedItems.reduce((sum, row) => sum + finiteNumber(row.quantity), 0);
+		const receivedTotal = refreshedItems.reduce((sum, row) => sum + finiteNumber(row.receivedQuantity), 0);
+		const nextStatus = receivedTotal >= orderedTotal ? 'received' : receivedTotal > 0 ? 'back_ordered' : po.status;
+		await this.db
+			.update(procurementPurchaseOrders)
+			.set({
+				status: nextStatus,
+				goodsReceiptDate: receipt.receiptDate,
+				updatedAt: now
+			} as any)
+			.where(eq(procurementPurchaseOrders.id, poId));
+		await this.audit.writeLog({
+			module: 'procurement',
+			actionType: 'update',
+			action: 'purchase_order.receipt.recorded',
+			entityType: 'purchase_order',
+			entityId: poId,
+			oldValue: po,
+			newValue: { receipt, status: nextStatus },
+			metadata: { poItemId: input.poItemId, quantityReceived, acceptedQuantity, backOrderQuantity }
+		});
+		return receipt;
+	}
+
+	async listPurchaseOrders() {
+		const purchaseOrders = await this.db
+			.select()
+			.from(procurementPurchaseOrders)
+			.where(isNull(procurementPurchaseOrders.deletedAt))
+			.orderBy(desc(procurementPurchaseOrders.createdAt));
+		const suppliers = await this.listSuppliers();
+		const supplierById = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
+		const result = [];
+		for (const po of purchaseOrders) {
+			const [items, receipts] = await Promise.all([
+				this.getPurchaseOrderItems(po.id),
+				this.db
+					.select()
+					.from(procurementPurchaseOrderReceipts)
+					.where(
+						and(
+							eq(procurementPurchaseOrderReceipts.poId, po.id),
+							isNull(procurementPurchaseOrderReceipts.deletedAt)
+						)
+					)
+					.orderBy(desc(procurementPurchaseOrderReceipts.receiptDate))
+			]);
+			const orderedQuantity = items.reduce((sum, item) => sum + finiteNumber(item.quantity), 0);
+			const receivedQuantity = items.reduce((sum, item) => sum + finiteNumber(item.receivedQuantity), 0);
+			const backOrderedQuantity = items.reduce((sum, item) => sum + finiteNumber(item.backOrderedQuantity), 0);
+			result.push({
+				...po,
+				supplier: po.supplierId ? supplierById.get(po.supplierId) ?? null : null,
+				items,
+				receipts,
+				orderedQuantity,
+				receivedQuantity,
+				backOrderedQuantity
+			});
+		}
+		return result;
+	}
+
+	private async getPurchaseOrder(poId: string) {
+		const rows = await this.db
+			.select()
+			.from(procurementPurchaseOrders)
+			.where(and(eq(procurementPurchaseOrders.id, poId), isNull(procurementPurchaseOrders.deletedAt)))
+			.limit(1);
+		const po = rows[0];
+		if (!po) throw new NotFoundError('Purchase order', poId);
+		return po;
+	}
+
+	private async getPurchaseOrderItems(poId: string) {
+		return this.db
+			.select()
+			.from(procurementPurchaseOrderItems)
+			.where(and(eq(procurementPurchaseOrderItems.poId, poId), isNull(procurementPurchaseOrderItems.deletedAt)))
+			.orderBy(procurementPurchaseOrderItems.createdAt);
+	}
+
+	private async resolveSupplierRisk(partnerId: string): Promise<SupplierRiskLevel> {
+		const [profile, scorecard] = await Promise.all([
+			this.getProfileByPartnerId(partnerId),
+			this.getSupplierScorecard(partnerId)
+		]);
+		if (profile?.supplierStatus === 'blacklisted' || profile?.supplierStatus === 'on_hold') return 'high';
+		const latestScore = scorecard.latest?.overallScore;
+		if (latestScore !== null && latestScore !== undefined) {
+			if (latestScore < 55) return 'high';
+			if (latestScore < 70) return 'medium';
+			return 'low';
+		}
+		return profile?.supplierStatus === 'preferred' ? 'low' : 'medium';
+	}
+
 	private async getProfilesByPartnerId(partnerIds: string[]) {
 		if (partnerIds.length === 0) return new Map<string, typeof partnerSupplierProfiles.$inferSelect>();
 		const rows = await this.db
@@ -608,5 +1416,27 @@ export class ProcurementService {
 				updatedAt: now
 			});
 		}
+	}
+
+	private async getQuotationItems(quotationIds: string[]) {
+		if (quotationIds.length === 0) {
+			return new Map<string, (typeof procurementSupplierQuotationItems.$inferSelect)[]>();
+		}
+		const rows = await this.db
+			.select()
+			.from(procurementSupplierQuotationItems)
+			.where(
+				and(
+					inArray(procurementSupplierQuotationItems.quotationId, quotationIds),
+					isNull(procurementSupplierQuotationItems.deletedAt)
+				)
+			);
+		const byQuotation = new Map<string, (typeof procurementSupplierQuotationItems.$inferSelect)[]>();
+		for (const row of rows) {
+			const list = byQuotation.get(row.quotationId) ?? [];
+			list.push(row);
+			byQuotation.set(row.quotationId, list);
+		}
+		return byQuotation;
 	}
 }

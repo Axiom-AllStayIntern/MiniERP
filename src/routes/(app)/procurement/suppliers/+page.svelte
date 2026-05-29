@@ -21,6 +21,12 @@
 		</a>
 		<a
 			class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+			href="/procurement/rfqs"
+		>
+			RFQs & comparison
+		</a>
+		<a
+			class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
 			href="/finance/expenses"
 		>
 			Supplier invoice expenses

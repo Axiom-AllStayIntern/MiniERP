@@ -40,6 +40,16 @@ export {
 	partnerSupplierEvaluations,
 	partnerContacts
 } from '$modules/procurement/repositories/supplier.schema';
+export {
+	procurementRfqs,
+	procurementRfqItems,
+	procurementRfqSuppliers,
+	procurementSupplierQuotations,
+	procurementSupplierQuotationItems,
+	procurementPurchaseOrders,
+	procurementPurchaseOrderItems,
+	procurementPurchaseOrderReceipts
+} from '$modules/procurement/repositories/rfq.schema';
 
 // Project module
 export { projects, projectEmployees } from '$modules/project/repositories/project.schema';

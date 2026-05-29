@@ -96,7 +96,10 @@
 	const procurementGroups: SideGroup[] = [
 		{
 			title: 'Suppliers',
-			items: [{ href: '/procurement/suppliers', label: 'Suppliers', moduleId: 'procurement', icon: 'S' }]
+			items: [
+				{ href: '/procurement/suppliers', label: 'Suppliers', moduleId: 'procurement', icon: 'S' },
+				{ href: '/procurement/rfqs', label: 'RFQs', moduleId: 'procurement', icon: 'R' }
+			]
 		}
 	];
 
@@ -237,6 +240,9 @@
 		// Procurement / Sales CRM
 		if (itemPath === '/procurement/suppliers') {
 			return path.startsWith('/procurement/suppliers');
+		}
+		if (itemPath === '/procurement/rfqs') {
+			return path.startsWith('/procurement/rfqs');
 		}
 		if (itemPath === '/sales-crm/customers') {
 			return path.startsWith('/sales-crm/customers');
