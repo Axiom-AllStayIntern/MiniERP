@@ -365,7 +365,8 @@
 						const jpeg = await renderPdfFirstPageToJpeg(selectedFile);
 						if (jpeg) {
 							const baseName = fname.replace(/\.pdf$/i, '') || 'document';
-							const ocrText = await runImageOcr(jpeg, `${baseName}-p1.jpg`);
+							const processed = await preprocessImageForOcr(jpeg);
+							const ocrText = await runImageOcr(processed, `${baseName}-p1.jpg`);
 							if (ocrText.trim()) fd.set('rawText', ocrText);
 						}
 					}

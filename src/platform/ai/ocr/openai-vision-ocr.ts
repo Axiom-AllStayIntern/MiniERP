@@ -24,19 +24,45 @@ const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const DEFAULT_MODEL = 'gpt-4o-mini';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
-const SYSTEM_PROMPT =
-	'You are an OCR engine for business and finance documents (invoices, contracts, POs, quotations). ' +
-	'Transcribe ALL visible text in natural reading order. Output each piece of information EXACTLY ONCE. ' +
-	'Output plain text only — no markdown, no bold, no preamble, no "Here is the text". ' +
-	'Preserve line breaks where they separate distinct lines or table rows. ' +
-	'Include numbers, dates, amounts, tax IDs, addresses, and table cells exactly as printed. ' +
-	'NEVER repeat lines or sections. Each header, address, and line item appears only once. ' +
-	'If the image is unreadable or not a document, output a single line: [UNREADABLE]. ' +
-	'Stop immediately after transcribing the last visible text on the page.';
+const SYSTEM_PROMPT = [
+	'You are a high-accuracy OCR engine for business and finance documents',
+	'(invoices, packing lists, contracts, POs, quotations, receipts).',
+	'',
+	'CHARACTER-LEVEL ACCURACY IS THE TOP PRIORITY:',
+	'- Transcribe every digit, decimal point, comma, hyphen, slash, currency',
+	'  symbol, and unit suffix EXACTLY as printed. Do NOT round, normalize,',
+	'  or "correct" values that look unusual.',
+	'- Product codes, invoice numbers, tax IDs, GST numbers, phone numbers,',
+	'  registration numbers, and postal codes must be reproduced byte-for-byte.',
+	'  Treat O vs 0, I vs 1, S vs 5, B vs 8, Z vs 2 as distinct — if uncertain,',
+	'  prefer the character that fits the surrounding pattern (e.g. all-digit',
+	'  fields stay digit).',
+	'- Preserve dimension/spec strings like "MSH3-15", "M2-0121882-9",',
+	'  "WP01FAA13200" with their original hyphens and case.',
+	'- Preserve decimal precision: "0.15" must NOT become "0.5" or "0.150".',
+	'',
+	'OUTPUT FORMAT:',
+	'- Plain text only. No markdown, no bold, no preamble, no "Here is the text".',
+	'- Preserve line breaks where they separate distinct rows / table lines.',
+	'- For tables, output each row on its own line with cells separated by a',
+	'  single space or tab; keep columns in natural reading order.',
+	'- Output each piece of information EXACTLY ONCE. Never repeat a header,',
+	'  address block, or line item.',
+	'',
+	'FAILURE MODE:',
+	'- If the image is unreadable or not a document, output a single line:',
+	'  [UNREADABLE]',
+	'- Stop immediately after the last visible text on the page.'
+].join('\n');
 
-const USER_PROMPT =
-	'Transcribe every legible word, digit, and symbol from this document image exactly once. ' +
-	'Do not repeat any section. Use the same language(s) as printed on the page. Stop after the last line.';
+const USER_PROMPT = [
+	'Transcribe every legible word, digit, and symbol from this document image',
+	'exactly once, in reading order. Pay special attention to numeric values',
+	'(quantities, unit prices, amounts, tax %, weights) and identifier strings',
+	'(product codes, invoice numbers, tax / GST registration numbers).',
+	'Reproduce them character-by-character — do not normalize or auto-correct.',
+	'Use the same language(s) as printed. Stop after the last line.'
+].join(' ');
 
 export async function runOpenAiVisionOcr(
 	env: Env,
@@ -67,12 +93,15 @@ export async function runOpenAiVisionOcr(
 				role: 'user',
 				content: [
 					{ type: 'text', text: USER_PROMPT },
-					{ type: 'image_url', image_url: { url: dataUri } }
+					// detail:"high" tiles the image at 512x512 native-resolution patches
+					// (+ a low-res macro). Default "auto" silently downscales to 512x512
+					// for typical sizes, which destroys digit accuracy on invoices.
+					{ type: 'image_url', image_url: { url: dataUri, detail: 'high' } }
 				]
 			}
 		],
-		max_tokens: 2048,
-		temperature: 0.1
+		max_tokens: 4096,
+		temperature: 0
 	};
 
 	let response: Response;

@@ -109,7 +109,8 @@
 			const jpeg = await renderPdfFirstPageJpeg(file);
 			if (jpeg) {
 				const base = name.replace(/\.pdf$/i, '') || 'document';
-				return await runWorkersVision(jpeg, `${base}-p1.jpg`);
+				const processed = await preprocessImageForOcr(jpeg);
+				return await runWorkersVision(processed, `${base}-p1.jpg`);
 			}
 			return text;
 		}

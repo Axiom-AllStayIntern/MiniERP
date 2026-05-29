@@ -2,6 +2,7 @@
 	import { invalidate } from '$app/navigation';
 	import PageShell from '$app-layer/components/PageShell.svelte';
 	import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+	import { preprocessImageForOcr } from '$lib/utils/preprocess-image';
 
 	let { data } = $props();
 
@@ -307,7 +308,8 @@
 			const isImage = mime.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(fname);
 
 			if (isImage) {
-				const ocrText = await runImageOcr(selectedFile, selectedFile.name);
+				const processed = await preprocessImageForOcr(selectedFile);
+				const ocrText = await runImageOcr(processed, processed.name);
 				if (ocrText.trim()) fd.set('rawText', ocrText);
 			} else if (isPdf) {
 				try {
@@ -319,7 +321,8 @@
 						const jpeg = await renderPdfFirstPageToJpeg(selectedFile);
 						if (jpeg) {
 							const baseName = fname.replace(/\.pdf$/i, '') || 'document';
-							const ocrText = await runImageOcr(jpeg, `${baseName}-p1.jpg`);
+							const processed = await preprocessImageForOcr(jpeg);
+							const ocrText = await runImageOcr(processed, `${baseName}-p1.jpg`);
 							if (ocrText.trim()) fd.set('rawText', ocrText);
 						}
 					}
