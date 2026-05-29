@@ -1,17 +1,17 @@
-import { createBusinessPartnerApi } from '$modules/business-partner';
 import type { ModuleContext } from '$platform/modules/types';
+import { ProcurementService } from './service';
 
 export type ProcurementApi = ReturnType<typeof createProcurementApi>;
 
 export function createProcurementApi(ctx: ModuleContext) {
-	const businessPartner = createBusinessPartnerApi(ctx);
+	const svc = new ProcurementService(ctx);
 
 	return {
-		listSuppliers: businessPartner.listSuppliers,
-		listPartnerContacts: businessPartner.listPartnerContacts,
-		getSupplierDetail: businessPartner.getSupplierDetail,
-		createSupplier: businessPartner.createSupplier,
-		updateSupplierWithContacts: businessPartner.updateSupplierWithContacts,
-		deleteSupplier: businessPartner.deleteById
+		listSuppliers: svc.listSuppliers.bind(svc),
+		listPartnerContacts: svc.listPartnerContacts.bind(svc),
+		getSupplierDetail: svc.getSupplierDetail.bind(svc),
+		createSupplier: svc.createSupplier.bind(svc),
+		updateSupplierWithContacts: svc.updateSupplierWithContacts.bind(svc),
+		deleteSupplier: svc.deleteSupplier.bind(svc)
 	};
 }

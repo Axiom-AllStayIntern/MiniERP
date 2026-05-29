@@ -2,8 +2,8 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
 import { createModuleContext } from '$platform/modules';
-import { createBusinessPartnerApi } from '$modules/business-partner';
 import { createProjectApi } from '$modules/project';
+import { createSalesCrmApi } from '$modules/sales-crm';
 
 export const load: PageServerLoad = async (event) => {
 	if (!event.platform) {
@@ -11,8 +11,8 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const ctx = await createModuleContext(event);
-	const businessPartner = createBusinessPartnerApi(ctx);
-	return { customers: await businessPartner.listCustomerOptions() };
+	const salesCrm = createSalesCrmApi(ctx);
+	return { customers: await salesCrm.listCustomerOptions() };
 };
 
 export const actions: Actions = {

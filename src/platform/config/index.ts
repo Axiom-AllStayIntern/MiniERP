@@ -10,8 +10,9 @@ const ENABLED_MODULE_ALIASES: Record<string, string> = {
 	person: 'hr'
 };
 
+// Legacy persisted module id from before Procurement and Sales CRM split.
 const ENABLED_MODULE_EXPANSIONS: Record<string, string[]> = {
-	'business-partner': ['business-partner', 'procurement', 'sales-crm']
+	'business-partner': ['procurement', 'sales-crm']
 };
 
 export function moduleForPath(

@@ -18,7 +18,6 @@ const MODULES_BY_ROLE: Record<AuthRole, readonly string[]> = {
 		'hr',
 		'procurement',
 		'sales-crm',
-		'business-partner',
 		'core'
 	],
 	admin: [
@@ -28,7 +27,6 @@ const MODULES_BY_ROLE: Record<AuthRole, readonly string[]> = {
 		'hr',
 		'procurement',
 		'sales-crm',
-		'business-partner',
 		'core'
 	],
 	finance: ['finance', 'document-intake'],

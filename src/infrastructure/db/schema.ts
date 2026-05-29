@@ -26,13 +26,17 @@ export {
 	freelancerProfiles
 } from '$modules/hr/repositories/person.schema';
 
-// Business Partner module
+// Sales CRM customer tables and shared customer/supplier base table
 export {
 	businessPartners,
+	partnerCustomerProfiles
+} from '$modules/sales-crm/repositories/customer.schema';
+
+// Procurement supplier tables
+export {
 	partnerSupplierProfiles,
-	partnerCustomerProfiles,
 	partnerContacts
-} from '$modules/business-partner/repositories/business-partner.schema';
+} from '$modules/procurement/repositories/supplier.schema';
 
 // Project module
 export { projects, projectEmployees } from '$modules/project/repositories/project.schema';

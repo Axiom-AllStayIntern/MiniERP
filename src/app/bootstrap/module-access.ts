@@ -35,10 +35,6 @@ const MODULE_PATH_MAPPINGS: ModulePathMapping[] = [
 	{ prefix: '/api/sales-crm', moduleId: 'sales-crm' },
 	{ prefix: '/sales-crm', moduleId: 'sales-crm' },
 
-	// Legacy Business Partner — compatibility routes over shared counterparty data.
-	{ prefix: '/api/business-partners', moduleId: 'business-partner' },
-	{ prefix: '/business-partners', moduleId: 'business-partner' },
-
 	// HR — persons, employees, allocations, payouts.
 	{ prefix: '/api/hr', moduleId: 'hr' },
 	{ prefix: '/hr', moduleId: 'hr' },

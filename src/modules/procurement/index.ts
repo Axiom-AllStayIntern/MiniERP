@@ -5,7 +5,7 @@ export const procurementModule: ModuleDefinition = {
 		id: 'procurement',
 		name: 'Procurement & Supplier',
 		layer: 'feature',
-		dependencies: ['core', 'business-partner']
+		dependencies: ['core']
 	}
 };
 

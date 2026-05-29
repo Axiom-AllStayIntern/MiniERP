@@ -165,8 +165,8 @@
 	// Determine which primary section the route belongs to
 	const primaryFromPath = $derived.by((): Primary => {
 		if (path.startsWith('/settings')) return 'settings';
-		if (path.startsWith('/procurement') || path.startsWith('/business-partners/suppliers')) return 'procurement';
-		if (path.startsWith('/sales-crm') || path.startsWith('/business-partners/customers')) return 'sales-crm';
+		if (path.startsWith('/procurement')) return 'procurement';
+		if (path.startsWith('/sales-crm')) return 'sales-crm';
 		// Project: list and detail routes
 		if (path === '/projects' || path.startsWith('/projects/')) return 'project';
 		// HR: employee master data (same employee module as in-project Team & Cost)
@@ -236,10 +236,10 @@
 		}
 		// Procurement / Sales CRM
 		if (itemPath === '/procurement/suppliers') {
-			return path.startsWith('/procurement/suppliers') || path.startsWith('/business-partners/suppliers');
+			return path.startsWith('/procurement/suppliers');
 		}
 		if (itemPath === '/sales-crm/customers') {
-			return path.startsWith('/sales-crm/customers') || path.startsWith('/business-partners/customers');
+			return path.startsWith('/sales-crm/customers');
 		}
 		// Settings
 		if (itemPath === '/settings') {

@@ -28,8 +28,7 @@
 		'project',
 		'hr',
 		'procurement',
-		'sales-crm',
-		'business-partner'
+		'sales-crm'
 	];
 	const actionTypes = ['view', 'create', 'update', 'delete', 'export', 'login', 'permission_change', 'system'];
 
