@@ -30,14 +30,15 @@
 			// extracts text, classifies, and returns the artifact view.
 			// Only TIFF / BMP need a client-side re-encode to JPEG (OpenAI
 			// Vision can't decode them). JPEG/PNG/WebP/GIF and PDFs upload
-			// as-is — going through preprocessImageForOcr would pull in
-			// OpenCV.js (~10 MB WASM) on first use and block the main thread.
+			// as-is. For TIFF/BMP we use the lightweight `'convert'` mode —
+			// decode → resize → JPEG, no OpenCV warp / unsharp — so we never
+			// touch the 10 MB WASM bundle on the upload critical path.
 			stage = 'extracting';
 			const mime = (file.type || '').toLowerCase();
 			const needsClientReencode =
 				/\.(tiff?|bmp)$/i.test(file.name) || /^image\/(tiff?|bmp|x-bmp)$/i.test(mime);
 			const uploadFile = needsClientReencode
-				? await preprocessImageForOcr(file).catch(() => file)
+				? await preprocessImageForOcr(file, undefined, { mode: 'convert' }).catch(() => file)
 				: file;
 			const artifact = await uploadDocument(uploadFile, { uploadedFrom: 'ai_panel' });
 

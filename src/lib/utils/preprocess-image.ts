@@ -30,8 +30,27 @@ const SHARPEN_AMOUNT = 0.8;
 /** Unsharp-mask blur radius (CSS-filter pixels). Small = fine-detail edges. */
 const SHARPEN_RADIUS = 1;
 
-export async function preprocessImageForOcr(input: Blob, fileName?: string): Promise<File> {
+export interface PreprocessImageOptions {
+	/**
+	 * `'full'` (default): decode → resize → OpenCV document de-warp → unsharp
+	 * mask → JPEG. Best OCR quality but pulls in OpenCV.js (~10 MB WASM) on
+	 * first use.
+	 *
+	 * `'convert'`: decode → resize → JPEG. No OpenCV, no per-pixel CPU loop.
+	 * Use for pure format conversion (TIFF/BMP → JPEG) where the source is
+	 * already a clean scanner output and the slow path's quality gains aren't
+	 * worth the WASM first-load cost.
+	 */
+	mode?: 'full' | 'convert';
+}
+
+export async function preprocessImageForOcr(
+	input: Blob,
+	fileName?: string,
+	options: PreprocessImageOptions = {}
+): Promise<File> {
 	const sourceName = fileName ?? (input instanceof File ? input.name : 'image.jpg');
+	const mode = options.mode ?? 'full';
 	const passthrough = (): File =>
 		input instanceof File
 			? input
@@ -49,20 +68,22 @@ export async function preprocessImageForOcr(input: Blob, fileName?: string): Pro
 	if (!canvas) return passthrough();
 
 	try {
-		// 3. Best-effort document detection + perspective de-warp.
-		try {
-			const warped = await tryWarpDocument(canvas);
-			if (warped) {
-				const refit = fitToLongSide(warped.width, warped.height, OCR_MAX_LONG_SIDE);
-				canvas = drawCanvasTo(warped, refit.width, refit.height) ?? canvas;
+		if (mode === 'full') {
+			// 3. Best-effort document detection + perspective de-warp.
+			try {
+				const warped = await tryWarpDocument(canvas);
+				if (warped) {
+					const refit = fitToLongSide(warped.width, warped.height, OCR_MAX_LONG_SIDE);
+					canvas = drawCanvasTo(warped, refit.width, refit.height) ?? canvas;
+				}
+			} catch {
+				/* warp failed — keep the EXIF-corrected, resized canvas */
 			}
-		} catch {
-			/* warp failed — keep the EXIF-corrected, resized canvas */
-		}
 
-		// 4. Sharpen.
-		const ctx = canvas.getContext('2d');
-		if (ctx) applyUnsharpMask(ctx, SHARPEN_AMOUNT, SHARPEN_RADIUS);
+			// 4. Sharpen.
+			const ctx = canvas.getContext('2d');
+			if (ctx) applyUnsharpMask(ctx, SHARPEN_AMOUNT, SHARPEN_RADIUS);
+		}
 
 		// 5. Export JPEG.
 		const blob = await canvasToBlob(canvas, 'image/jpeg', JPEG_QUALITY);

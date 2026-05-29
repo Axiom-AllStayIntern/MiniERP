@@ -228,11 +228,13 @@
 			// OpenAI Vision handles JPEG/PNG/WebP/GIF natively — upload as-is so
 			// we don't pay the OpenCV.js (~10 MB WASM) first-load cost on the
 			// critical path. Only TIFF and BMP need a client-side re-encode to
-			// JPEG, because the vision API can't decode them.
+			// JPEG (the vision API can't decode them), and we use the lightweight
+			// `'convert'` mode which skips the OpenCV warp + unsharp steps —
+			// pure format conversion only.
 			const needsClientReencode =
 				/\.(tiff?|bmp)$/i.test(name) || /^image\/(tiff?|bmp|x-bmp)$/i.test(mime);
 			const uploadFile = needsClientReencode
-				? await preprocessImageForOcr(file).catch(() => file)
+				? await preprocessImageForOcr(file, undefined, { mode: 'convert' }).catch(() => file)
 				: file;
 			return { text: '', method: 'manual', uploadFile };
 		}
