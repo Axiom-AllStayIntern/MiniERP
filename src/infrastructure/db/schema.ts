@@ -35,6 +35,8 @@ export {
 // Procurement supplier tables
 export {
 	partnerSupplierProfiles,
+	partnerSupplierComplianceRecords,
+	partnerSupplierAttachments,
 	partnerContacts
 } from '$modules/procurement/repositories/supplier.schema';
 

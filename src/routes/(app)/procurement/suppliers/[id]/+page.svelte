@@ -9,6 +9,26 @@
 		wechat: string;
 		position: string;
 	};
+	type ComplianceDraft = {
+		_key: string;
+		recordType: string;
+		title: string;
+		issuer: string;
+		referenceNo: string;
+		issueDate: string;
+		expiryDate: string;
+		status: string;
+		notes: string;
+	};
+	type AttachmentDraft = {
+		_key: string;
+		attachmentType: string;
+		title: string;
+		fileName: string;
+		fileUrl: string;
+		expiryDate: string;
+		notes: string;
+	};
 	const toDraft = (c?: Partial<ContactDraft>): ContactDraft => ({
 		_key: c?._key ?? crypto.randomUUID(),
 		name: c?.name ?? '',
@@ -16,8 +36,30 @@
 		wechat: c?.wechat ?? '',
 		position: c?.position ?? ''
 	});
-	let contacts = $state<ContactDraft[]>(
-		data.contacts.length > 0
+	const toComplianceDraft = (record?: Partial<ComplianceDraft>): ComplianceDraft => ({
+		_key: record?._key ?? crypto.randomUUID(),
+		recordType: record?.recordType ?? 'licence',
+		title: record?.title ?? '',
+		issuer: record?.issuer ?? '',
+		referenceNo: record?.referenceNo ?? '',
+		issueDate: record?.issueDate ?? '',
+		expiryDate: record?.expiryDate ?? '',
+		status: record?.status ?? 'pending_review',
+		notes: record?.notes ?? ''
+	});
+	const toAttachmentDraft = (attachment?: Partial<AttachmentDraft>): AttachmentDraft => ({
+		_key: attachment?._key ?? crypto.randomUUID(),
+		attachmentType: attachment?.attachmentType ?? 'contract',
+		title: attachment?.title ?? '',
+		fileName: attachment?.fileName ?? '',
+		fileUrl: attachment?.fileUrl ?? '',
+		expiryDate: attachment?.expiryDate ?? '',
+		notes: attachment?.notes ?? ''
+	});
+	const profile = $derived(data.profile);
+
+	function initialContacts() {
+		return data.contacts.length > 0
 			? data.contacts.map((c) =>
 					toDraft({
 						_key: c.id,
@@ -27,8 +69,46 @@
 						position: c.position ?? ''
 					})
 				)
-			: [toDraft()]
-	);
+			: [toDraft()];
+	}
+
+	function initialComplianceRecords() {
+		return data.complianceRecords.length > 0
+			? data.complianceRecords.map((record) =>
+					toComplianceDraft({
+						_key: record.id,
+						recordType: record.recordType,
+						title: record.title,
+						issuer: record.issuer ?? '',
+						referenceNo: record.referenceNo ?? '',
+						issueDate: record.issueDate ?? '',
+						expiryDate: record.expiryDate ?? '',
+						status: record.status,
+						notes: record.notes ?? ''
+					})
+				)
+			: [toComplianceDraft()];
+	}
+
+	function initialAttachments() {
+		return data.attachments.length > 0
+			? data.attachments.map((attachment) =>
+					toAttachmentDraft({
+						_key: attachment.id,
+						attachmentType: attachment.attachmentType,
+						title: attachment.title,
+						fileName: attachment.fileName ?? '',
+						fileUrl: attachment.fileUrl ?? '',
+						expiryDate: attachment.expiryDate ?? '',
+						notes: attachment.notes ?? ''
+					})
+				)
+			: [toAttachmentDraft()];
+	}
+
+	let contacts = $state<ContactDraft[]>(initialContacts());
+	let complianceRecords = $state<ComplianceDraft[]>(initialComplianceRecords());
+	let attachments = $state<AttachmentDraft[]>(initialAttachments());
 
 	function addContact() {
 		contacts = [...contacts, toDraft()];
@@ -37,6 +117,24 @@
 	function removeContact(k: string) {
 		contacts = contacts.filter((c) => c._key !== k);
 		if (contacts.length === 0) addContact();
+	}
+
+	function addComplianceRecord() {
+		complianceRecords = [...complianceRecords, toComplianceDraft()];
+	}
+
+	function removeComplianceRecord(k: string) {
+		complianceRecords = complianceRecords.filter((record) => record._key !== k);
+		if (complianceRecords.length === 0) addComplianceRecord();
+	}
+
+	function addAttachment() {
+		attachments = [...attachments, toAttachmentDraft()];
+	}
+
+	function removeAttachment(k: string) {
+		attachments = attachments.filter((attachment) => attachment._key !== k);
+		if (attachments.length === 0) addAttachment();
 	}
 </script>
 
@@ -91,6 +189,101 @@
 				<span class="text-slate-700">Project Related</span>
 				<input name="projectRelated" value={data.supplier.projectRelated ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
 			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Supplier type</span>
+				<select name="supplierType" class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]">
+					<option value="corporate_local" selected={(profile?.supplierType ?? 'corporate_local') === 'corporate_local'}>Corporate (Local)</option>
+					<option value="corporate_international" selected={profile?.supplierType === 'corporate_international'}>Corporate (International)</option>
+					<option value="individual" selected={profile?.supplierType === 'individual'}>Individual</option>
+				</select>
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Supplier status</span>
+				<select name="supplierStatus" class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]">
+					<option value="approved" selected={(profile?.supplierStatus ?? 'approved') === 'approved'}>Approved</option>
+					<option value="preferred" selected={profile?.supplierStatus === 'preferred'}>Preferred</option>
+					<option value="on_hold" selected={profile?.supplierStatus === 'on_hold'}>On Hold</option>
+					<option value="blacklisted" selected={profile?.supplierStatus === 'blacklisted'}>Blacklisted</option>
+				</select>
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">ACRA UEN</span>
+				<input name="acraUen" value={profile?.acraUen ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Business registration no.</span>
+				<input name="businessRegistrationNo" value={profile?.businessRegistrationNo ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">GST registration status</span>
+				<select name="gstRegistrationStatus" class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]">
+					<option value="unknown" selected={(profile?.gstRegistrationStatus ?? 'unknown') === 'unknown'}>Unknown</option>
+					<option value="registered" selected={profile?.gstRegistrationStatus === 'registered'}>Registered</option>
+					<option value="not_registered" selected={profile?.gstRegistrationStatus === 'not_registered'}>Not registered</option>
+					<option value="exempt" selected={profile?.gstRegistrationStatus === 'exempt'}>Exempt</option>
+				</select>
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Tax code</span>
+				<select name="taxCode" class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]">
+					<option value="" selected={!profile?.taxCode}>Select tax code</option>
+					<option value="SR" selected={profile?.taxCode === 'SR'}>SR</option>
+					<option value="ZR" selected={profile?.taxCode === 'ZR'}>ZR</option>
+					<option value="ES" selected={profile?.taxCode === 'ES'}>ES</option>
+					<option value="OP" selected={profile?.taxCode === 'OP'}>OP</option>
+				</select>
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Billing address</span>
+				<textarea name="billingAddress" rows="3" class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]">{profile?.billingAddress ?? ''}</textarea>
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Shipping address</span>
+				<textarea name="shippingAddress" rows="3" class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]">{profile?.shippingAddress ?? ''}</textarea>
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Bank name</span>
+				<input name="bankName" value={profile?.bankName ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Bank account no.</span>
+				<input name="bankAccountNo" value={profile?.bankAccountNo ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">SWIFT code</span>
+				<input name="swiftCode" value={profile?.swiftCode ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 uppercase outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Preferred currency</span>
+				<input name="preferredCurrency" value={profile?.preferredCurrency ?? data.supplier.currency ?? 'SGD'} class="w-full rounded-md border border-slate-300 px-3 py-2 uppercase outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Credit terms</span>
+				<input name="creditTerms" value={profile?.creditTerms ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+			</label>
+
+			<label class="space-y-1 text-sm">
+				<span class="text-slate-700">Payment terms</span>
+				<input name="paymentTerms" value={profile?.paymentTerms ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+			</label>
+
+			<label class="space-y-1 text-sm md:col-span-2">
+				<span class="text-slate-700">Supplier category</span>
+				<input name="supplierCategory" value={profile?.supplierCategory ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+			</label>
 		</div>
 
 		<div class="space-y-3 rounded-lg border border-slate-200 p-4">
@@ -118,6 +311,114 @@
 					</label>
 					<div class="flex items-end justify-end">
 						<button type="button" class="rounded border border-rose-200 px-2.5 py-2 text-xs text-rose-700 hover:bg-rose-50" onclick={() => removeContact(c._key)}>
+							Remove
+						</button>
+					</div>
+				</div>
+			{/each}
+		</div>
+
+		<div class="space-y-3 rounded-lg border border-slate-200 p-4">
+			<div class="flex items-center justify-between">
+				<p class="text-sm font-medium text-slate-800">Legal compliance records</p>
+				<button type="button" class="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50" onclick={addComplianceRecord}>Add record</button>
+			</div>
+			{#each complianceRecords as record}
+				<div class="grid gap-3 rounded-md border border-slate-200 p-3 md:grid-cols-4">
+					<label class="space-y-1 text-xs">
+						<span class="text-slate-600">Type</span>
+						<select name="complianceRecordType" class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]">
+							<option value="licence" selected={record.recordType === 'licence'}>Licence</option>
+							<option value="permit" selected={record.recordType === 'permit'}>Permit</option>
+							<option value="insurance" selected={record.recordType === 'insurance'}>Insurance</option>
+							<option value="certificate" selected={record.recordType === 'certificate'}>Certificate</option>
+							<option value="other" selected={record.recordType === 'other'}>Other</option>
+						</select>
+					</label>
+					<label class="space-y-1 text-xs">
+						<span class="text-slate-600">Title</span>
+						<input name="complianceTitle" value={record.title} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+					</label>
+					<label class="space-y-1 text-xs">
+						<span class="text-slate-600">Issuer</span>
+						<input name="complianceIssuer" value={record.issuer} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+					</label>
+					<label class="space-y-1 text-xs">
+						<span class="text-slate-600">Reference no.</span>
+						<input name="complianceReferenceNo" value={record.referenceNo} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+					</label>
+					<label class="space-y-1 text-xs">
+						<span class="text-slate-600">Issue date</span>
+						<input name="complianceIssueDate" type="date" value={record.issueDate} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+					</label>
+					<label class="space-y-1 text-xs">
+						<span class="text-slate-600">Expiry date</span>
+						<input name="complianceExpiryDate" type="date" value={record.expiryDate} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+					</label>
+					<label class="space-y-1 text-xs">
+						<span class="text-slate-600">Status</span>
+						<select name="complianceStatus" class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]">
+							<option value="pending_review" selected={record.status === 'pending_review'}>Pending review</option>
+							<option value="valid" selected={record.status === 'valid'}>Valid</option>
+							<option value="expiring" selected={record.status === 'expiring'}>Expiring</option>
+							<option value="expired" selected={record.status === 'expired'}>Expired</option>
+						</select>
+					</label>
+					<div class="flex items-end justify-end">
+						<button type="button" class="rounded border border-rose-200 px-2.5 py-2 text-xs text-rose-700 hover:bg-rose-50" onclick={() => removeComplianceRecord(record._key)}>
+							Remove
+						</button>
+					</div>
+					<label class="space-y-1 text-xs md:col-span-4">
+						<span class="text-slate-600">Notes</span>
+						<input name="complianceNotes" value={record.notes} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+					</label>
+				</div>
+			{/each}
+		</div>
+
+		<div class="space-y-3 rounded-lg border border-slate-200 p-4">
+			<div class="flex items-center justify-between">
+				<p class="text-sm font-medium text-slate-800">Attachments</p>
+				<button type="button" class="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50" onclick={addAttachment}>Add attachment</button>
+			</div>
+			{#each attachments as attachment}
+				<div class="grid gap-3 rounded-md border border-slate-200 p-3 md:grid-cols-4">
+					<label class="space-y-1 text-xs">
+						<span class="text-slate-600">Type</span>
+						<select name="attachmentType" class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]">
+							<option value="contract" selected={attachment.attachmentType === 'contract'}>Contract</option>
+							<option value="mou" selected={attachment.attachmentType === 'mou'}>MOU</option>
+							<option value="nda" selected={attachment.attachmentType === 'nda'}>NDA</option>
+							<option value="certificate" selected={attachment.attachmentType === 'certificate'}>Certificate</option>
+							<option value="licence" selected={attachment.attachmentType === 'licence'}>Licence</option>
+							<option value="permit" selected={attachment.attachmentType === 'permit'}>Permit</option>
+							<option value="insurance" selected={attachment.attachmentType === 'insurance'}>Insurance</option>
+							<option value="other" selected={attachment.attachmentType === 'other'}>Other</option>
+						</select>
+					</label>
+					<label class="space-y-1 text-xs">
+						<span class="text-slate-600">Title</span>
+						<input name="attachmentTitle" value={attachment.title} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+					</label>
+					<label class="space-y-1 text-xs">
+						<span class="text-slate-600">File name</span>
+						<input name="attachmentFileName" value={attachment.fileName} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+					</label>
+					<label class="space-y-1 text-xs">
+						<span class="text-slate-600">Expiry date</span>
+						<input name="attachmentExpiryDate" type="date" value={attachment.expiryDate} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+					</label>
+					<label class="space-y-1 text-xs md:col-span-2">
+						<span class="text-slate-600">File URL</span>
+						<input name="attachmentFileUrl" value={attachment.fileUrl} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+					</label>
+					<label class="space-y-1 text-xs">
+						<span class="text-slate-600">Notes</span>
+						<input name="attachmentNotes" value={attachment.notes} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+					</label>
+					<div class="flex items-end justify-end">
+						<button type="button" class="rounded border border-rose-200 px-2.5 py-2 text-xs text-rose-700 hover:bg-rose-50" onclick={() => removeAttachment(attachment._key)}>
 							Remove
 						</button>
 					</div>
