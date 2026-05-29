@@ -1,4 +1,4 @@
-import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { timeFields } from '$platform/modules/schema-helpers';
 import { businessPartners } from '$modules/sales-crm/repositories/customer.schema';
 
@@ -84,3 +84,57 @@ export const partnerSupplierAttachments = sqliteTable('partner_supplier_attachme
 	notes: text('notes'),
 	...timeFields
 });
+
+export const partnerSupplierEvaluations = sqliteTable(
+	'partner_supplier_evaluations',
+	{
+		id: text('id').primaryKey(),
+		partnerId: text('partner_id')
+			.notNull()
+			.references(() => businessPartners.id),
+		evaluationDate: text('evaluation_date').notNull(),
+		evaluationCategory: text('evaluation_category'),
+		evaluatorUserId: text('evaluator_user_id'),
+		evaluatorEmail: text('evaluator_email'),
+		defectRate: real('defect_rate').notNull().default(0),
+		returnRate: real('return_rate').notNull().default(0),
+		onTimeDeliveryPct: real('on_time_delivery_pct').notNull().default(0),
+		leadTimeReliabilityScore: real('lead_time_reliability_score').notNull().default(0),
+		priceCompetitivenessScore: real('price_competitiveness_score').notNull().default(0),
+		paymentTermsScore: real('payment_terms_score').notNull().default(0),
+		responsivenessScore: real('responsiveness_score').notNull().default(0),
+		afterSalesSupportScore: real('after_sales_support_score').notNull().default(0),
+		certificationScore: real('certification_score').notNull().default(0),
+		creditCheckScore: real('credit_check_score').notNull().default(0),
+		environmentalComplianceScore: real('environmental_compliance_score').notNull().default(0),
+		qualityScore: real('quality_score').notNull().default(0),
+		deliveryScore: real('delivery_score').notNull().default(0),
+		priceScore: real('price_score').notNull().default(0),
+		serviceScore: real('service_score').notNull().default(0),
+		complianceScore: real('compliance_score').notNull().default(0),
+		financialStabilityScore: real('financial_stability_score').notNull().default(0),
+		sustainabilityScore: real('sustainability_score').notNull().default(0),
+		qualityWeight: real('quality_weight').notNull().default(20),
+		deliveryWeight: real('delivery_weight').notNull().default(20),
+		priceWeight: real('price_weight').notNull().default(15),
+		serviceWeight: real('service_weight').notNull().default(15),
+		complianceWeight: real('compliance_weight').notNull().default(15),
+		financialStabilityWeight: real('financial_stability_weight').notNull().default(10),
+		sustainabilityWeight: real('sustainability_weight').notNull().default(5),
+		goldThreshold: real('gold_threshold').notNull().default(85),
+		silverThreshold: real('silver_threshold').notNull().default(70),
+		bronzeThreshold: real('bronze_threshold').notNull().default(55),
+		overallScore: real('overall_score').notNull().default(0),
+		overallRating: text('overall_rating', {
+			enum: ['gold', 'silver', 'bronze', 'not_approved']
+		})
+			.notNull()
+			.default('not_approved'),
+		notes: text('notes'),
+		...timeFields
+	},
+	(table) => [
+		index('idx_supplier_evaluation_partner_date').on(table.partnerId, table.evaluationDate),
+		index('idx_supplier_evaluation_rating').on(table.overallRating)
+	]
+);

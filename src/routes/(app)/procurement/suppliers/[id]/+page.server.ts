@@ -20,6 +20,11 @@ function pick<T extends readonly string[]>(value: string, allowed: T, fallback: 
 	return allowed.includes(value) ? (value as T[number]) : fallback;
 }
 
+function numberField(form: FormData, key: string) {
+	const value = Number(text(form, key));
+	return Number.isFinite(value) ? value : undefined;
+}
+
 export const load: PageServerLoad = async (event) => {
 	if (!event.platform) throw error(500, 'Cloudflare platform bindings are required');
 	const ctx = await createModuleContext(event);
@@ -31,11 +36,49 @@ export const load: PageServerLoad = async (event) => {
 		profile: detail.profile,
 		contacts: detail.contacts,
 		complianceRecords: detail.complianceRecords,
-		attachments: detail.attachments
+		attachments: detail.attachments,
+		scorecard: detail.scorecard
 	};
 };
 
 export const actions: Actions = {
+	evaluate: async (event) => {
+		if (!event.platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
+		const form = await event.request.formData();
+		const ctx = await createModuleContext(event);
+		const procurement = createProcurementApi(ctx);
+		await procurement.createSupplierEvaluation(event.params.id, {
+			evaluationDate: text(form, 'evaluationDate') || undefined,
+			evaluationCategory: text(form, 'evaluationCategory') || undefined,
+			defectRate: numberField(form, 'defectRate'),
+			returnRate: numberField(form, 'returnRate'),
+			onTimeDeliveryPct: numberField(form, 'onTimeDeliveryPct'),
+			leadTimeReliabilityScore: numberField(form, 'leadTimeReliabilityScore'),
+			priceCompetitivenessScore: numberField(form, 'priceCompetitivenessScore'),
+			paymentTermsScore: numberField(form, 'paymentTermsScore'),
+			responsivenessScore: numberField(form, 'responsivenessScore'),
+			afterSalesSupportScore: numberField(form, 'afterSalesSupportScore'),
+			certificationScore: numberField(form, 'certificationScore'),
+			creditCheckScore: numberField(form, 'creditCheckScore'),
+			environmentalComplianceScore: numberField(form, 'environmentalComplianceScore'),
+			weights: {
+				quality: numberField(form, 'qualityWeight'),
+				delivery: numberField(form, 'deliveryWeight'),
+				price: numberField(form, 'priceWeight'),
+				service: numberField(form, 'serviceWeight'),
+				compliance: numberField(form, 'complianceWeight'),
+				financialStability: numberField(form, 'financialStabilityWeight'),
+				sustainability: numberField(form, 'sustainabilityWeight')
+			},
+			thresholds: {
+				gold: numberField(form, 'goldThreshold'),
+				silver: numberField(form, 'silverThreshold'),
+				bronze: numberField(form, 'bronzeThreshold')
+			},
+			notes: text(form, 'evaluationNotes') || undefined
+		});
+		throw redirect(303, `/procurement/suppliers/${event.params.id}`);
+	},
 	update: async (event) => {
 		if (!event.platform) return fail(500, { message: 'Cloudflare platform bindings are required' });
 		const form = await event.request.formData();

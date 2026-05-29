@@ -37,6 +37,7 @@ export {
 	partnerSupplierProfiles,
 	partnerSupplierComplianceRecords,
 	partnerSupplierAttachments,
+	partnerSupplierEvaluations,
 	partnerContacts
 } from '$modules/procurement/repositories/supplier.schema';
 

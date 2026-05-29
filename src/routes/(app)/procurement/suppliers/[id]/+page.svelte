@@ -57,6 +57,25 @@
 		notes: attachment?.notes ?? ''
 	});
 	const profile = $derived(data.profile);
+	const scorecard = $derived(data.scorecard);
+	const latestEvaluation = $derived(scorecard.latest);
+	const trendRows = $derived(scorecard.trend.slice(-6).reverse());
+
+	function formatScore(value: number | null | undefined) {
+		return value == null ? '-' : value.toFixed(1);
+	}
+
+	function ratingLabel(rating: string | null | undefined) {
+		if (rating === 'not_approved') return 'Not Approved';
+		return rating ? rating[0].toUpperCase() + rating.slice(1) : 'Not Approved';
+	}
+
+	function ratingClass(rating: string | null | undefined) {
+		if (rating === 'gold') return 'bg-amber-100 text-amber-800 border-amber-200';
+		if (rating === 'silver') return 'bg-slate-100 text-slate-700 border-slate-200';
+		if (rating === 'bronze') return 'bg-orange-100 text-orange-800 border-orange-200';
+		return 'bg-rose-100 text-rose-800 border-rose-200';
+	}
 
 	function initialContacts() {
 		return data.contacts.length > 0
@@ -148,6 +167,211 @@
 			Back to suppliers
 		</a>
 	</div>
+
+	<section class="mb-4 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+		<div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+			<div class="flex flex-wrap items-start justify-between gap-3">
+				<div>
+					<p class="text-xs font-medium uppercase tracking-wide text-slate-500">Supplier scorecard</p>
+					<h2 class="mt-1 text-lg font-semibold text-slate-900">
+						{#if latestEvaluation}
+							{formatScore(latestEvaluation.overallScore)} / 100
+						{:else}
+							No evaluation yet
+						{/if}
+					</h2>
+					<p class="mt-1 text-sm text-slate-500">
+						{latestEvaluation?.evaluationDate ?? 'Create the first scorecard from ISO 9001-aligned criteria.'}
+					</p>
+				</div>
+				<span class={`rounded-full border px-3 py-1 text-xs font-semibold ${ratingClass(latestEvaluation?.overallRating)}`}>
+					{ratingLabel(latestEvaluation?.overallRating)}
+				</span>
+			</div>
+
+			{#if latestEvaluation}
+				<div class="mt-5 grid gap-3 sm:grid-cols-2">
+					<div class="rounded-lg border border-slate-100 p-3">
+						<p class="text-xs text-slate-500">Quality</p>
+						<p class="text-lg font-semibold text-slate-900">{formatScore(latestEvaluation.qualityScore)}</p>
+					</div>
+					<div class="rounded-lg border border-slate-100 p-3">
+						<p class="text-xs text-slate-500">Delivery</p>
+						<p class="text-lg font-semibold text-slate-900">{formatScore(latestEvaluation.deliveryScore)}</p>
+					</div>
+					<div class="rounded-lg border border-slate-100 p-3">
+						<p class="text-xs text-slate-500">Price</p>
+						<p class="text-lg font-semibold text-slate-900">{formatScore(latestEvaluation.priceScore)}</p>
+					</div>
+					<div class="rounded-lg border border-slate-100 p-3">
+						<p class="text-xs text-slate-500">Service</p>
+						<p class="text-lg font-semibold text-slate-900">{formatScore(latestEvaluation.serviceScore)}</p>
+					</div>
+					<div class="rounded-lg border border-slate-100 p-3">
+						<p class="text-xs text-slate-500">Compliance</p>
+						<p class="text-lg font-semibold text-slate-900">{formatScore(latestEvaluation.complianceScore)}</p>
+					</div>
+					<div class="rounded-lg border border-slate-100 p-3">
+						<p class="text-xs text-slate-500">Financial / Sustainability</p>
+						<p class="text-lg font-semibold text-slate-900">
+							{formatScore(latestEvaluation.financialStabilityScore)} / {formatScore(latestEvaluation.sustainabilityScore)}
+						</p>
+					</div>
+				</div>
+			{/if}
+
+			<div class="mt-5 overflow-x-auto">
+				<table class="min-w-full text-left text-sm">
+					<thead class="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+						<tr>
+							<th class="py-2 pr-3">Date</th>
+							<th class="py-2 pr-3">Score</th>
+							<th class="py-2 pr-3">Delta</th>
+							<th class="py-2 pr-3">Rating</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-slate-100">
+						{#if trendRows.length === 0}
+							<tr>
+								<td colspan="4" class="py-4 text-slate-500">No trend data.</td>
+							</tr>
+						{:else}
+							{#each trendRows as row}
+								<tr>
+									<td class="py-2 pr-3 text-slate-600">{row.evaluationDate}</td>
+									<td class="py-2 pr-3 font-medium text-slate-900">{formatScore(row.overallScore)}</td>
+									<td class={`py-2 pr-3 ${row.scoreDelta && row.scoreDelta < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+										{row.scoreDelta == null ? '-' : `${row.scoreDelta > 0 ? '+' : ''}${formatScore(row.scoreDelta)}`}
+									</td>
+									<td class="py-2 pr-3 text-slate-600">{ratingLabel(row.overallRating)}</td>
+								</tr>
+							{/each}
+						{/if}
+					</tbody>
+				</table>
+			</div>
+		</div>
+
+		<form class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm" method="POST" action="?/evaluate">
+			<div class="flex flex-wrap items-start justify-between gap-3">
+				<div>
+					<p class="text-xs font-medium uppercase tracking-wide text-slate-500">New evaluation</p>
+					<h2 class="mt-1 text-lg font-semibold text-slate-900">Weighted supplier assessment</h2>
+				</div>
+				<button class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]" type="submit">
+					Generate scorecard
+				</button>
+			</div>
+
+			<div class="mt-4 grid gap-3 md:grid-cols-3">
+				<label class="space-y-1 text-sm">
+					<span class="text-slate-700">Evaluation date</span>
+					<input name="evaluationDate" type="date" class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-sm md:col-span-2">
+					<span class="text-slate-700">Category / sourcing group</span>
+					<input name="evaluationCategory" value={profile?.supplierCategory ?? ''} class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]" placeholder="Packaging, logistics, subcontractor..." />
+				</label>
+			</div>
+
+			<div class="mt-4 grid gap-3 md:grid-cols-4">
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Defect rate %</span>
+					<input name="defectRate" type="number" min="0" step="0.1" value={latestEvaluation?.defectRate ?? 0} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Return rate %</span>
+					<input name="returnRate" type="number" min="0" step="0.1" value={latestEvaluation?.returnRate ?? 0} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">On-time delivery %</span>
+					<input name="onTimeDeliveryPct" type="number" min="0" max="100" step="0.1" value={latestEvaluation?.onTimeDeliveryPct ?? 90} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Lead time reliability</span>
+					<input name="leadTimeReliabilityScore" type="number" min="0" max="100" step="0.1" value={latestEvaluation?.leadTimeReliabilityScore ?? 80} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Price competitiveness</span>
+					<input name="priceCompetitivenessScore" type="number" min="0" max="100" step="0.1" value={latestEvaluation?.priceCompetitivenessScore ?? 80} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Payment terms</span>
+					<input name="paymentTermsScore" type="number" min="0" max="100" step="0.1" value={latestEvaluation?.paymentTermsScore ?? 80} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Responsiveness</span>
+					<input name="responsivenessScore" type="number" min="0" max="100" step="0.1" value={latestEvaluation?.responsivenessScore ?? 80} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">After-sales support</span>
+					<input name="afterSalesSupportScore" type="number" min="0" max="100" step="0.1" value={latestEvaluation?.afterSalesSupportScore ?? 80} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">ISO / HACCP certificates</span>
+					<input name="certificationScore" type="number" min="0" max="100" step="0.1" value={latestEvaluation?.certificationScore ?? 80} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Credit check</span>
+					<input name="creditCheckScore" type="number" min="0" max="100" step="0.1" value={latestEvaluation?.creditCheckScore ?? 80} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs md:col-span-2">
+					<span class="text-slate-600">Environmental compliance</span>
+					<input name="environmentalComplianceScore" type="number" min="0" max="100" step="0.1" value={latestEvaluation?.environmentalComplianceScore ?? 80} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+			</div>
+
+			<div class="mt-4 grid gap-3 md:grid-cols-7">
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Quality wgt</span>
+					<input name="qualityWeight" type="number" min="0" step="0.1" value={latestEvaluation?.qualityWeight ?? 20} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Delivery wgt</span>
+					<input name="deliveryWeight" type="number" min="0" step="0.1" value={latestEvaluation?.deliveryWeight ?? 20} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Price wgt</span>
+					<input name="priceWeight" type="number" min="0" step="0.1" value={latestEvaluation?.priceWeight ?? 15} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Service wgt</span>
+					<input name="serviceWeight" type="number" min="0" step="0.1" value={latestEvaluation?.serviceWeight ?? 15} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Compliance wgt</span>
+					<input name="complianceWeight" type="number" min="0" step="0.1" value={latestEvaluation?.complianceWeight ?? 15} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Finance wgt</span>
+					<input name="financialStabilityWeight" type="number" min="0" step="0.1" value={latestEvaluation?.financialStabilityWeight ?? 10} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Sustain wgt</span>
+					<input name="sustainabilityWeight" type="number" min="0" step="0.1" value={latestEvaluation?.sustainabilityWeight ?? 5} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+			</div>
+
+			<div class="mt-4 grid gap-3 md:grid-cols-3">
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Gold threshold</span>
+					<input name="goldThreshold" type="number" min="0" max="100" step="0.1" value={latestEvaluation?.goldThreshold ?? 85} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Silver threshold</span>
+					<input name="silverThreshold" type="number" min="0" max="100" step="0.1" value={latestEvaluation?.silverThreshold ?? 70} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-xs">
+					<span class="text-slate-600">Bronze threshold</span>
+					<input name="bronzeThreshold" type="number" min="0" max="100" step="0.1" value={latestEvaluation?.bronzeThreshold ?? 55} class="w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--sf-green)]" />
+				</label>
+				<label class="space-y-1 text-sm md:col-span-3">
+					<span class="text-slate-700">Evaluation notes</span>
+					<textarea name="evaluationNotes" rows="2" class="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--sf-green)]"></textarea>
+				</label>
+			</div>
+		</form>
+	</section>
 
 	<form class="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm" method="POST" action="?/update">
 		{#if form?.message}
