@@ -91,7 +91,7 @@
 		return payload.data.text;
 	}
 
-	async function extractRawText(file: File): Promise<string> {
+	async function extractRawText(file: File): Promise<{ rawText: string; processed?: File }> {
 		const mime = file.type.toLowerCase();
 		const name = file.name.toLowerCase();
 		const isPdf = mime === 'application/pdf' || name.endsWith('.pdf');
@@ -100,22 +100,24 @@
 
 		if (isImage) {
 			const processed = await preprocessImageForOcr(file);
-			return await runWorkersVision(processed, processed.name);
+			const rawText = await runWorkersVision(processed, processed.name);
+			return { rawText, processed };
 		}
 		if (isPdf) {
 			const text = await extractPdfText(file);
-			if (text.trim().length >= 48) return text;
+			if (text.trim().length >= 48) return { rawText: text };
 			// Scanned PDF fallback: rasterize first page + vision OCR
 			const jpeg = await renderPdfFirstPageJpeg(file);
 			if (jpeg) {
 				const base = name.replace(/\.pdf$/i, '') || 'document';
 				const processed = await preprocessImageForOcr(jpeg);
-				return await runWorkersVision(processed, `${base}-p1.jpg`);
+				const rawText = await runWorkersVision(processed, `${base}-p1.jpg`);
+				return { rawText, processed };
 			}
-			return text;
+			return { rawText: text };
 		}
 		// Fallback: let server try as PDF (best-effort)
-		return '';
+		return { rawText: '' };
 	}
 
 	// ---------------------------------------------------------------------------
@@ -167,16 +169,24 @@
 
 		try {
 			// Extract text + upload in parallel
-			const [rawText, uploadResult] = await Promise.all([
-				extractRawText(file).catch(() => ''),
+			const [extract, uploadResult] = await Promise.all([
+				extractRawText(file).catch(() => ({ rawText: '' as string, processed: undefined as File | undefined })),
 				uploadToR2(file)
 			]);
+
+			// Expose the preprocessed image via blob URL so the FilePreview can
+			// offer an "Original / Processed" toggle for visual QA. The URL is
+			// retained for the page lifetime (auto-revoked on unload).
+			const processedImageUrl = extract.processed
+				? URL.createObjectURL(extract.processed)
+				: undefined;
 
 			panel.patchState({
 				fileKey: uploadResult.key,
 				fileName: file.name,
 				fileType: file.type || 'application/octet-stream',
-				rawText
+				rawText: extract.rawText,
+				processedImageUrl
 			});
 
 			// Step 2 will kick off the classify call immediately on mount.
