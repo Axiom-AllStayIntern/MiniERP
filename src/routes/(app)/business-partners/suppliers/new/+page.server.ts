@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 
-import { createBusinessPartnerApi } from '$modules/business-partner';
+import { createProcurementApi } from '$modules/procurement';
 import { createModuleContext } from '$platform/modules';
 
 export const actions: Actions = {
@@ -37,8 +37,8 @@ export const actions: Actions = {
 		}
 
 		const ctx = await createModuleContext(event);
-		const bp = createBusinessPartnerApi(ctx);
-		await bp.createSupplier({
+		const procurement = createProcurementApi(ctx);
+		await procurement.createSupplier({
 			name,
 			address: address || undefined,
 			contact: contact || undefined,
@@ -49,7 +49,7 @@ export const actions: Actions = {
 			contacts
 		});
 
-		throw redirect(303, '/business-partners/suppliers');
+		throw redirect(303, '/procurement/suppliers');
 	}
 };
 

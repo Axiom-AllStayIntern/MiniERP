@@ -5,7 +5,7 @@
 	import WorkflowPanel from '$app-layer/ai-panel/components/workflow-panel/WorkflowPanel.svelte';
 	import PanelTrigger from '$app-layer/ai-panel/components/workflow-panel/PanelTrigger.svelte';
 
-	type Primary = 'finance' | 'project' | 'hr' | 'business-partner' | 'settings';
+	type Primary = 'finance' | 'project' | 'hr' | 'procurement' | 'sales-crm' | 'settings';
 
 	type SideLink = {
 		href: string;
@@ -29,7 +29,8 @@
 		{ id: 'finance', href: '/finance/dashboard', label: 'Finance', moduleId: 'finance' },
 		{ id: 'project', href: '/projects', label: 'Project', moduleId: 'project' },
 		{ id: 'hr', href: '/hr/employees', label: 'HR', moduleId: 'hr' },
-		{ id: 'business-partner', href: '/business-partners/customers', label: 'Business Partner', moduleId: 'business-partner' },
+		{ id: 'procurement', href: '/procurement/suppliers', label: 'Procurement', moduleId: 'procurement' },
+		{ id: 'sales-crm', href: '/sales-crm/customers', label: 'Sales CRM', moduleId: 'sales-crm' },
 		{ id: 'settings', href: '/settings', label: 'Setting', moduleId: 'core' }
 	];
 
@@ -92,13 +93,17 @@
 		}
 	];
 
-	const businessPartnerGroups: SideGroup[] = [
+	const procurementGroups: SideGroup[] = [
 		{
-			title: 'Partners',
-			items: [
-				{ href: '/business-partners/customers', label: 'Customers', moduleId: 'business-partner', icon: 'B' },
-				{ href: '/business-partners/suppliers', label: 'Suppliers', moduleId: 'business-partner', icon: 'B' }
-			]
+			title: 'Suppliers',
+			items: [{ href: '/procurement/suppliers', label: 'Suppliers', moduleId: 'procurement', icon: 'S' }]
+		}
+	];
+
+	const salesCrmGroups: SideGroup[] = [
+		{
+			title: 'Customers',
+			items: [{ href: '/sales-crm/customers', label: 'Customers', moduleId: 'sales-crm', icon: 'C' }]
 		}
 	];
 
@@ -160,8 +165,8 @@
 	// Determine which primary section the route belongs to
 	const primaryFromPath = $derived.by((): Primary => {
 		if (path.startsWith('/settings')) return 'settings';
-		if (path.startsWith('/business-partners/customers')) return 'business-partner';
-		if (path.startsWith('/business-partners/suppliers')) return 'business-partner';
+		if (path.startsWith('/procurement') || path.startsWith('/business-partners/suppliers')) return 'procurement';
+		if (path.startsWith('/sales-crm') || path.startsWith('/business-partners/customers')) return 'sales-crm';
 		// Project: list and detail routes
 		if (path === '/projects' || path.startsWith('/projects/')) return 'project';
 		// HR: employee master data (same employee module as in-project Team & Cost)
@@ -174,7 +179,8 @@
 	const shellSidebarGroups = $derived.by((): SideGroup[] => {
 		if (primaryFromPath === 'project') return projectListGroups;
 		if (primaryFromPath === 'hr') return hrGroups;
-		if (primaryFromPath === 'business-partner') return businessPartnerGroups;
+		if (primaryFromPath === 'procurement') return procurementGroups;
+		if (primaryFromPath === 'sales-crm') return salesCrmGroups;
 		if (primaryFromPath === 'settings') return settingsGroups;
 		return financeGroups;
 	});
@@ -228,12 +234,12 @@
 		if (itemPath === '/hr/employees') {
 			return path === '/hr/employees';
 		}
-		// Business Partners
-		if (itemPath === '/business-partners/customers') {
-			return path.startsWith('/business-partners/customers');
+		// Procurement / Sales CRM
+		if (itemPath === '/procurement/suppliers') {
+			return path.startsWith('/procurement/suppliers') || path.startsWith('/business-partners/suppliers');
 		}
-		if (itemPath === '/business-partners/suppliers') {
-			return path.startsWith('/business-partners/suppliers');
+		if (itemPath === '/sales-crm/customers') {
+			return path.startsWith('/sales-crm/customers') || path.startsWith('/business-partners/customers');
 		}
 		// Settings
 		if (itemPath === '/settings') {

@@ -14,7 +14,7 @@
 </script>
 
 <PageShell
-	eyebrow="Business partners"
+	eyebrow="Procurement"
 	title="New supplier"
 	description="Creates a supplier record for purchase orders, incoming invoices, and vendor-facing documents."
 >
@@ -154,7 +154,7 @@
 			<button class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]" type="submit">
 				Save supplier
 			</button>
-			<a class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/business-partners/suppliers">
+			<a class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/procurement/suppliers">
 				Back to list
 			</a>
 		</div>

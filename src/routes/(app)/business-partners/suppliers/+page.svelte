@@ -8,14 +8,14 @@
 </script>
 
 <PageShell
-	eyebrow="Business partners"
+	eyebrow="Procurement"
 	title="Suppliers"
 	description="Vendor and supplier master data used on purchase orders, supplier invoices, and AP-related documents."
 >
 	<div class="mb-4 flex flex-wrap items-center gap-3">
 		<a
 			class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]"
-			href="/business-partners/suppliers/new"
+			href="/procurement/suppliers/new"
 		>
 			New supplier
 		</a>
@@ -53,7 +53,7 @@
 			<button class="rounded-md bg-[var(--sf-green)] px-3 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]" type="submit">
 				Apply filters
 			</button>
-			<a class="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/business-partners/suppliers">
+			<a class="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/procurement/suppliers">
 				Reset
 			</a>
 		</div>
@@ -78,7 +78,7 @@
 					<tr>
 						<td colspan="8" class="px-4 py-8 text-center text-slate-500">
 							No suppliers yet.
-							<a class="font-medium text-[var(--sf-green)] hover:underline" href="/business-partners/suppliers/new">Add your first supplier</a>
+							<a class="font-medium text-[var(--sf-green)] hover:underline" href="/procurement/suppliers/new">Add your first supplier</a>
 							or open
 							<a class="font-medium text-[var(--sf-green)] hover:underline" href="/finance/expenses">supplier invoice expenses</a>.
 						</td>
@@ -120,7 +120,7 @@
 						{:else}
 							<tr class="hover:bg-slate-50/80">
 								<td class="px-4 py-3 font-medium text-slate-900">
-									<a class="hover:text-[var(--sf-green)] hover:underline" href={`/business-partners/suppliers/${s.id}`}>{s.name}</a>
+									<a class="hover:text-[var(--sf-green)] hover:underline" href={`/procurement/suppliers/${s.id}`}>{s.name}</a>
 								</td>
 								<td class="px-4 py-3 text-slate-600">{s.contact ?? '-'}</td>
 								<td class="px-4 py-3 text-slate-600">{s.itemDescription ?? '-'}</td>

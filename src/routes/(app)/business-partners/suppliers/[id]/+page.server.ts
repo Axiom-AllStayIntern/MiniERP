@@ -1,14 +1,14 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-import { createBusinessPartnerApi } from '$modules/business-partner';
+import { createProcurementApi } from '$modules/procurement';
 import { createModuleContext } from '$platform/modules';
 
 export const load: PageServerLoad = async (event) => {
 	if (!event.platform) throw error(500, 'Cloudflare platform bindings are required');
 	const ctx = await createModuleContext(event);
-	const bp = createBusinessPartnerApi(ctx);
-	const detail = await bp.getSupplierDetail(event.params.id);
+	const procurement = createProcurementApi(ctx);
+	const detail = await procurement.getSupplierDetail(event.params.id);
 	if (!detail?.supplier) throw error(404, 'Supplier not found');
 	return {
 		supplier: detail.supplier,
@@ -41,8 +41,8 @@ export const actions: Actions = {
 			}))
 			.filter((c) => c.name);
 		const ctx = await createModuleContext(event);
-		const bp = createBusinessPartnerApi(ctx);
-		await bp.updateSupplierWithContacts(event.params.id, {
+		const procurement = createProcurementApi(ctx);
+		await procurement.updateSupplierWithContacts(event.params.id, {
 			name,
 			address: address || undefined,
 			contact: contact || undefined,
@@ -52,7 +52,7 @@ export const actions: Actions = {
 			gstRegNo: gstRegNo || undefined,
 			contacts
 		});
-		throw redirect(303, `/business-partners/suppliers/${event.params.id}`);
+		throw redirect(303, `/procurement/suppliers/${event.params.id}`);
 	}
 };
 

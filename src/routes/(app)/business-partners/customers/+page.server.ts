@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 
 import { createModuleContext } from '$platform/modules';
-import { createBusinessPartnerApi } from '$modules/business-partner';
+import { createSalesCrmApi } from '$modules/sales-crm';
 import { fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async (event) => {
@@ -10,8 +10,8 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const ctx = await createModuleContext(event);
-	const businessPartner = createBusinessPartnerApi(ctx);
-	return { customers: await businessPartner.listCustomerDirectory() };
+	const salesCrm = createSalesCrmApi(ctx);
+	return { customers: await salesCrm.listCustomerDirectory() };
 };
 
 export const actions: Actions = {
@@ -21,8 +21,8 @@ export const actions: Actions = {
 		const id = data.get('id');
 		if (!id || typeof id !== 'string') return fail(400, { error: 'Missing id' });
 		const ctx = await createModuleContext(event);
-		const bp = createBusinessPartnerApi(ctx);
-		await bp.deleteById(id);
+		const salesCrm = createSalesCrmApi(ctx);
+		await salesCrm.deleteCustomer(id);
 		return { success: true };
 	}
 };

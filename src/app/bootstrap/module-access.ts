@@ -9,10 +9,8 @@ import {
 import type { AuthRole } from '$platform/auth/config';
 import { canRolesAccessModule } from '$platform/auth/permissions';
 
-// Wave 3.4 + 3.5 terminal mappings — only the 5 v4 target business modules + core.
-// Routes are consolidated under /<module>/<sub> so each business domain owns a
-// single top-level prefix. Order matters: moduleForPath() is first-match-wins,
-// so longer / more specific prefixes must come before shorter ones.
+// Order matters: moduleForPath() is first-match-wins, so longer / more specific
+// prefixes must come before shorter ones.
 const MODULE_PATH_MAPPINGS: ModulePathMapping[] = [
 	// Document Intake — file uploads, OCR, artifact lifecycle.
 	{ prefix: '/api/documents', moduleId: 'document-intake' },
@@ -29,7 +27,15 @@ const MODULE_PATH_MAPPINGS: ModulePathMapping[] = [
 	{ prefix: '/api/projects', moduleId: 'project' },
 	{ prefix: '/projects', moduleId: 'project' },
 
-	// Business Partner — customers, suppliers, contacts.
+	// Procurement — suppliers, vendor contacts, purchase-side master data.
+	{ prefix: '/api/procurement', moduleId: 'procurement' },
+	{ prefix: '/procurement', moduleId: 'procurement' },
+
+	// Sales CRM — customers and customer-facing master data.
+	{ prefix: '/api/sales-crm', moduleId: 'sales-crm' },
+	{ prefix: '/sales-crm', moduleId: 'sales-crm' },
+
+	// Legacy Business Partner — compatibility routes over shared counterparty data.
 	{ prefix: '/api/business-partners', moduleId: 'business-partner' },
 	{ prefix: '/business-partners', moduleId: 'business-partner' },
 

@@ -1,14 +1,14 @@
 import type { RequestHandler } from './$types';
 
 import { createModuleContext } from '$platform/modules';
-import { createBusinessPartnerApi } from '$modules/business-partner';
+import { createProcurementApi } from '$modules/procurement';
 import { fail, ok } from '$platform/http';
 
 export const GET: RequestHandler = async (event) => {
 	try {
 		const ctx = await createModuleContext(event);
-		const bp = createBusinessPartnerApi(ctx);
-		const suppliers = await bp.listSuppliers();
+		const procurement = createProcurementApi(ctx);
+		const suppliers = await procurement.listSuppliers();
 		return ok(suppliers);
 	} catch (e) {
 		return fail((e as Error).message, 500);
@@ -18,7 +18,7 @@ export const GET: RequestHandler = async (event) => {
 export const POST: RequestHandler = async (event) => {
 	try {
 		const ctx = await createModuleContext(event);
-		const bp = createBusinessPartnerApi(ctx);
+		const procurement = createProcurementApi(ctx);
 
 		const body = (await event.request.json()) as {
 			name?: string;
@@ -41,7 +41,7 @@ export const POST: RequestHandler = async (event) => {
 			return fail('Missing required field: name');
 		}
 
-		const result = await bp.createSupplier({
+		const result = await procurement.createSupplier({
 			name: body.name,
 			address: body.address,
 			contact: body.contact,

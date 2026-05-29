@@ -1,6 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 
-import { createBusinessPartnerApi } from '$modules/business-partner';
+import { createProcurementApi } from '$modules/procurement';
 import { createModuleContext } from '$platform/modules';
 import { fail } from '@sveltejs/kit';
 
@@ -32,9 +32,9 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const ctx = await createModuleContext(event);
-	const bp = createBusinessPartnerApi(ctx);
-	const rows = await bp.listSuppliers();
-	const contacts = await bp.listPartnerContacts(rows.map((r) => r.id));
+	const procurement = createProcurementApi(ctx);
+	const rows = await procurement.listSuppliers();
+	const contacts = await procurement.listPartnerContacts(rows.map((r) => r.id));
 	const byPartnerId = new Map<string, typeof contacts>();
 	for (const c of contacts) {
 		const list = byPartnerId.get(c.partnerId) ?? [];
@@ -97,8 +97,8 @@ export const actions: Actions = {
 		const id = data.get('id');
 		if (!id || typeof id !== 'string') return fail(400, { error: 'Missing id' });
 		const ctx = await createModuleContext(event);
-		const bp = createBusinessPartnerApi(ctx);
-		await bp.deleteById(id);
+		const procurement = createProcurementApi(ctx);
+		await procurement.deleteSupplier(id);
 		return { success: true };
 	}
 };

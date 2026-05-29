@@ -5,7 +5,7 @@
 </script>
 
 <PageShell
-	eyebrow="Business partners"
+	eyebrow="Sales & CRM"
 	title="New customer"
 	description="Creates a customer record for project assignment and customer-facing AR documents (invoices, quotations)."
 >
@@ -58,7 +58,7 @@
 			<button class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]" type="submit">
 				Save customer
 			</button>
-			<a class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/business-partners/customers">
+			<a class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/sales-crm/customers">
 				Back to list
 			</a>
 		</div>

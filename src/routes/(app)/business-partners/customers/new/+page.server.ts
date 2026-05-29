@@ -2,7 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 
 import { createModuleContext } from '$platform/modules';
-import { createBusinessPartnerApi } from '$modules/business-partner';
+import { createSalesCrmApi } from '$modules/sales-crm';
 
 export const actions: Actions = {
 	default: async (event) => {
@@ -21,8 +21,8 @@ export const actions: Actions = {
 		}
 
 		const ctx = await createModuleContext(event);
-		const businessPartner = createBusinessPartnerApi(ctx);
-		await businessPartner.createCustomer({
+		const salesCrm = createSalesCrmApi(ctx);
+		await salesCrm.createCustomer({
 			name,
 			address: address || undefined,
 			contact: contact || undefined,
@@ -30,7 +30,7 @@ export const actions: Actions = {
 			metadata: undefined
 		});
 
-		throw redirect(303, '/business-partners/customers');
+		throw redirect(303, '/sales-crm/customers');
 	}
 };
 

@@ -41,12 +41,12 @@
 </script>
 
 <PageShell
-	eyebrow="Business partners"
+	eyebrow="Procurement"
 	title={`Supplier: ${data.supplier.name}`}
 	description="Supplier master profile with contacts (supply chain initial data entry)."
 >
 	<div class="mb-4 flex gap-2">
-		<a class="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/business-partners/suppliers">
+		<a class="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/procurement/suppliers">
 			Back to suppliers
 		</a>
 	</div>
@@ -129,7 +129,7 @@
 			<button class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]" type="submit">
 				Save changes
 			</button>
-			<a class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/business-partners/suppliers">
+			<a class="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" href="/procurement/suppliers">
 				Cancel
 			</a>
 		</div>

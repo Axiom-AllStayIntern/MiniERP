@@ -8,14 +8,14 @@
 </script>
 
 <PageShell
-	eyebrow="Business partners"
+	eyebrow="Sales & CRM"
 	title="Customers"
-	description="Customers are required before you create a project. Add billing party details used on AR documents."
+	description="Customer master data for projects, quotations, and customer-facing AR documents."
 >
 	<div class="mb-4 flex flex-wrap items-center gap-3">
 		<a
 			class="rounded-md bg-[var(--sf-green)] px-4 py-2 text-sm font-medium text-white hover:bg-[#2f5e2c]"
-			href="/business-partners/customers/new"
+			href="/sales-crm/customers/new"
 		>
 			New customer
 		</a>
@@ -39,7 +39,7 @@
 					<tr>
 						<td colspan="4" class="px-4 py-8 text-center text-slate-500">
 							No customers yet.
-							<a class="font-medium text-[var(--sf-green)] hover:underline" href="/business-partners/customers/new">Add your first customer</a>
+							<a class="font-medium text-[var(--sf-green)] hover:underline" href="/sales-crm/customers/new">Add your first customer</a>
 							then create a project.
 						</td>
 					</tr>
