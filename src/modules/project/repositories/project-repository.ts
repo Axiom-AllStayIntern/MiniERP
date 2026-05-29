@@ -1,7 +1,7 @@
 import { eq, isNull, and, like, or, desc, sql } from 'drizzle-orm';
 import type { DBClient } from '$infrastructure/db';
 import { projects, projectEmployees } from './project.schema';
-import { businessPartners } from '$modules/business-partner/repositories/business-partner.schema';
+import { businessPartners } from '$modules/sales-crm/repositories/customer.schema';
 import { BaseRepository } from '$platform/modules/base-repository';
 
 // ---------------------------------------------------------------------------

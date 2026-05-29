@@ -53,15 +53,15 @@
 	{#if data.customers.length === 0}
 		<div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
 			There are no customers yet.{' '}
-			<a class="font-medium text-[var(--sf-green)] underline" href="/business-partners/customers/new">Add a customer</a>
+			<a class="font-medium text-[var(--sf-green)] underline" href="/sales-crm/customers/new">Add a customer</a>
 			first, then return here to create a project.
 		</div>
 	{:else}
 		<p class="mb-4 text-sm text-slate-600">
 			Need another billing party?
-			<a class="font-medium text-[var(--sf-green)] hover:underline" href="/business-partners/customers/new">New customer</a>
+			<a class="font-medium text-[var(--sf-green)] hover:underline" href="/sales-crm/customers/new">New customer</a>
 			·
-			<a class="font-medium text-slate-600 hover:underline" href="/business-partners/customers">All customers</a>
+			<a class="font-medium text-slate-600 hover:underline" href="/sales-crm/customers">All customers</a>
 		</p>
 	{/if}
 	<form class="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm" method="POST">
